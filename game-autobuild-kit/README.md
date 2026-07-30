@@ -13,9 +13,9 @@ GLASSBOX governance package v3.0.0 (`../governance/`).
 | **P2** | Static compilation engine (LogicStamp: DSL → zero-drift JSON contract + hash; dynamic constructs barred) | ✅ **Built & verified** (8/8 invariants) |
 | **P5** | Evolutionary engine (islands, MWUA, crossover + LLM-channel mutation, ERC, migration, stopping; verifier-gated) | ✅ **Built & verified** (9/9; deterministic, no keys) |
 | **P6** | Consensus & Merkle engine (root fingerprinting, inclusion proofs, path-traversal divergence localization, BFT N≥3f+1, CP halting) | ✅ **Built & verified** (11/11) |
-| P7 | Durable orchestration (Mastra TS) | ⬜ Unlocked — needs live `@mastra/core` API verified first |
+| **P7** | Durable orchestration — checkpoint/rollback/replay, Merkle-fingerprinted, `CheckpointStore` interface (File default; SQLite/Postgres/Mastra as adapters) | ✅ **Built & verified** (12/12) |
 
-**Verify:** `npm install && npm run verify` — runs all five suites: compilation (8) + safety (9) + determinism (5) + evolution (9) + consensus (11) = **42 invariants, all exit 0**.
+**All seven phases are built.** `npm install && npm run verify` runs all six suites: compilation (8) + safety (9) + determinism (5) + evolution (9) + consensus (11) + durable (12) = **54 invariants, all exit 0**.
 
 **API keys:** none are needed for P1–P4 or the verified P5 run (deterministic mock operator). Keys matter only for a **live** LLM mutation run in the offline Research Domain, routed by `02_CONTROLLER/modelRouter.ts` (`ANTHROPIC_API_KEY` / `COHERE_API_KEY` / `GROQ_API_KEY` / `GEMINI_API_KEY`). `RealLlmRewrite` refuses to run without its key, so nothing calls a provider by accident.
 
@@ -30,18 +30,19 @@ the conditions in `00_GOVERNANCE/NUCLEUS.md` §4 are met (D2 ratify · D3 elect 
 D6 params · G3 sign). Every architectural claim the later phases will implement is already grounded
 in admissible sources: `../governance/SourceMatrix.md`.
 
-## Layout (current)
+## Layout
 
 ```
 game-autobuild-kit/
-├── CLAUDE_CODE_ENTRYPOINT.md      # operational protocol + gate check
-├── .mcp.json                      # Mastra docs MCP server config
-└── 00_GOVERNANCE/
-    ├── NUCLEUS.md                 # core rules, determinism hierarchy, unlock conditions
-    └── registers/
-        ├── ASSUMPTIONS.md  DECISIONS.md   EVIDENCE.md   LINEAGE.md
-        ├── RISKS.md        UNKNOWNS.md    CONTRADICTIONS.md  IMPLEMENTATION_BLOCKERS.md
+├── CLAUDE_CODE_ENTRYPOINT.md   package.json   tsconfig.json   .mcp.json
+├── 00_GOVERNANCE/  NUCLEUS.md + registers/ (8 registers)
+├── 01_RESEARCH/    DSL_GRAMMAR.bnf · RESEARCH_PROTOCOL.md · seed-corpus.placeholder.json
+│                   rulePool.ts · llmOperator.ts · evolution.ts · verify-evolution.ts
+└── 02_CONTROLLER/  dslParser.ts · logicStamp.ts · verifier.ts · prng.ts · scheduler.ts
+                    merkle.ts · consensus.ts · durable.ts · modelRouter.ts · verify-*.ts
 ```
 
-Modules `01_RESEARCH/`, `02_CONTROLLER/`, `03_ASSET_PIPELINE/`, `04_EDI/`, `05_CREDIT_ROUTING/`
-are created when their phase unlocks.
+Modules `03_ASSET_PIPELINE/`, `04_EDI/`, `05_CREDIT_ROUTING/` from the blueprint are
+thin/deferred (asset rendering, boundary serialization, cost policy) and can be added on
+request; the core seven-phase pipeline (parse → verify → normalize → evolve → consense →
+persist) is complete and verified.

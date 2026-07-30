@@ -14,7 +14,9 @@ Simulation logs, test metrics, verification proofs for the kit. Authoritative Ev
 
 | KIT-EVT-007 | Validation | **Consensus & Merkle (P6) proof** — `02_CONTROLLER/verify-consensus.ts`. Root fingerprinting (same state→same root; one-leaf change→new root); inclusion proofs verify & tampering fails; **path traversal isolates the exact divergent leaf**; BFT N=4,f=1 isolates the Byzantine replica and proceeds on the majority root; CP-halt when faulty>f; N<3f+1 rejected as misconfigured. | **11/11 invariants PASS (exit 0)** | RECORDED |
 
-**Full suite:** compilation (8) + safety (9) + determinism (5) + evolution (9) + consensus (11) = **42/42 PASS**.
+| KIT-EVT-008 | Validation | **Durable orchestration (P7) proof** — `02_CONTROLLER/verify-durable.ts`. Checkpoints every step; after an injected fault, **resumes from the last checkpoint without re-running completed steps** and reaches the clean-run state; durability survives a fresh store instance; each checkpoint's Merkle root matches its state; replay reproduces checkpoints (transient), corrupted replay flagged as deterministic drift → safety halt. | **12/12 invariants PASS (exit 0)** | RECORDED |
+
+**Full suite (all 7 phases):** compilation (8) + safety (9) + determinism (5) + evolution (9) + consensus (11) + durable (12) = **54/54 PASS**.
 
 ## KIT-EVT-006 detail — best evolved program (fitness 1.00, gen 2), verifier-sound
 ```
