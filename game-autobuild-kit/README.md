@@ -9,7 +9,7 @@ GLASSBOX governance package v3.0.0 (`../governance/`).
 |-------|-------|--------|
 | **P1** | Governance foundation (`00_GOVERNANCE/`, `CLAUDE_CODE_ENTRYPOINT.md`, `.mcp.json`) | ✅ **Built** |
 | **P3** | Deterministic core: seedable PRNG + cooperative scheduler + record/replay entropy | ✅ **Built & verified** (5/5 invariants) |
-| **P4** | DSL grammar (`01_RESEARCH/DSL_GRAMMAR.bnf`) + research protocol + placeholder `\|S₀\|` | ✅ **Substrate built** (ω-automata verifier pending) |
+| **P4** | DSL grammar + research protocol + placeholder `\|S₀\|` + **verifier** (CETI reachability reduction: safety/liveness gate) | ✅ **Built & verified** (9/9 invariants) |
 | **P2** | Static compilation engine (LogicStamp: DSL → zero-drift JSON contract + hash; dynamic constructs barred) | ✅ **Built & verified** (8/8 invariants) |
 | P5 | Evolutionary engine (islands, MWUA) | ⬜ Unlocked — runs at C(σ)≥0.98, placeholder corpus |
 | P6 | Consensus & Merkle engine | ⬜ Unlocked |

@@ -8,6 +8,9 @@ Simulation logs, test metrics, verification proofs for the kit. Authoritative Ev
 | KIT-EVT-002 | Validation | Gate G3 authorized; P2–P7 unlocked (`../../../governance/DEC-2026-07-027…`). | — | RECORDED |
 | KIT-EVT-003 | Validation | **Determinism proof** — `02_CONTROLLER/verify-determinism.ts` (seed 2654435769). Record→replay identical trace; single-item optimization 13 draws < 14 selection points; truncated-log divergence detected; different seed → different schedule. | **5/5 invariants PASS (exit 0)** | RECORDED |
 | KIT-EVT-004 | Validation | **Compilation (LogicStamp) proof** — `02_CONTROLLER/verify-compilation.ts`. Zero-drift: environment noise + flipped commutative operands → byte-identical contract `sha256:a126962ac4c583f6…`; eval/import()/template-literal barred; non-whitelisted predicate & malformed rejected. | **8/8 invariants PASS (exit 0)** | RECORDED |
+| KIT-EVT-005 | Validation | **Verification (P4) proof** — `02_CONTROLLER/verify-safety.ts` (CETI reachability reduction). Well-formed→SOUND; bad location/out-of-range card/empty bracket→UNSOUND; over-deep antecedent (depth 12)→UNSOUND; degenerate→LIVENESS fail; **error behind unsatisfiable guard→SOUND (unreachable)**. | **9/9 invariants PASS (exit 0)** | RECORDED |
+
+**Full suite:** `verify:compilation` (8) + `verify:safety` (9) + `verify:determinism` (5) = **22/22 PASS**.
 
 ## KIT-EVT-003 detail — Layer-2/3 determinism, operationally verified
 ```
