@@ -1,0 +1,31 @@
+{
+  "$schema": "internal://glassbox/seed-corpus/v1",
+  "corpusId": "S0-placeholder-2026-07-30",
+  "status": "PLACEHOLDER",
+  "authority": "Tier 1 elected D4 = relax + placeholder (DEC-2026-07-027)",
+  "consistencyThreshold": 0.98,
+  "note": "Placeholder |S0|. VALIDATION_CONSISTENCY_THRESHOLD re-bound 1.00 -> 0.98, tolerating a single flaky seed. Replace with the authoritative human-verified corpus before G5 (Final Acceptance). Each seed is a (state -> expected human decision) pair the evolved policy must reproduce.",
+  "versioning": "content-hashed; each revision appends to LINEAGE.md",
+  "ownership": "Human Project Owner (Tier 1)",
+  "acceptanceCriteria": "C(sigma) = mean seed agreement >= 0.98 across the corpus at Gate G4",
+  "seeds": [
+    {
+      "id": "seed-001",
+      "state": { "hand": [12, 25, 31, 40, 55], "top": { "location": "DISCARD", "card": 28 } },
+      "expectedDecision": "IF isCardBetweenNumbers(TOP,25,31,2,HAND) THEN show(EQ,HAND)",
+      "verifiedBy": "PLACEHOLDER"
+    },
+    {
+      "id": "seed-002",
+      "state": { "hand": [5, 18, 22, 44, 60], "top": { "location": "DECK", "card": 0 } },
+      "expectedDecision": "DO draw()",
+      "verifiedBy": "PLACEHOLDER"
+    },
+    {
+      "id": "seed-003",
+      "state": { "hand": [10, 20, 30, 40, 50], "top": { "location": "DISCARD", "card": 15 } },
+      "expectedDecision": "IF hasRacko(HAND) THEN show(GE,HAND)",
+      "verifiedBy": "PLACEHOLDER"
+    }
+  ]
+}

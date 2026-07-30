@@ -8,12 +8,14 @@ GLASSBOX governance package v3.0.0 (`../governance/`).
 | Phase | Focus | Status |
 |-------|-------|--------|
 | **P1** | Governance foundation (`00_GOVERNANCE/`, `CLAUDE_CODE_ENTRYPOINT.md`, `.mcp.json`) | ✅ **Built** |
-| P2 | Static compilation engine (ts-morph / LogicStamp) | 🔒 Gated (G3) |
-| P3 | Deterministic scheduler | 🔒 Gated (G3) |
-| P4 | DSL & ω-automata verifier | 🔒 Gated (G3) |
-| P5 | Evolutionary engine (islands, MWUA) | 🔒 Gated (G3 + D4 seed corpus) |
-| P6 | Consensus & Merkle engine | 🔒 Gated (G3) |
-| P7 | Durable orchestration (Mastra TS) | 🔒 Gated (G3) |
+| **P3** | Deterministic core: seedable PRNG + cooperative scheduler + record/replay entropy | ✅ **Built & verified** (5/5 invariants) |
+| **P4** | DSL grammar (`01_RESEARCH/DSL_GRAMMAR.bnf`) + research protocol + placeholder `\|S₀\|` | ✅ **Substrate built** (ω-automata verifier pending) |
+| P2 | Static compilation engine (ts-morph / LogicStamp) | ⬜ Unlocked — next |
+| P5 | Evolutionary engine (islands, MWUA) | ⬜ Unlocked — runs at C(σ)≥0.98, placeholder corpus |
+| P6 | Consensus & Merkle engine | ⬜ Unlocked |
+| P7 | Durable orchestration (Mastra TS) | ⬜ Unlocked |
+
+**Verify the determinism core:** `npm run verify:determinism` (or `npx tsx 02_CONTROLLER/verify-determinism.ts`).
 
 ## Why phase-gated
 

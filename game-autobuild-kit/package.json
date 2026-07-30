@@ -1,0 +1,14 @@
+{
+  "name": "game-autobuild-kit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Governed solo-developer game/app automation kit under GLASSBOX v3.0.0",
+  "scripts": {
+    "verify:determinism": "tsx 02_CONTROLLER/verify-determinism.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

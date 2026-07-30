@@ -2,25 +2,24 @@
 
 **Kit Version:** 0.1.0 (P1 — Governance Foundation only)
 **Governing Authority:** GLASSBOX governance package v3.0.0 (see `../../governance/`)
-**Build Authorization:** Tier 1 approval recorded in `../../governance/DEC-2026-07-026_TIER1_APPROVAL.md` — **scoped to Phase 1 (P1) only**.
+**Build Authorization:** Gate G3 **APPROVED** — `../../governance/DEC-2026-07-027_G3_AUTHORIZATION.md` (Tier 1). P2–P7 unlocked; zero open Critical findings; parameters bound.
 **Author/Tier:** AI Auditor (Tier 2)
 
 ---
 
 ## 0. Read this first — what is and isn't built
 
-This kit is being constructed **phase-gated** under GLASSBOX. Only **P1 (this governance foundation)** exists.
-Phases **P2–P7 are LOCKED** and MUST NOT be generated until the conditions in §4 are met.
+Gate **G3 is APPROVED** (`../../governance/DEC-2026-07-027…`). P2–P7 are **UNLOCKED** and built incrementally, each with evidence recorded before promotion.
 
 | Phase | Module(s) | Status |
 |-------|-----------|--------|
-| P1 Governance Foundation | `00_GOVERNANCE/`, entrypoint, `.mcp.json` | **BUILT (this commit)** |
-| P2 Static Compilation (ts-morph/LogicStamp) | `02_CONTROLLER/` (partial) | **LOCKED — G3** |
-| P3 Deterministic Scheduler | `02_CONTROLLER/` | **LOCKED — G3** |
-| P4 DSL & ω-automata Verifier | `01_RESEARCH/`, `02_CONTROLLER/` | **LOCKED — G3** |
-| P5 Evolutionary Engine (islands, MWUA) | `01_RESEARCH/` | **LOCKED — hard lock (`04` research workflow) + D4** |
-| P6 Consensus & Merkle Engine | `02_CONTROLLER/`, `04_EDI/` | **LOCKED — G3** |
-| P7 Durable Orchestration | `02_CONTROLLER/`, `05_CREDIT_ROUTING/` | **LOCKED — G3** |
+| P1 Governance Foundation | `00_GOVERNANCE/`, entrypoint, `.mcp.json` | **BUILT** |
+| P2 Static Compilation (ts-morph/LogicStamp) | `02_CONTROLLER/` | **UNLOCKED — in progress** |
+| P3 Deterministic Scheduler | `02_CONTROLLER/` | **UNLOCKED — building** |
+| P4 DSL & ω-automata Verifier | `01_RESEARCH/`, `02_CONTROLLER/` | **UNLOCKED — grammar defined** |
+| P5 Evolutionary Engine (islands, MWUA) | `01_RESEARCH/` | **UNLOCKED** — runs at `VALIDATION_CONSISTENCY_THRESHOLD=0.98` with placeholder `\|S₀\|` (D4) |
+| P6 Consensus & Merkle Engine | `02_CONTROLLER/`, `04_EDI/` | **UNLOCKED** |
+| P7 Durable Orchestration | `02_CONTROLLER/`, `05_CREDIT_ROUTING/` | **UNLOCKED** |
 
 ## 1. Core rules (immutable for this kit)
 
@@ -45,16 +44,16 @@ Phases **P2–P7 are LOCKED** and MUST NOT be generated until the conditions in 
 
 Governance registers live in `registers/`. They mirror and defer to the GLASSBOX registers in `../../governance/`. The authoritative Source Matrix and Evidence Register for all cited claims are `../../governance/SourceMatrix.md` and `../../governance/EvidenceRegister.md`.
 
-## 4. Unlock conditions for P2–P7 (Tier 1)
+## 4. Unlock conditions for P2–P7 — **ALL MET (2026-07-30)**
 
-P2–P7 remain LOCKED until **all** hold and are recorded in `../../governance/`:
-1. **D2 ratified** — bibliography (`SourceMatrix.md`) accepted by Tier 1.
-2. **D3 elected** — the "42%" claim dispositioned (recommended: Option B, downgrade to qualitative).
-3. **D4 supplied** — the `|S₀|` human-verified seed corpus defined (contents, versioning, ownership, acceptance), **or** `VALIDATION_CONSISTENCY_THRESHOLD` relaxed to 0.98 with a placeholder corpus. *P5 cannot run without this.*
-4. **D6 ratified** — the 11 domain parameters (population, λ, thresholds, etc.).
-5. **G3 signed** — a Tier 1 Approval Record (`02` § Evidence Standards → Approval Record Schema, 8 fields) with zero open Critical findings.
+Recorded in `../../governance/DEC-2026-07-027_G3_AUTHORIZATION.md`:
+1. ✅ **D2 ratified** — bibliography (`SourceMatrix.md`) accepted by Tier 1.
+2. ✅ **D3 elected** — Option B: "42%" downgraded to qualitative; figure struck.
+3. ✅ **D4 handled** — `VALIDATION_CONSISTENCY_THRESHOLD` re-bound 1.00→0.98; placeholder `|S₀|` in `01_RESEARCH/`.
+4. ✅ **D6 ratified** — 11 domain parameters bound.
+5. ✅ **G3 APPROVED** — Tier 1 Approval Record, zero open Critical findings.
 
-Until then, any request to generate P2–P7 code is refused and logged to `registers/IMPLEMENTATION_BLOCKERS.md`.
+P2–P7 may now be generated. G4 (Validation Consistency, Tier 2) and G5 (Final Acceptance, Tier 1) still gate promotion of evolved candidates.
 
 ---
 
