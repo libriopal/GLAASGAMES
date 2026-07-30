@@ -10,12 +10,14 @@ GLASSBOX governance package v3.0.0 (`../governance/`).
 | **P1** | Governance foundation (`00_GOVERNANCE/`, `CLAUDE_CODE_ENTRYPOINT.md`, `.mcp.json`) | ✅ **Built** |
 | **P3** | Deterministic core: seedable PRNG + cooperative scheduler + record/replay entropy | ✅ **Built & verified** (5/5 invariants) |
 | **P4** | DSL grammar (`01_RESEARCH/DSL_GRAMMAR.bnf`) + research protocol + placeholder `\|S₀\|` | ✅ **Substrate built** (ω-automata verifier pending) |
-| P2 | Static compilation engine (ts-morph / LogicStamp) | ⬜ Unlocked — next |
+| **P2** | Static compilation engine (LogicStamp: DSL → zero-drift JSON contract + hash; dynamic constructs barred) | ✅ **Built & verified** (8/8 invariants) |
 | P5 | Evolutionary engine (islands, MWUA) | ⬜ Unlocked — runs at C(σ)≥0.98, placeholder corpus |
 | P6 | Consensus & Merkle engine | ⬜ Unlocked |
 | P7 | Durable orchestration (Mastra TS) | ⬜ Unlocked |
 
-**Verify the determinism core:** `npm run verify:determinism` (or `npx tsx 02_CONTROLLER/verify-determinism.ts`).
+**Verify:** `npm install && npm run verify` — runs P2 compilation (8 invariants) + P3 determinism (5 invariants). Both exit 0.
+
+**Note on P2 scope:** the LogicStamp engine here normalizes the **evolvable DSL** (what crosses the Research→Execution boundary) into a bit-identical contract. A `ts-morph`-based adapter for arbitrary TypeScript source is a parallel follow-on; it needs the external library and API verification before it's coded (tracked in `UNKNOWNS.md`).
 
 ## Why phase-gated
 
