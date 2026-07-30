@@ -1,0 +1,9 @@
+{
+  "$schema": "internal://glassbox/visual-pillars/v1",
+  "status": "SCAFFOLD",
+  "note": "Deterministic style contract for asset generation. Asset *rendering* is out of scope for the verified core; this pins the constraints a renderer must honor so outputs stay reproducible and on-brand.",
+  "palette": { "maxColors": 8, "mode": "placeholder — set brand values before use" },
+  "resolution": { "target": "1024x1024", "maxBytesPerAsset": 512000 },
+  "performanceBudget": { "maxAssetsPerScene": 64, "maxTotalBytes": 8388608 },
+  "determinism": "asset generation is a Research-Domain activity; only asset hashes/manifests cross the EDI boundary, never generation-time randomness"
+}

@@ -16,7 +16,9 @@ Simulation logs, test metrics, verification proofs for the kit. Authoritative Ev
 
 | KIT-EVT-008 | Validation | **Durable orchestration (P7) proof** — `02_CONTROLLER/verify-durable.ts`. Checkpoints every step; after an injected fault, **resumes from the last checkpoint without re-running completed steps** and reaches the clean-run state; durability survives a fresh store instance; each checkpoint's Merkle root matches its state; replay reproduces checkpoints (transient), corrupted replay flagged as deterministic drift → safety halt. | **12/12 invariants PASS (exit 0)** | RECORDED |
 
-**Full suite (all 7 phases):** compilation (8) + safety (9) + determinism (5) + evolution (9) + consensus (11) + durable (12) = **54/54 PASS**.
+| KIT-EVT-009 | Validation | **Thin modules proof** — `04_EDI/verify-boundary.ts`. EDI gate composes parse→verify→normalize: sound program crosses as a hashed contract; eval/unsound/malformed stopped at the boundary; env-noise → same contract hash. Budget ledger accrues spend, routes to a provider tier, and throttles overspend (runaway-loop guard). | **8/8 invariants PASS (exit 0)** | RECORDED |
+
+**Full suite (7 phases + thin modules):** compilation (8) + safety (9) + determinism (5) + evolution (9) + consensus (11) + durable (12) + boundary (8) = **62/62 PASS**.
 
 ## KIT-EVT-006 detail — best evolved program (fitness 1.00, gen 2), verifier-sound
 ```

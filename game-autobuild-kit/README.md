@@ -15,7 +15,7 @@ GLASSBOX governance package v3.0.0 (`../governance/`).
 | **P6** | Consensus & Merkle engine (root fingerprinting, inclusion proofs, path-traversal divergence localization, BFT N≥3f+1, CP halting) | ✅ **Built & verified** (11/11) |
 | **P7** | Durable orchestration — checkpoint/rollback/replay, Merkle-fingerprinted, `CheckpointStore` interface (File default; SQLite/Postgres/Mastra as adapters) | ✅ **Built & verified** (12/12) |
 
-**All seven phases are built.** `npm install && npm run verify` runs all six suites: compilation (8) + safety (9) + determinism (5) + evolution (9) + consensus (11) + durable (12) = **54 invariants, all exit 0**.
+**All seven phases + thin modules are built.** `npm install && npm run verify` runs all seven suites: compilation (8) + safety (9) + determinism (5) + evolution (9) + consensus (11) + durable (12) + boundary (8) = **62 invariants, all exit 0**.
 
 **API keys:** none are needed for P1–P4 or the verified P5 run (deterministic mock operator). Keys matter only for a **live** LLM mutation run in the offline Research Domain, routed by `02_CONTROLLER/modelRouter.ts` (`ANTHROPIC_API_KEY` / `COHERE_API_KEY` / `GROQ_API_KEY` / `GEMINI_API_KEY`). `RealLlmRewrite` refuses to run without its key, so nothing calls a provider by accident.
 
@@ -42,7 +42,7 @@ game-autobuild-kit/
                     merkle.ts · consensus.ts · durable.ts · modelRouter.ts · verify-*.ts
 ```
 
-Modules `03_ASSET_PIPELINE/`, `04_EDI/`, `05_CREDIT_ROUTING/` from the blueprint are
-thin/deferred (asset rendering, boundary serialization, cost policy) and can be added on
-request; the core seven-phase pipeline (parse → verify → normalize → evolve → consense →
-persist) is complete and verified.
+Thin blueprint modules are also present: `04_EDI/gate.ts` (boundary gate composing
+parse→verify→normalize), `05_CREDIT_ROUTING/budget.ts` (token cap / runaway-loop guard),
+`03_ASSET_PIPELINE/VISUAL_PILLARS.json` (style contract scaffold; asset *rendering* is
+out of scope for the deterministic core).

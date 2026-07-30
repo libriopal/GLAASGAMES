@@ -11,7 +11,8 @@
     "verify:evolution": "tsx 01_RESEARCH/verify-evolution.ts",
     "verify:consensus": "tsx 02_CONTROLLER/verify-consensus.ts",
     "verify:durable": "tsx 02_CONTROLLER/verify-durable.ts",
-    "verify": "npm run verify:compilation && npm run verify:safety && npm run verify:determinism && npm run verify:evolution && npm run verify:consensus && npm run verify:durable"
+    "verify:boundary": "tsx 04_EDI/verify-boundary.ts",
+    "verify": "npm run verify:compilation && npm run verify:safety && npm run verify:determinism && npm run verify:evolution && npm run verify:consensus && npm run verify:durable && npm run verify:boundary"
   },
   "devDependencies": {
     "tsx": "^4.19.0",
