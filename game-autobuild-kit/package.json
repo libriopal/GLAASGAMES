@@ -8,7 +8,8 @@
     "verify:determinism": "tsx 02_CONTROLLER/verify-determinism.ts",
     "verify:compilation": "tsx 02_CONTROLLER/verify-compilation.ts",
     "verify:safety": "tsx 02_CONTROLLER/verify-safety.ts",
-    "verify": "npm run verify:compilation && npm run verify:safety && npm run verify:determinism"
+    "verify:evolution": "tsx 01_RESEARCH/verify-evolution.ts",
+    "verify": "npm run verify:compilation && npm run verify:safety && npm run verify:determinism && npm run verify:evolution"
   },
   "devDependencies": {
     "tsx": "^4.19.0",
