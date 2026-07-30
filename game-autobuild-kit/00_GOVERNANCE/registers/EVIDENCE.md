@@ -12,7 +12,9 @@ Simulation logs, test metrics, verification proofs for the kit. Authoritative Ev
 
 | KIT-EVT-006 | Validation/Fitness | **Evolutionary engine (P5) proof** — `01_RESEARCH/verify-evolution.ts` (deterministic, NO keys). Search PROMOTED a candidate at C(σ)=1.00 in 2 generations, recovered the reference policy exactly, passed the P4 verifier; same seed→identical result; MWUA tradeoff H(λ=1.0)=2.513 > H(λ=0.05)=0.030 bits; RealLlmRewrite refuses to run without a key. | **9/9 invariants PASS (exit 0)** | RECORDED |
 
-**Full suite:** `verify:compilation` (8) + `verify:safety` (9) + `verify:determinism` (5) + `verify:evolution` (9) = **31/31 PASS**.
+| KIT-EVT-007 | Validation | **Consensus & Merkle (P6) proof** — `02_CONTROLLER/verify-consensus.ts`. Root fingerprinting (same state→same root; one-leaf change→new root); inclusion proofs verify & tampering fails; **path traversal isolates the exact divergent leaf**; BFT N=4,f=1 isolates the Byzantine replica and proceeds on the majority root; CP-halt when faulty>f; N<3f+1 rejected as misconfigured. | **11/11 invariants PASS (exit 0)** | RECORDED |
+
+**Full suite:** compilation (8) + safety (9) + determinism (5) + evolution (9) + consensus (11) = **42/42 PASS**.
 
 ## KIT-EVT-006 detail — best evolved program (fitness 1.00, gen 2), verifier-sound
 ```

@@ -12,10 +12,10 @@ GLASSBOX governance package v3.0.0 (`../governance/`).
 | **P4** | DSL grammar + research protocol + placeholder `\|S₀\|` + **verifier** (CETI reachability reduction: safety/liveness gate) | ✅ **Built & verified** (9/9 invariants) |
 | **P2** | Static compilation engine (LogicStamp: DSL → zero-drift JSON contract + hash; dynamic constructs barred) | ✅ **Built & verified** (8/8 invariants) |
 | **P5** | Evolutionary engine (islands, MWUA, crossover + LLM-channel mutation, ERC, migration, stopping; verifier-gated) | ✅ **Built & verified** (9/9; deterministic, no keys) |
-| P6 | Consensus & Merkle engine | ⬜ Unlocked |
-| P7 | Durable orchestration (Mastra TS) | ⬜ Unlocked |
+| **P6** | Consensus & Merkle engine (root fingerprinting, inclusion proofs, path-traversal divergence localization, BFT N≥3f+1, CP halting) | ✅ **Built & verified** (11/11) |
+| P7 | Durable orchestration (Mastra TS) | ⬜ Unlocked — needs live `@mastra/core` API verified first |
 
-**Verify:** `npm install && npm run verify` — runs all four suites: compilation (8) + safety (9) + determinism (5) + evolution (9) = **31 invariants, all exit 0**.
+**Verify:** `npm install && npm run verify` — runs all five suites: compilation (8) + safety (9) + determinism (5) + evolution (9) + consensus (11) = **42 invariants, all exit 0**.
 
 **API keys:** none are needed for P1–P4 or the verified P5 run (deterministic mock operator). Keys matter only for a **live** LLM mutation run in the offline Research Domain, routed by `02_CONTROLLER/modelRouter.ts` (`ANTHROPIC_API_KEY` / `COHERE_API_KEY` / `GROQ_API_KEY` / `GEMINI_API_KEY`). `RealLlmRewrite` refuses to run without its key, so nothing calls a provider by accident.
 
