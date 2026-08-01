@@ -12,6 +12,6 @@
     "lib": ["ES2022"],
     "types": ["node"]
   },
-  "include": ["families", "foundry", "corpus", "game", "00_GOVERNANCE"],
+  "include": ["families", "foundry", "corpus", "game", "core", "00_GOVERNANCE"],
   "exclude": ["game-autobuild-kit"]
 }

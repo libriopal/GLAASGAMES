@@ -111,4 +111,71 @@
 | Tier 1 decisions still required | None to continue implementation. Two **operational** (not code) items remain before any of this runs against real users: (1) run an actual W4 harvest against a live deployed build to get real contested states; (2) run an actual W5 Delphi round with 3–5 live human raters. Neither is something Tier 2 can substitute for. |
 | Out of scope (per `DEC-2026-08-001`) | Real-money payment processing, KYC/age-verification vendor integration, live deployment of the staking/economy layer — not implemented, would need separate legal/compliance authorization. |
 
+*End of Phase 1 (W1–W9) report.*
+
+---
+
+# PHASE 2 BUILD REPORT — §15 format
+
+**Source:** `design_handoff_glassbox_v6_phase2/17_PHASE2_HANDOFF_COMPLETE.md` (v6.2.0)
+**Authorization:** `DEC-2026-08-002`, Tier 1, 2026-08-01 — elections E1–E5
+**Base commit (at report time):** `9cdcffdfd09e970759ddec587003172897114d4a`
+
+## P1 — Persistence substrate + `Store`
+**Status:** COMPLETE
+**Gate:** Schema migrates clean; `branch_a_no_bots` a real DB CHECK; adapter parity green → **PASS**
+**Files:**
+`core/store/types.ts`, `core/store/sqlite.ts`, `core/store/postgres.ts`,
+`core/store/migrations/0001_init.postgres.sql`, `core/store/migrations/0001_init.sqlite.sql`,
+`core/store/verify-store.ts`,
+`00_GOVERNANCE/verify-no-secrets.ts`, `00_GOVERNANCE/verify-no-prod-credentials-local.ts`,
+`package.json` (added `pg`, `verify:store`, `verify:no-secrets`, `verify:no-prod-credentials-local`, `engines.node`),
+`tsconfig.json` (added `core` to `include`)
+**Verify:** `npm run verify` → exit 0 (165 checks: 143 Phase 1 + 16 store + 3 no-secrets + 3 no-prod-credentials-local, 0 failures). `npx tsc --noEmit` → exit 0.
+**Provenance:** modelIdentity: `claude-sonnet-5` · commitSha: (uncommitted at report time — see note below) · isStandIn: **false** on both adapters (the Postgres arm ran against a real, disposably-provisioned `postgres:16-alpine` container, migrated and exercised for real, not a fixture standing in for one)
+**Halt conditions triggered:** none of H1–H10. One thing worth recording even though it didn't halt: the ambient shell environment already carried a `DATABASE_URL` and Supabase keys (from `.env`/`setup-env.sh`) at verify time — see "Known issue" below. `verify:store` never used them; every PASS above is from the local SQLite adapter and a throwaway Docker-provisioned Postgres, never the ambient credential.
+**Tier 1 decisions required:** none to continue to P2.
+**Fixtures remaining:** 0 for P1's own scope. (Phase-wide "fixtures remaining" per §15 stays nonzero until P10 — P1 doesn't touch harvest/telemetry/rater fixtures.)
+
+**Mechanical fix applied, not a spec deviation:** §3.2's schema lists `harvest_runs` (which references `organisms(id)`) before `organisms` is defined. That ordering isn't valid forward-only SQL — Postgres rejects a `REFERENCES` to a table that doesn't exist yet. `core/store/migrations/0001_init.postgres.sql` creates `organisms` before `harvest_runs`; every column, type, and constraint is otherwise verbatim from the doc. Noted per LAW 1 ("every claim is falsifiable by a machine check that exists and runs") — this fix is what makes "schema migrates clean" true rather than aspirational.
+
+**Scoping decision:** of §14's checks tagged `core/store/`, P1 implements the ones with schema/interface support already in §3.2: `verify-store-parity`, `verify-no-vendor-leak`, `verify-branch-a-db-constraint`, `verify-branch-a-needs-opponent`, `verify-telemetry-schema-clean`, `verify-economy-columns-match`, `verify-deletion-cascade`, `verify-r1-anonymity`, `verify-rater-deletion`. `verify-cohort-disjoint` and `verify-consent-recorded` are deferred — §3.2 has no consent table or rater/playtester cohort column, and inventing one now would be schema invention ahead of the phase (P6/P11) that actually defines that data. Flagging this now rather than silently skipping it later.
+
+**⚠ Known issue outside this build's scope — needs your attention before P9, and ideally before P2:**
+The local `.env` (gitignored, never read by anything in P1's own code path except the new `verify-no-prod-credentials-local` scan) already contains `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` — apparently written by `setup-env.sh`. Two problems:
+1. `DATABASE_URL` is corrupted: several connection strings concatenated together, still containing the literal unresolved placeholder `[YOUR-PASSWORD]` mixed with what looks like a real password fragment. It doesn't parse to a usable connection.
+2. `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_ANON_KEY` look like live key values, sitting in the ambient shell environment (inherited by every process launched from this shell, not sandboxed to this repo).
+
+Nothing in this build used or logged those values — `verify:store` explicitly falls back to a disposable Docker Postgres rather than trusting `DATABASE_URL` blindly, precisely because of this. But you should fix `setup-env.sh`'s write path (it looks like it appends instead of overwriting) and confirm whether that service-role key should be rotated, before P9 (LLM adapter layer) or any phase that actually reads these values in earnest.
+
+---
+
+## P1 — AMENDMENT: admin/user database split
+
+**Status:** COMPLETE (supersedes the single-database version of P1 above)
+**Trigger:** direct Tier 1 instruction, live in conversation, 2026-08-01 — not yet a numbered entry in `11_TIER1_ELECTIONS_DECISION_RECORD.md`. Recording it here per LAW 2 (provenance); recommend folding it into that record as its own entry if you want it preserved in that format.
+**Decision:** two physically separate Supabase projects instead of one. `Glassbox_Labs/admin` (`tstwsszlkucmlozlttnn`, pre-existing) holds secrets/security data; `Glassbox_Labs/user` (`nimgivdwcslipgtgiann`, created this session, $0/month, free tier, org `libriopal's Org`) holds everything playtester/rater traffic reaches.
+**Table split:**
+- **admin:** `accounts`, `organisms`, `harvest_runs`, `gate_results`, `audit_log`, `converged_seeds`
+- **user:** `sessions`, `session_events`, `telemetry_events`, `contested_states`, `rater_judgments`
+
+**Gate:** Schema migrates clean on both physical databases; `branch_a_no_bots` a real DB CHECK; adapter parity green → **PASS**
+**Files:** `core/store/migrations/0001_init.{postgres,sqlite}.{admin,user}.sql` (replaced the single-DB migration files — nothing had been committed against the old layout, so this is a clean replacement, not a live migration), `core/store/{sqlite,postgres}.ts` (rewritten for dual connections + cross-boundary soft-FK checks + explicit cascade), `core/store/verify-store.ts` (dual-container provisioning, 26 named checks), `setup-env.sh` / `start-claude.sh` / `.env.example` (rewritten for 8 persistence variables instead of 4)
+**Verify:** `npm run verify` → exit 0 (175 checks: 143 Phase 1 + 26 store + 3 no-secrets + 3 no-prod-credentials-local). `npx tsc --noEmit` → exit 0.
+**Provenance:** modelIdentity: `claude-sonnet-5` · isStandIn: **false** — schema applied for real to both live Supabase projects via the Supabase MCP (not just the disposable Docker parity proof, which also ran clean with two containers).
+
+**Cost of the split, stated plainly (LAW 1 — every claim falsifiable):** four columns that were real `FOREIGN KEY` constraints in the single-DB design now cross a physical database boundary and cannot be expressed as SQL foreign keys at all — `sessions.account_id`, `contested_states.harvest_run_id`, `audit_log.session_id`, `converged_seeds.contested_state_id`. Each is now a plain column, existence-checked in application code at write time (`verify-*-soft-fk` checks, 4 of the 26), with cascade-on-delete for `deleteAccount` written explicitly rather than left to the database. There is no cross-database transaction between two separate Postgres instances, so that cascade is best-effort in program order, not atomic — documented in both adapters' source, not hidden.
+
+**Tool issue encountered:** `apply_migration` failed twice with "socket connection closed unexpectedly" against the admin project; `execute_sql` succeeded immediately with identical SQL. Used `execute_sql` for both projects' schema application as a result — noting this in case it recurs, since `apply_migration` is the tool meant to track migration history and `execute_sql` doesn't.
+
+**Security finding surfaced and fixed, with your explicit go-ahead:** Supabase's own advisory flagged Row Level Security disabled on all 11 new tables across both projects at creation — meaning the anon/publishable key could read or write everything, including the admin-side secrets this split exists to protect, and could read individual (non-anonymized) rater judgments directly, bypassing the §3.4 anonymity query layer entirely. Enabled RLS with zero policies on all 11 tables (confirmed via `list_tables`) — this is a deny-all posture for the anon/authenticated roles; the server's service-role key bypasses RLS and is unaffected, matching the server-mediated design already in the handoff doc.
+
+**Credential hygiene finding — action still needed from you:** the local `.env` this session found had `DATABASE_URL` *and* `GEMINI_API_KEY` corrupted (concatenated/duplicated values, one still containing the unresolved `[YOUR-PASSWORD]` placeholder) — not an isolated glitch, a systemic issue with whatever wrote that file. `.env` was regenerated: `SUPABASE_URL_ADMIN`, `SUPABASE_ANON_KEY_ADMIN`, `SUPABASE_URL_USER`, `SUPABASE_ANON_KEY_USER` are populated with values fetched directly from the live projects via the Supabase MCP and are known-correct. `DATABASE_URL_ADMIN`, `DATABASE_URL_USER`, `SUPABASE_SERVICE_ROLE_KEY_ADMIN`, `SUPABASE_SERVICE_ROLE_KEY_USER`, and all four LLM keys were left blank rather than carried forward unverified — none of these are retrievable via the Supabase MCP (by design; the DB password and service-role key aren't exposed through it). Run the rewritten `./setup-env.sh` to enter these six values (hidden input, never echoed) directly from each project's Settings > Database / Settings > API pages. Given the corruption already found, consider rotating the service-role keys and LLM keys rather than trusting whatever was in the old file, even for the ones that looked well-formed.
+
+**Halt conditions triggered:** none of H1–H10. H9 ("would commit a credential") is exactly what motivated leaving six values blank rather than guessing at them.
+**Tier 1 decisions required:** whether to formalize this split as a numbered election in `11_TIER1_ELECTIONS_DECISION_RECORD.md`.
+**Fixtures remaining:** 0 for P1's scope.
+
+---
+
 *End of V6_BUILD_REPORT.md.*
