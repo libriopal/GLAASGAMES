@@ -161,6 +161,9 @@ export function evolve(config: EvoConfig, op: MutationOperator = new MockLlmRewr
   const history: number[] = [];
   let plateau = 0;
   let generations = 0;
+  // Tracked explicitly (not read back from `history`) so generation 1 has a real
+  // baseline to compare against instead of `history[history.length - 2]` === undefined.
+  let prevBest = bestFitness;
 
   for (let gen = 1; gen <= config.maxGenerations; gen++) {
     generations = gen;
@@ -197,7 +200,8 @@ export function evolve(config: EvoConfig, op: MutationOperator = new MockLlmRewr
     }
 
     history.push(bestFitness);
-    plateau = genBest > history[history.length - 2]! ? 0 : plateau + 1;
+    plateau = genBest > prevBest ? 0 : plateau + 1;
+    prevBest = genBest;
 
     if (config.earlyStop && bestFitness >= config.promoteThreshold) break;
     if (config.earlyStop && plateau >= config.plateauWindow) break;

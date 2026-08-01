@@ -13,13 +13,17 @@
  * Run: npm run verify:durable   ·   Exit 0 = all invariants held.
  */
 
-import { rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import {
+  CheckpointCorruptError,
+  CheckpointIncompatibleError,
   DurableWorkflow,
   MemoryCheckpointStore,
   FileCheckpointStore,
   replayStep,
   stateRoot,
+  type Checkpoint,
+  type CheckpointStore,
   type Step,
   type WorkState,
 } from "./durable.ts";
@@ -89,6 +93,77 @@ ok(allReproduced, "replaying recorded entropy reproduces every checkpoint (trans
 const driftedStep: Step = { id: "s2", run: (st, rng) => { st["k2"] = (st["k2"] ?? 0) + rng.pick(100) + 1; } };
 const driftRoot = replayStep(driftedStep, cps[1]!.state, cps[2]!.entropyLog);
 ok(driftRoot !== cps[2]!.stateRoot, "a corrupted replay is detected as deterministic drift (=> safety halt)");
+
+// 6. Resume must not trust a persisted checkpoint as-is: tampered checkpoints halt, not resume.
+function throws(fn: () => void, ctor: new (...args: never[]) => Error): boolean {
+  try {
+    fn();
+    return false;
+  } catch (e) {
+    return e instanceof ctor;
+  }
+}
+
+function memWithTamperedLatest(good: Checkpoint[], tampered: Checkpoint): CheckpointStore {
+  const store = new MemoryCheckpointStore();
+  for (const cp of good) store.save(cp);
+  store.save(tampered); // becomes "latest" for its workflowId
+  return store;
+}
+
+const cleanCps: Checkpoint[] = (() => {
+  const s = new MemoryCheckpointStore();
+  new DurableWorkflow("wf-tamper", makeSteps(), s).run(SEED);
+  return s.all("wf-tamper");
+})();
+const lastGood = cleanCps[cleanCps.length - 1]!;
+
+// 6a. state mutated but stateRoot left stale => integrity check catches it (CheckpointCorruptError).
+const mutatedState = { ...lastGood.state, k4: (lastGood.state["k4"] ?? 0) + 999 };
+const tamperedRoot: Checkpoint = { ...lastGood, state: mutatedState /* stateRoot intentionally NOT recomputed */ };
+const storeA = memWithTamperedLatest(cleanCps.slice(0, -1), tamperedRoot);
+ok(
+  throws(() => new DurableWorkflow("wf-tamper", makeSteps(), storeA).run(SEED), CheckpointCorruptError),
+  "state mutated with a stale stateRoot is rejected as CheckpointCorruptError, not silently resumed",
+);
+
+// 6b. malformed index (negative / non-integer) => CheckpointCorruptError.
+const badIndexCp: Checkpoint = { ...lastGood, index: -1 };
+const storeB = memWithTamperedLatest(cleanCps.slice(0, -1), badIndexCp);
+ok(
+  throws(() => new DurableWorkflow("wf-tamper", makeSteps(), storeB).run(SEED), CheckpointCorruptError),
+  "a negative checkpoint index is rejected as CheckpointCorruptError",
+);
+
+// 6c. index out of bounds for the current step list => CheckpointIncompatibleError.
+const outOfRangeCp: Checkpoint = { ...lastGood, index: makeSteps().length + 10 };
+const storeC = memWithTamperedLatest(cleanCps.slice(0, -1), outOfRangeCp);
+ok(
+  throws(() => new DurableWorkflow("wf-tamper", makeSteps(), storeC).run(SEED), CheckpointIncompatibleError),
+  "an out-of-range checkpoint index is rejected as CheckpointIncompatibleError",
+);
+
+// 6d. stepId doesn't match the step at that index in the CURRENT workflow => CheckpointIncompatibleError.
+const wrongStepIdCp: Checkpoint = { ...lastGood, stepId: "not-a-real-step" };
+const storeD = memWithTamperedLatest(cleanCps.slice(0, -1), wrongStepIdCp);
+ok(
+  throws(() => new DurableWorkflow("wf-tamper", makeSteps(), storeD).run(SEED), CheckpointIncompatibleError),
+  "a stepId mismatch against the current step list is rejected as CheckpointIncompatibleError",
+);
+
+// 6e. corrupted JSON on disk => CheckpointCorruptError, not a crash from JSON.parse.
+const corruptPath = ".checkpoints/durable-corrupt-test.json";
+try {
+  rmSync(corruptPath, { force: true });
+} catch {
+  /* ignore */
+}
+mkdirSync(".checkpoints", { recursive: true });
+writeFileSync(corruptPath, "{not valid json");
+ok(
+  throws(() => new FileCheckpointStore(corruptPath).latest("wf-tamper"), CheckpointCorruptError),
+  "malformed JSON in a checkpoint file is rejected as CheckpointCorruptError",
+);
 
 console.log("");
 console.log(`Final state root: ${cleanRoot.slice(0, 24)}…  checkpoints: ${cps.length}`);

@@ -55,7 +55,18 @@ ok(
   `MWUA tradeoff: larger λ preserves diversity — H(λ=1.0)=${hDiverse.toFixed(3)} > H(λ=0.05)=${hGreedy.toFixed(3)} bits`,
 );
 
-// 5. LLM channel is key-gated.
+// 5. Plateau regression: generation 1 must not be misclassified as "no improvement".
+//    With plateauWindow=1, the old off-by-one (`history[history.length - 2]` === undefined
+//    on gen 1) always incremented plateau to 1 immediately, terminating the run at
+//    generation 1 even though gen 1 always improves on the -1 baseline. promoteThreshold
+//    is set above what fitness can reach so the run can ONLY stop via the plateau path.
+const plateauRun = evolve({ ...DEFAULT_CONFIG, seed: 0xa11ce, plateauWindow: 1, promoteThreshold: 1.01 });
+ok(
+  plateauRun.generations > 1,
+  `plateauWindow=1 run survives past generation 1 (ran ${plateauRun.generations} generations) — gen 1's improvement is not misclassified as a plateau`,
+);
+
+// 6. LLM channel is key-gated.
 let gated = false;
 try {
   new RealLlmRewrite({ provider: "cohere", apiKeyEnv: "COHERE_API_KEY" }).rewrite([0, 0, 0], new Mulberry32(1));

@@ -5,7 +5,7 @@
  */
 
 import { crossBoundary } from "./gate.ts";
-import { BudgetLedger, BudgetExceededError } from "../05_CREDIT_ROUTING/budget.ts";
+import { BudgetLedger, BudgetExceededError, InvalidBudgetInputError } from "../05_CREDIT_ROUTING/budget.ts";
 
 let failures = 0;
 const ok = (cond: boolean, msg: string) => {
@@ -45,6 +45,52 @@ try {
   capped = e instanceof BudgetExceededError;
 }
 ok(capped, "budget cap throttles a call that would overspend (runaway-loop guard)");
+
+// Invalid estimates must not poison or decrement accounting — reject before touching `spent`.
+const spentBeforeInvalid = ledger.totalSpent;
+
+let negativeRejected = false;
+try {
+  ledger.authorize("mutate", -1);
+} catch (e) {
+  negativeRejected = e instanceof InvalidBudgetInputError;
+}
+ok(negativeRejected, 'authorize("mutate", -1) throws InvalidBudgetInputError');
+ok(ledger.totalSpent === spentBeforeInvalid, "  ...and totalSpent is unchanged (negative estimate did not decrement spend)");
+
+let nanRejected = false;
+try {
+  ledger.authorize("mutate", NaN);
+} catch (e) {
+  nanRejected = e instanceof InvalidBudgetInputError;
+}
+ok(nanRejected, 'authorize("mutate", NaN) throws InvalidBudgetInputError');
+ok(ledger.totalSpent === spentBeforeInvalid, "  ...and totalSpent is unchanged (NaN did not poison accounting)");
+ok(Number.isFinite(ledger.remaining), "  ...remaining is still a finite number (cap check is not disabled)");
+
+let fractionalRejected = false;
+try {
+  ledger.authorize("mutate", 1.5);
+} catch (e) {
+  fractionalRejected = e instanceof InvalidBudgetInputError;
+}
+ok(fractionalRejected, 'authorize("mutate", 1.5) throws InvalidBudgetInputError (non-integer estimate)');
+
+let infinityRejected = false;
+try {
+  ledger.authorize("mutate", Infinity);
+} catch (e) {
+  infinityRejected = e instanceof InvalidBudgetInputError;
+}
+ok(infinityRejected, 'authorize("mutate", Infinity) throws InvalidBudgetInputError');
+
+let capRejected = false;
+try {
+  new BudgetLedger(-100);
+} catch (e) {
+  capRejected = e instanceof InvalidBudgetInputError;
+}
+ok(capRejected, "constructing a BudgetLedger with a negative capTokens throws InvalidBudgetInputError");
 
 console.log("");
 if (failures === 0) {

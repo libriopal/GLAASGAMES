@@ -52,6 +52,53 @@ export function stateRoot(state: WorkState): string {
   return new MerkleTree(stateLeaves(state)).root;
 }
 
+/** A persisted checkpoint is malformed or its fingerprint doesn't match its own state. */
+export class CheckpointCorruptError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CheckpointCorruptError";
+  }
+}
+
+/** A persisted checkpoint is well-formed but doesn't match the CURRENT workflow's step list. */
+export class CheckpointIncompatibleError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CheckpointIncompatibleError";
+  }
+}
+
+/**
+ * Resume must not trust a persisted checkpoint as-is: bounds, step-list
+ * compatibility, and the Merkle fingerprint are all re-checked before any
+ * state from it is used. Any failure is a safety halt (throw), never a
+ * silent resume.
+ */
+function validateCheckpoint(latest: Checkpoint, steps: Step[]): void {
+  if (!Number.isInteger(latest.index) || latest.index < 0) {
+    throw new CheckpointCorruptError(
+      `checkpoint for workflow "${latest.workflowId}" has a malformed index (${JSON.stringify(latest.index)})`,
+    );
+  }
+  if (latest.index >= steps.length) {
+    throw new CheckpointIncompatibleError(
+      `checkpoint index ${latest.index} is out of range for workflow "${latest.workflowId}" (${steps.length} step(s) defined) — step list changed since this checkpoint was written`,
+    );
+  }
+  const expectedStep = steps[latest.index]!;
+  if (expectedStep.id !== latest.stepId) {
+    throw new CheckpointIncompatibleError(
+      `checkpoint step mismatch for workflow "${latest.workflowId}" at index ${latest.index}: expected step "${expectedStep.id}", checkpoint recorded "${latest.stepId}"`,
+    );
+  }
+  const recomputedRoot = stateRoot(latest.state);
+  if (recomputedRoot !== latest.stateRoot) {
+    throw new CheckpointCorruptError(
+      `checkpoint state-root mismatch for workflow "${latest.workflowId}" at step "${latest.stepId}": stored root does not match the state's recomputed root (state corrupted or tampered)`,
+    );
+  }
+}
+
 export class MemoryCheckpointStore implements CheckpointStore {
   private cps: Checkpoint[] = [];
   save(cp: Checkpoint): void {
@@ -71,7 +118,14 @@ export class FileCheckpointStore implements CheckpointStore {
   constructor(private readonly path: string) {}
   private read(): Checkpoint[] {
     if (!existsSync(this.path)) return [];
-    return JSON.parse(readFileSync(this.path, "utf8")) as Checkpoint[];
+    const raw = readFileSync(this.path, "utf8");
+    try {
+      return JSON.parse(raw) as Checkpoint[];
+    } catch (err) {
+      throw new CheckpointCorruptError(
+        `checkpoint file "${this.path}" is not valid JSON: ${(err as Error).message}`,
+      );
+    }
   }
   private write(cps: Checkpoint[]): void {
     mkdirSync(dirname(this.path), { recursive: true });
@@ -115,6 +169,7 @@ export class DurableWorkflow {
   /** Run (or resume). `failSet` injects a fault before the named steps. */
   run(seed: number, failSet: Set<string> = new Set()): RunResult {
     const latest = this.store.latest(this.id);
+    if (latest) validateCheckpoint(latest, this.steps);
     let startIdx = latest ? latest.index + 1 : 0;
     let state: WorkState = latest ? { ...latest.state } : {};
     const executed: string[] = [];
