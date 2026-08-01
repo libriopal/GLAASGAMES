@@ -1,0 +1,28 @@
+{
+  "name": "glassbox-labs",
+  "version": "6.0.0",
+  "private": true,
+  "type": "module",
+  "description": "GLASSBOX v6 — genome-driven game foundry (governance + foundry + game, one repo)",
+  "scripts": {
+    "verify:genome": "tsx families/genome/verify-genome.ts",
+    "verify:expression": "tsx families/expression/verify-expression.ts",
+    "verify:telemetry": "tsx foundry/telemetry/verify-telemetry.ts",
+    "verify:harvest": "tsx foundry/harvest/verify-harvest.ts",
+    "verify:corpus": "tsx corpus/delphi/verify-corpus.ts",
+    "verify:fitness": "tsx foundry/fitness/verify-fitness.ts",
+    "verify:gates": "tsx foundry/gates/verify-gates.ts",
+    "verify:kot": "tsx foundry/gates/verify-kot-calibration.ts",
+    "verify:determinism": "tsx game/determinism/verify-determinism.ts",
+    "verify:branch-a": "tsx game/branch-a/verify-branch-a.ts",
+    "verify:breeder": "tsx foundry/breeder/verify-breeder.ts",
+    "verify:economy": "tsx game/economy/verify-economy.ts",
+    "verify:suite": "tsx 00_GOVERNANCE/verify-suite.ts",
+    "verify": "npm run verify:genome && npm run verify:expression && npm run verify:telemetry && npm run verify:harvest && npm run verify:corpus && npm run verify:fitness && npm run verify:gates && npm run verify:kot && npm run verify:determinism && npm run verify:branch-a && npm run verify:breeder && npm run verify:economy && npm run verify:suite"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

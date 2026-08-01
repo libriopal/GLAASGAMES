@@ -1,0 +1,9 @@
+[submodule "core"]
+	path = core
+	url = https://github.com/libriopal/FAR_NZY.git
+[submodule "dream"]
+	path = dream
+	url = https://github.com/libriopal/adabt-core.git
+[submodule "devos"]
+	path = devos
+	url = https://github.com/libriopal/libriopal-devos.git
