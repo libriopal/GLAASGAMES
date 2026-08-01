@@ -1,0 +1,21 @@
+{
+  "name": "game-autobuild-kit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Governed solo-developer game/app automation kit under GLASSBOX v3.0.0",
+  "scripts": {
+    "verify:determinism": "tsx 02_CONTROLLER/verify-determinism.ts",
+    "verify:compilation": "tsx 02_CONTROLLER/verify-compilation.ts",
+    "verify:safety": "tsx 02_CONTROLLER/verify-safety.ts",
+    "verify:evolution": "tsx 01_RESEARCH/verify-evolution.ts",
+    "verify:consensus": "tsx 02_CONTROLLER/verify-consensus.ts",
+    "verify:durable": "tsx 02_CONTROLLER/verify-durable.ts",
+    "verify:boundary": "tsx 04_EDI/verify-boundary.ts",
+    "verify": "npm run verify:compilation && npm run verify:safety && npm run verify:determinism && npm run verify:evolution && npm run verify:consensus && npm run verify:durable && npm run verify:boundary"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

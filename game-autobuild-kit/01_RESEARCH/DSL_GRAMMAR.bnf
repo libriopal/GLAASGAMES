@@ -1,0 +1,42 @@
+; game-autobuild-kit — Evolvable DSL grammar (BNF)
+; Research Domain. Grammar-restricted synthesis: the evolvable logic may ONLY use
+; the antecedents/actions below — no arbitrary code, no eval, no imports.
+; Grounded: Tao et al. 2024 (https://doi.org/10.3390/a17070287) — a BNF grammar
+; that restricts callable functions is the safety mechanism; O'Neill & Ryan
+; Grammatical Evolution lineage (Hemberg, Kelly & O'Reilly 2019,
+; https://doi.org/10.1145/3321707.3321865).
+; Max derivation depth: 10 (Maximum Tree Depth parameter, D6).
+
+<program>            ::= <rule> | <rule> <program>
+<rule>               ::= <mandatory-rule> | <conditional-rule>
+<mandatory-rule>     ::= "DO" <action>                       ; executes once per phase transition
+<conditional-rule>   ::= "IF" <antecedent> "THEN" <action>   ; fires when antecedent is true
+
+<antecedent>         ::= <isSmaller>
+                       | <isCardBetweenNumbers>
+                       | <givesRacko>
+                       | <hasRacko>
+                       | <sum>
+                       | <play>
+                       | "(" <antecedent> "AND" <antecedent> ")"
+                       | "(" <antecedent> "OR"  <antecedent> ")"
+                       | "NOT" <antecedent>
+
+<isSmaller>          ::= "isSmaller("  <action-ref> "," <index> "," <hand> ")"
+<isCardBetweenNumbers> ::= "isCardBetweenNumbers(" <action-ref> "," <number> "," <number> "," <index> "," <hand> ")"
+<givesRacko>         ::= "givesRacko(" <action-ref> ")"
+<hasRacko>           ::= "hasRacko(" <hand> ")"
+<sum>                ::= "sum(" <location> "," <restriction> "," <location> ")"
+<play>               ::= "play(" <location> "," <restriction> "," <location> ")"
+
+<action>             ::= <draw> | <show>
+<draw>               ::= "draw()"                              ; deck -> player buffer
+<show>               ::= "show(" <restriction> "," <location> ")"
+
+<restriction>        ::= "LT" | "LE" | "EQ" | "GE" | "GT"
+<location>           ::= "DECK" | "DISCARD" | "HAND" | "BOARD"
+<action-ref>         ::= "SELECTED" | "TOP" | "BUFFER"
+<hand>               ::= "HAND"
+<index>              ::= <number>
+<number>             ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+                       | <number> <number>
