@@ -1,7 +1,65 @@
-# GLAASGAMES — Claude Code operating directives
+# GLAASGAMES — agent operating directives
 
 Loaded automatically at session start. These are standing instructions, not
 suggestions to weigh per task.
+
+---
+
+## 0. Execution environment
+
+This repo is driven by **OpenClaude on Android (Termux, non-root)**, backed by
+**Cloudflare Workers AI** running `@cf/google/gemma-4-26b-a4b-it` — a
+Mixture-of-Experts model, 26B total parameters with ~4B active per forward pass,
+which advertises function calling. Tool calling is not optional here: an agent
+that cannot call tools cannot edit this repo at all.
+
+- **Config**: `.openclaude/settings.json`, **generated** by
+  `scripts/termux-setup.sh` from `.openclaude/settings.template.json`. Edit the
+  template, never the generated file — it is gitignored and regenerated.
+- **Secrets**: `$HOME/.env` in Termux (`/data/data/com.termux/files/home/.env`),
+  outside the working tree. Never move it inside, never echo the token, never
+  paste it into a prompt. `00_GOVERNANCE/verify-no-secrets.ts` scans every
+  tracked file and will fail the build on a committed credential.
+- **Setup / re-setup**: `npm run setup:termux` (idempotent).
+- **On-device verification**: `npm run verify:termux`, **not** `npm run verify`.
+
+### What cannot run on the phone, and why
+
+Two capabilities are absent on stock Android. Neither is a defect to work around
+— attempting to fake either produces false confidence, which is worse than a
+skip.
+
+1. **No WebGPU.** There is no Vulkan loader or Dawn binding Node can reach in
+   Termux, so the GPU half of the engine does not execute on-device.
+   `verify-parity` still proves the CPU/GPU **layout contract** statically —
+   that half needs no adapter — and reports its execution half as a loud skip.
+   **GPU parity is a desktop or CI job.** Run
+   `npm run verify:parity -- --require-gpu` on hardware with an adapter, where a
+   missing device becomes a build failure instead of a skip.
+2. **No Postgres.** `verify:store` proves its SQLite half and reports its
+   Postgres half as failed rather than passed — governance rule H8, an
+   unreachable dependency is not evidence. This is why `npm run verify` exits
+   non-zero on a phone and `verify:termux` exists.
+
+**Never** "fix" either by weakening a check: do not stub a GPU adapter, do not
+mark a Postgres check skipped-as-passed, do not drop `--require-gpu` from CI.
+The CPU reference executor is the authority on-device; that is by design, and
+`engine/sim/kernel.ts` is written to be exactly that.
+
+### Working within a smaller model's budget
+
+The backing model is far smaller than the one this engine was authored with.
+That changes tactics, not standards:
+
+- Read `engine/sim/state.ts` before touching either executor — it is the memory
+  contract, and it is short.
+- Change **one** of `kernel.ts` / `sim.wgsl` and immediately mirror it in the
+  other, in the same commit. Never leave them divergent across turns.
+- Run `npm run verify:termux` after every change, not at the end of a batch. The
+  suite is the ground truth, and a fast failing signal beats a long correct
+  plan.
+- If a task needs more context than fits, do the smallest verifiable slice and
+  say what remains. Do not guess at code you have not read.
 
 ---
 
@@ -175,10 +233,14 @@ Record evidence and dispositions; do not ratify them.
 ## Commands
 
 ```bash
-npm run verify:engine          # engine suite: fixed, trig, sim, parity
-npm run verify:parity -- --require-gpu   # make missing-GPU fatal (GPU runners/CI)
-npm run verify                 # full inherited GLASSBOX suite
+npm run setup:termux           # idempotent bootstrap: env, settings.json, endpoint smoke test
+npm run verify:termux          # EVERYTHING PROVABLE ON THE PHONE — use this on Android
+npm run verify:engine          # engine suite only: fixed, trig, sim, parity
 npx tsc --noEmit               # typecheck (strict, noUncheckedIndexedAccess)
+
+# Desktop / CI only — these need hardware the phone does not have:
+npm run verify                 # full suite; exits 1 on Android (no Postgres) by design
+npm run verify:parity -- --require-gpu   # makes a missing GPU adapter fatal
 ```
 
 `verify:parity` skips its execution half where no WebGPU adapter exists and says

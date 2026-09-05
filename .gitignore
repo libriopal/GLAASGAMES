@@ -3,3 +3,13 @@ node_modules/
 .env
 .env.*
 !.env.example
+
+# OpenClaude settings are GENERATED from .openclaude/settings.template.json by
+# scripts/termux-setup.sh and contain a live Cloudflare API token. The template is
+# tracked; the generated file must never be.
+.openclaude/settings.json
+
+# The real env file lives at $HOME/.env, outside the tree. This entry catches a copy
+# accidentally made inside the repo before verify-no-secrets has to.
+.env
+.env.local

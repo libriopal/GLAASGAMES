@@ -1,0 +1,18 @@
+{
+  "$comment": "TEMPLATE ONLY — committed to the repo. scripts/termux-setup.sh reads ~/.env and writes the real .openclaude/settings.json next to this file with the placeholders substituted. The generated file carries a live API token and is gitignored; 00_GOVERNANCE/verify-no-secrets.ts will fail the build if a token is ever committed. Never fill the placeholders in and commit this file.",
+
+  "agentModels": {
+    "cf-gemma4": {
+      "base_url": "https://api.cloudflare.com/client/v4/accounts/__CLOUDFLARE_ACCOUNT_ID__/ai/v1",
+      "api_key": "__CLOUDFLARE_API_TOKEN__",
+      "model": "@cf/google/gemma-4-26b-a4b-it"
+    }
+  },
+
+  "agentRouting": {
+    "Explore": "cf-gemma4",
+    "Plan": "cf-gemma4",
+    "general-purpose": "cf-gemma4",
+    "default": "cf-gemma4"
+  }
+}
