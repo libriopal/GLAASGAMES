@@ -1,4 +1,61 @@
-# Glassbox Labs — GLASSBOX Governance Package & Scite Deep-Research Deliverables
+# GLAASGAMES
+
+GPU-authoritative 4D game engine, built on the GLASSBOX genome-driven foundry.
+
+Seeded from [`libriopal/Glassbox_Labs`](https://github.com/libriopal/Glassbox_Labs)
+with its full commit history; the governance package, foundry and genome families
+below are inherited unchanged. The `engine/` tree is new.
+
+## The engine
+
+Four independent spatial dimensions (`x, y, z, w` — `w` is a real extent, not a
+homogeneous coordinate), simulated in Q16.16 fixed point, advanced by WGSL
+compute shaders against state that lives in VRAM.
+
+**Why fixed point.** IEEE-754 is not reproducible across GPU vendors: an
+implementation may contract `a*b+c` into a fused multiply-add with one rounding
+instead of two, and NVIDIA, AMD, Intel and Apple choose differently. Integer
+arithmetic in WGSL is exact everywhere. This extends the `Q x 1000` scoring
+discipline already in `game/determinism/` into the spatial domain.
+
+**One rule set, two executors.** `engine/sim/kernel.ts` is the semantic
+definition of a tick; `engine/gpu/shaders/sim.wgsl` is a port of it. A verify
+pass runs both from one seed and compares per-tick hash chains, so the GPU path
+is proven rather than assumed — and a divergence names the tick it began on.
+
+| Path | Role |
+|---|---|
+| `engine/math/fixed.ts` | Q16.16 scalars; limb-based multiply (WGSL has no i64) |
+| `engine/math/trig.ts` | CORDIC sin/cos — shift-and-add only, no vendor libm |
+| `engine/math/vec4.ts` | 4D vectors; `wedge4` in place of the nonexistent 4D cross product |
+| `engine/math/rotor4.ts` | Rotation in six planes, not about axes; 4D→3D project and slice |
+| `engine/sim/state.ts` | Entity layout + free-list pool; the CPU/GPU memory contract |
+| `engine/sim/kernel.ts` | Reference tick — the semantic definition |
+| `engine/gpu/shaders/sim.wgsl` | GPU kernel, integer-only, step-for-step identical |
+| `engine/gpu/device.ts` | Device acquisition; GPU-resident world, no per-tick round-trip |
+| `engine/host/loop.ts` | Fixed timestep with spiral-of-death guard |
+| `engine/config/sim.json` | All gameplay constants; no balance value lives in source |
+
+**On "running the server on the GPU":** a GPU cannot host a server — no OS, no
+network stack, no syscalls. What this provides is the achievable form: the
+authoritative world lives in GPU memory and is advanced by GPU kernels, with a
+thin CPU host doing only socket I/O and input marshalling. The same WGSL runs
+under Node (via Dawn) and in the browser, so server and client execute one
+kernel rather than two implementations kept in agreement by hand.
+
+```bash
+npm run verify:engine        # fixed, trig, sim, parity
+npm run verify               # typecheck + engine + full inherited GLASSBOX suite
+npm run verify:parity -- --require-gpu    # make a missing adapter fatal
+```
+
+`verify:parity` proves the CPU/GPU layout contract statically anywhere, and runs
+real execution parity where a WebGPU adapter exists — it reports a skip, loudly,
+where none does.
+
+---
+
+# Inherited: GLASSBOX Governance Package & Scite Deep-Research Deliverables
 
 This repository holds the **GLASSBOX governance package (v3.0.0)** and the Tier 2 **Scite deep-research** evidence artifacts produced against it.
 

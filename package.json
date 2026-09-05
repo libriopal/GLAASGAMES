@@ -1,9 +1,9 @@
 {
-  "name": "glassbox-labs",
+  "name": "glaasgames",
   "version": "6.0.0",
   "private": true,
   "type": "module",
-  "description": "GLASSBOX v6 — genome-driven game foundry (governance + foundry + game, one repo)",
+  "description": "GLAASGAMES \u2014 GPU-authoritative 4D game engine on the GLASSBOX genome-driven foundry",
   "scripts": {
     "verify:genome": "tsx families/genome/verify-genome.ts",
     "verify:expression": "tsx families/expression/verify-expression.ts",
@@ -21,7 +21,13 @@
     "verify:store": "tsx core/store/verify-store.ts",
     "verify:no-secrets": "tsx 00_GOVERNANCE/verify-no-secrets.ts",
     "verify:no-prod-credentials-local": "tsx 00_GOVERNANCE/verify-no-prod-credentials-local.ts",
-    "verify": "npm run verify:genome && npm run verify:expression && npm run verify:telemetry && npm run verify:harvest && npm run verify:corpus && npm run verify:fitness && npm run verify:gates && npm run verify:kot && npm run verify:determinism && npm run verify:branch-a && npm run verify:breeder && npm run verify:economy && npm run verify:suite && npm run verify:store && npm run verify:no-secrets && npm run verify:no-prod-credentials-local"
+    "verify:fixed": "tsx engine/verify/verify-fixed.ts",
+    "verify:trig": "tsx engine/verify/verify-trig.ts",
+    "verify:sim": "tsx engine/verify/verify-sim.ts",
+    "verify:parity": "tsx engine/verify/verify-parity.ts",
+    "verify:engine": "npm run verify:fixed && npm run verify:trig && npm run verify:sim && npm run verify:parity",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run typecheck && npm run verify:engine && npm run verify:genome && npm run verify:expression && npm run verify:telemetry && npm run verify:harvest && npm run verify:corpus && npm run verify:fitness && npm run verify:gates && npm run verify:kot && npm run verify:determinism && npm run verify:branch-a && npm run verify:breeder && npm run verify:economy && npm run verify:suite && npm run verify:store && npm run verify:no-secrets && npm run verify:no-prod-credentials-local"
   },
   "engines": {
     "node": ">=22.5.0"

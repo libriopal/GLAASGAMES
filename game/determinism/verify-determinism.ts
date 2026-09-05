@@ -56,8 +56,12 @@ ok(Buffer.from(s1).toString('hex') !== Buffer.from(s2).toString('hex'), 'two CSP
 
 // 7. verify-no-math-random: static scan of the new source trees.
 const repoRoot = join(import.meta.dirname, '..', '..');
-const scan = scanForMathRandom([join(repoRoot, 'families'), join(repoRoot, 'foundry'), join(repoRoot, 'corpus'), join(repoRoot, 'game')]);
-ok(scan.clean, scan.clean ? 'no Math.random() found under families/foundry/corpus/game' : `Math.random() found in: ${scan.offendingFiles.join(', ')}`);
+// engine/ is included because it is where determinism is most load-bearing: the
+// simulation kernel must reproduce bit-for-bit across CPU and GPU executors, and
+// a single Math.random() there would break parity in a way that reproduces only
+// intermittently and on one machine.
+const scan = scanForMathRandom([join(repoRoot, 'families'), join(repoRoot, 'foundry'), join(repoRoot, 'corpus'), join(repoRoot, 'game'), join(repoRoot, 'engine')]);
+ok(scan.clean, scan.clean ? 'no Math.random() found under families/foundry/corpus/game/engine' : `Math.random() found in: ${scan.offendingFiles.join(', ')}`);
 
 console.log('');
 if (failures === 0) {
