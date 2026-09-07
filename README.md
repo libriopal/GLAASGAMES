@@ -65,6 +65,23 @@ real silicon: the integer-only design argues vendor divergence cannot arise, but
 that argument is not a measurement. Run `npm run verify:gpu` on a real GPU to
 measure it.
 
+## Seeing it
+
+    npm run serve:web        # then open http://localhost:8080
+
+A WebGPU page that runs the simulation kernel on the GPU and draws the world.
+Colour encodes **w** — position in the fourth dimension — so the axis that has no
+screen direction is still legible. Drag to orbit; shift-drag or two fingers turns
+the xw and yw planes, which is the control that actually reveals 4D structure.
+
+On Android this runs in Chrome on your phone's real GPU, which is the
+cross-vendor measurement software Vulkan cannot give. The HUD reports the live
+state digest and the adapter identity.
+
+`npm run verify:render` proves the render shader draws by rendering to an
+offscreen texture and inspecting the pixels — no canvas, no compositor, so it
+works headless and runs in CI.
+
 ## Getting started on Android
 
     git clone https://github.com/libriopal/GLAASGAMES.git

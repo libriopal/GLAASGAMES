@@ -1,0 +1,19 @@
+{
+  "$comment": "Emitting build for the browser host. Separate from the root config because that one is noEmit and allows .ts import specifiers, which cannot be emitted. Only engine/ and web/ are compiled: game/, foundry/ and the governance trees are Node-only and some import with .ts extensions.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "noEmit": false,
+    "rootDir": "..",
+    "outDir": "dist",
+    "sourceMap": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["@webgpu/types"]
+  },
+  "include": ["../engine/math", "../engine/sim", "../engine/host", "./main.ts"],
+  "exclude": ["../engine/verify", "../engine/sim/config.ts", "../engine/gpu"]
+}

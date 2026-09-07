@@ -74,6 +74,12 @@ jobs:
       - name: GPU parity (WGSL executed on lavapipe)
         run: deno run --allow-all --unstable-sloppy-imports engine/verify/verify-parity.ts --require-gpu
 
+      # Same reasoning as the parity step: Deno has native WebGPU, and the render
+      # target here is an offscreen texture rather than a canvas, so no
+      # compositor is involved and a headless runner can prove it draws.
+      - name: Render verification (render.wgsl executed on lavapipe)
+        run: deno run --allow-all --unstable-sloppy-imports engine/verify/verify-render.ts
+
       - name: GLASSBOX governance suite
         run: |
           npm run verify:genome && npm run verify:expression && npm run verify:telemetry

@@ -15,7 +15,7 @@
 // tick would be a megabyte of garbage a second and a visible GC sawtooth.
 
 import { mulFixed } from '../math/fixed.js';
-import type { SimConfig } from './config.js';
+import type { SimConfig } from './config-parse.js';
 import {
   ENTITY_STRIDE,
   FLAG_ALIVE,

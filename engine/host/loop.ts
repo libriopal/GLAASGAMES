@@ -8,7 +8,7 @@
 //
 // This is the only module in the engine allowed to see wall-clock time.
 
-import type { SimConfig } from '../sim/config.js';
+import type { SimConfig } from '../sim/config-parse.js';
 
 /** Milliseconds of elapsed time that will ever be honoured in a single frame. */
 const MAX_FRAME_MS = 250;

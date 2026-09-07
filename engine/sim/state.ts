@@ -56,7 +56,7 @@ export interface EntitySpawn {
  */
 export class WorldState {
   readonly capacity: number;
-  readonly buffer: Int32Array;
+  readonly buffer: Int32Array<ArrayBuffer>;
 
   /** Free slot indices. Pop to allocate, push to release — no scanning. */
   private readonly freeList: number[];

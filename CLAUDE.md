@@ -53,6 +53,28 @@ skip.
    unreachable dependency is not evidence. This is why `npm run verify` exits
    non-zero on a phone and `verify:termux` exists.
 
+### The browser host is the exception to "no WebGPU on the phone"
+
+Termux/Node has no WebGPU adapter. **Chrome on Android does.** `npm run serve:web`
+builds `web/` and serves it at `http://localhost:8080`; opening that in Chrome
+runs `engine/gpu/shaders/sim.wgsl` — unmodified, the same file CI runs — on the
+phone's real Adreno or Mali silicon. The HUD shows the live state digest and the
+adapter identity, which is the cross-vendor measurement software Vulkan cannot
+provide. `localhost` is a secure context, so WebGPU is available; a LAN IP is not.
+
+Rendering is the one place floats are allowed: `web/shaders/render.wgsl` uses
+them freely because rasterisation has no reproducibility requirement.
+`verify-parity` scans only `sim.wgsl`, deliberately. Nothing in the render path
+may ever write to the world buffer — it is bound `read`, so the compiler enforces
+that rather than the author.
+
+`verify-render` proves the render shader draws, by rendering to an offscreen
+texture and reading the pixels back. It does **not** go through a canvas: a
+canvas requires both a correct shader and a working compositor, those fail
+independently, and in headless Chromium the second fails routinely — a WebGPU
+canvas reads back fully transparent while the frame loop runs perfectly. A test
+that cannot tell "broken shader" from "no compositor" is not evidence.
+
 **Never** "fix" either by weakening a check: do not stub a GPU adapter, do not
 mark a Postgres check skipped-as-passed, do not drop `--require-gpu` from CI.
 The CPU reference executor is the authority on-device; that is by design, and
@@ -267,6 +289,7 @@ Record evidence and dispositions; do not ratify them.
 
 ```bash
 npm run setup:termux           # idempotent bootstrap: env, settings.json, endpoint smoke test
+npm run serve:web              # build the browser host and serve it at http://localhost:8080
 npm run verify:termux          # EVERYTHING PROVABLE ON THE PHONE — use this on Android
 npm run verify:engine          # engine suite only: fixed, trig, sim, parity
 npx tsc --noEmit               # typecheck (strict, noUncheckedIndexedAccess)
