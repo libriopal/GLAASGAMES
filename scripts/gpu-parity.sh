@@ -58,6 +58,6 @@ say "Executing the WGSL kernel against the reference executor"
 deno run --allow-all --unstable-sloppy-imports engine/verify/verify-parity.ts --require-gpu
 
 say "Executing the render shader against an offscreen target"
-deno run --allow-all --unstable-sloppy-imports engine/verify/verify-render.ts
+deno run --allow-all --unstable-sloppy-imports engine/verify/verify-render.ts --require-gpu
 
 say "GPU parity and render both proven."

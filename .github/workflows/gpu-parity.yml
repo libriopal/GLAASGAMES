@@ -78,7 +78,7 @@ jobs:
       # target here is an offscreen texture rather than a canvas, so no
       # compositor is involved and a headless runner can prove it draws.
       - name: Render verification (render.wgsl executed on lavapipe)
-        run: deno run --allow-all --unstable-sloppy-imports engine/verify/verify-render.ts
+        run: deno run --allow-all --unstable-sloppy-imports engine/verify/verify-render.ts --require-gpu
 
       - name: GLASSBOX governance suite
         run: |

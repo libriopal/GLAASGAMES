@@ -106,18 +106,30 @@ function encodePng(rgba: Uint8Array, width: number, height: number): Uint8Array 
 
 const config = loadSimConfig();
 
-const gpu = (globalThis as { navigator?: { gpu?: GPU } }).navigator?.gpu;
-if (gpu === undefined) {
-  console.log('  render: SKIPPED — no WebGPU. Run under Deno (deno run --allow-all) with a Vulkan device.');
+// --require-gpu turns a missing adapter from a skip into a failure. On a phone a
+// skip is honest; in CI it is a lie, and a step that silently skips is
+// indistinguishable from one that passed — it even takes about the same time,
+// since this pass runs in under a second. verify-parity has the same flag for
+// the same reason.
+const requireGpu = process.argv.includes('--require-gpu');
+const unavailable = (reason: string): never => {
+  if (requireGpu) {
+    console.error(`verify-render: FAIL — --require-gpu was passed but ${reason}`);
+    process.exit(1);
+  }
+  console.log(`  render: SKIPPED — ${reason}`);
   console.log('verify-render: SKIPPED');
   process.exit(0);
+};
+
+const gpu = (globalThis as { navigator?: { gpu?: GPU } }).navigator?.gpu;
+if (gpu === undefined) {
+  unavailable('no WebGPU. Run under Deno (deno run --allow-all) with a Vulkan device.');
 }
 
 const adapter = await gpu.requestAdapter({ powerPreference: 'high-performance' });
 if (adapter === null) {
-  console.log('  render: SKIPPED — no adapter.');
-  console.log('verify-render: SKIPPED');
-  process.exit(0);
+  unavailable('no adapter — a WebGPU implementation is present but no GPU is usable.');
 }
 const device = await adapter.requestDevice();
 
