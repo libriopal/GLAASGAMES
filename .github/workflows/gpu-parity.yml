@@ -64,6 +64,9 @@ jobs:
       - name: Engine suite (CPU)
         run: npm run verify:engine
 
+      - name: Browser host builds
+        run: npm run build:web
+
       # The parity pass runs under Deno rather than Node because Deno implements
       # WebGPU natively; Node needs a separate Dawn binding. --require-gpu turns a
       # missing adapter from a skip into a failure, which is the whole point of

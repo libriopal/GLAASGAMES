@@ -52,8 +52,37 @@
   }
   button:active { background: rgba(60,60,96,.95); }
 
+  #pad {
+    position: fixed; left: 0; right: 0; bottom: 62px;
+    bottom: calc(62px + env(safe-area-inset-bottom));
+    display: flex; justify-content: space-between; padding: 0 10px;
+    pointer-events: none;
+  }
+  .cluster {
+    display: grid; pointer-events: auto;
+    grid-template-areas: ". u ." "l . r" ". d .";
+    gap: 5px;
+  }
+  button.pad {
+    /* 52px keeps every control above the ~44px minimum comfortable touch target,
+       with the thumb clusters pushed to the screen edges where thumbs rest. */
+    width: 52px; height: 52px; min-width: 0; min-height: 0;
+    padding: 0; font-size: 13px; line-height: 1.1;
+    background: rgba(24,24,40,.78); border-radius: 12px;
+  }
+  button.pad.wbtn {
+    /* The w controls are the mechanic, so they are visually distinct from the
+       three directions the player already understands. */
+    background: rgba(60,30,74,.85); border-color: rgba(220,140,255,.5); color: #f0c8ff;
+    font-size: 11px;
+  }
+  button.pad small { opacity: .65; font-size: 9px; }
+
+  #hint b { color: #f0c8ff; }
   #hint {
-    position: fixed; bottom: 70px; left: 0; right: 0; text-align: center;
+    /* Clear of the pad, which rises from 62px to roughly 220px. Overlapping it
+       printed the hint straight through the d-pad. */
+    position: fixed; bottom: 232px; left: 0; right: 0; text-align: center;
     color: #6a6a86; font-size: 11px; pointer-events: none; padding: 0 12px;
   }
 
@@ -75,12 +104,32 @@
     <div class="row"><span class="k">ticks</span><span class="v" id="ticks">0</span></div>
     <div class="row"><span class="k">entities</span><span class="v" id="entities">0</span></div>
     <div class="row"><span class="k">dropped</span><span class="v" id="dropped">0</span></div>
+    <div class="row"><span class="k">collected</span><span class="v" id="score">—</span></div>
+    <div class="row"><span class="k">time</span><span class="v" id="clock">0.0s</span></div>
+    <div class="row"><span class="k">your w</span><span class="v" id="playerw">0.00</span></div>
+    <div class="row"><span class="k">nearest</span><span class="v" id="nearest">—</span></div>
+    <div class="row"><span class="k">state</span><span class="v" id="phase">—</span></div>
     <div class="row"><span class="k">mode</span><span class="v" id="mode">—</span></div>
     <div class="row"><span class="k">digest</span><span class="v" id="digest">—</span></div>
     <div class="row"><span class="k">gpu</span><span class="v" id="adapter">—</span></div>
   </div>
 
-  <div id="hint">drag: orbit · shift-drag or 2 fingers: rotate through w · pinch/scroll: zoom</div>
+  <div id="hint">move with the pad · <b>ana/kata</b> travel through w · drag the view to orbit</div>
+
+  <div id="pad">
+    <div class="cluster" id="cluster-move">
+      <button class="pad" id="pad-up"    style="grid-area:u">▲</button>
+      <button class="pad" id="pad-left"  style="grid-area:l">◀</button>
+      <button class="pad" id="pad-right" style="grid-area:r">▶</button>
+      <button class="pad" id="pad-down"  style="grid-area:d">▼</button>
+    </div>
+    <div class="cluster" id="cluster-w">
+      <button class="pad wbtn" id="pad-ana"  style="grid-area:u">ana<br><small>+w</small></button>
+      <button class="pad" id="pad-rise" style="grid-area:l">up</button>
+      <button class="pad" id="pad-fall" style="grid-area:r">dn</button>
+      <button class="pad wbtn" id="pad-kata" style="grid-area:d">kata<br><small>−w</small></button>
+    </div>
+  </div>
 
   <div id="controls">
     <button id="btn-spin">spin</button>

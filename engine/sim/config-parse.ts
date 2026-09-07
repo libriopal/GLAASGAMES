@@ -33,6 +33,10 @@ export interface SimConfig {
   readonly viewerW: number;
   readonly sliceThickness: number;
   readonly workgroupSize: number;
+  readonly targetCount: number;
+  readonly collectRadius: number;
+  readonly playerSpeed: number;
+  readonly playerWSpeed: number;
 }
 
 interface RawVec4 {
@@ -53,6 +57,12 @@ export interface RawConfig {
   };
   rendering: { mode: string; viewerW: number; sliceThickness: number };
   gpu: { workgroupSize: number };
+  game: {
+    targetCount: number;
+    collectRadius: number;
+    playerSpeed: number;
+    playerWSpeed: number;
+  };
 }
 
 function toFixedVec4(raw: RawVec4, label: string): FixedVec4Config {
@@ -73,7 +83,7 @@ function toFixedVec4(raw: RawVec4, label: string): FixedVec4Config {
  * an error. The checks fail here, on the CPU, where the message is useful.
  */
 export function parseSimConfig(raw: RawConfig): SimConfig {
-  const { world, tick, physics, rendering, gpu } = raw;
+  const { world, tick, physics, rendering, gpu, game } = raw;
 
   if (!Number.isInteger(world.capacity) || world.capacity <= 0) {
     throw new Error(`sim.json: world.capacity must be a positive integer`);
@@ -100,6 +110,25 @@ export function parseSimConfig(raw: RawConfig): SimConfig {
   }
   if (!Number.isInteger(gpu.workgroupSize) || gpu.workgroupSize <= 0 || gpu.workgroupSize > 256) {
     throw new Error(`sim.json: gpu.workgroupSize must be an integer in 1..256`);
+  }
+
+  if (!Number.isInteger(game.targetCount) || game.targetCount <= 0) {
+    throw new Error(`sim.json: game.targetCount must be a positive integer`);
+  }
+  if (game.collectRadius <= 0) {
+    throw new Error(`sim.json: game.collectRadius must be positive`);
+  }
+  if (game.playerSpeed <= 0 || game.playerWSpeed <= 0) {
+    throw new Error(`sim.json: game.playerSpeed and playerWSpeed must be positive`);
+  }
+  // The player must not be able to cross a collect radius within one tick, or a
+  // target can be passed straight through between samples and never collected.
+  const reachPerTick = Math.max(game.playerSpeed, game.playerWSpeed) / tick.hz;
+  if (reachPerTick >= game.collectRadius) {
+    throw new Error(
+      `sim.json: player moves ${reachPerTick.toFixed(2)} per tick but collectRadius is ` +
+        `${game.collectRadius} — targets could be tunnelled through. Lower the speed or widen the radius.`,
+    );
   }
 
   const boundsMin = toFixedVec4(world.boundsMin, 'world.boundsMin');
@@ -131,8 +160,21 @@ export function parseSimConfig(raw: RawConfig): SimConfig {
     viewerW: toFixed(rendering.viewerW),
     sliceThickness: toFixed(rendering.sliceThickness),
     workgroupSize: gpu.workgroupSize,
+    targetCount: game.targetCount,
+    collectRadius: toFixed(game.collectRadius),
+    playerSpeed: toFixed(game.playerSpeed),
+    playerWSpeed: toFixed(game.playerWSpeed),
   };
 }
+
+/**
+ * Byte offset of playerPos within the SimParams uniform.
+ *
+ * The player moves every tick while everything else in SimParams is constant, so
+ * the host writes just these 16 bytes rather than re-packing and re-uploading
+ * the whole struct. vec4<i32> requires 16-byte alignment and 80 satisfies it.
+ */
+export const PLAYER_POS_BYTE_OFFSET = 80;
 
 /**
  * Packs the config into the uniform buffer layout the WGSL kernel expects.
@@ -142,7 +184,7 @@ export function parseSimConfig(raw: RawConfig): SimConfig {
  * vec4 fields lead and the scalars follow, padded to a multiple of four i32.
  */
 export function packConfigForGpu(config: SimConfig): Int32Array<ArrayBuffer> {
-  const packed = new Int32Array(24);
+  const packed = new Int32Array(32);
   let cursor = 0;
 
   const writeVec4 = (v: FixedVec4Config): void => {
@@ -167,5 +209,29 @@ export function packConfigForGpu(config: SimConfig): Int32Array<ArrayBuffer> {
   packed[18] = 0; // padding
   packed[19] = 0; // padding
 
+  // 20..23 — playerPos, rewritten every tick by the host at PLAYER_POS_BYTE_OFFSET.
+  packed[24] = mulFixedLocal(config.collectRadius, config.collectRadius);
+  packed[25] = config.collectRadius;
+
   return packed;
+}
+
+/**
+ * Q16.16 multiply, duplicated here rather than imported from math/fixed.ts.
+ *
+ * config-parse is the boundary module both hosts load; keeping it free of any
+ * dependency it does not strictly need keeps that boundary small. This is the
+ * only product it computes, and it is computed once at startup.
+ */
+function mulFixedLocal(a: number, b: number): number {
+  const negative = a < 0 !== b < 0;
+  const ua = Math.abs(a) >>> 0;
+  const ub = Math.abs(b) >>> 0;
+  const a0 = ua & 0xffff, a1 = ua >>> 16;
+  const b0 = ub & 0xffff, b1 = ub >>> 16;
+  const lo = Math.imul(a0, b0) >>> 0;
+  const cross = (Math.imul(a1, b0) + Math.imul(a0, b1)) >>> 0;
+  const hi = Math.imul(a1, b1) >>> 0;
+  const magnitude = (((hi << 16) >>> 0) + cross + (lo >>> 16)) >>> 0;
+  return (negative ? -magnitude : magnitude) | 0;
 }

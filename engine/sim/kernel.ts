@@ -19,12 +19,31 @@ import type { SimConfig } from './config-parse.js';
 import {
   ENTITY_STRIDE,
   FLAG_ALIVE,
+  FLAG_COLLECTED,
+  KIND_PLAYER,
+  KIND_TARGET,
   OFFSET_AGE,
   OFFSET_FLAGS,
+  OFFSET_KIND,
   OFFSET_POS_X,
   OFFSET_VEL_X,
   type WorldState,
 } from './state.js';
+
+/** The player's position for this tick, in Q16.16. */
+export interface PlayerPosition {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly w: number;
+}
+
+/**
+ * Defaults to the origin because packConfigForGpu leaves the uniform's playerPos
+ * slots zeroed. A CPU default that differed from the GPU's would break parity on
+ * any world containing a target.
+ */
+const ORIGIN: PlayerPosition = { x: 0, y: 0, z: 0, w: 0 };
 
 /**
  * Advances the world by exactly one tick, in place.
@@ -36,7 +55,7 @@ import {
  * pacing is handled entirely in engine/host/loop.ts, which decides *how many*
  * ticks to run, never how long one lasts.
  */
-export function tick(world: WorldState, config: SimConfig): void {
+export function tick(world: WorldState, config: SimConfig, player: PlayerPosition = ORIGIN): void {
   const buffer = world.buffer;
   const capacity = world.capacity;
 
@@ -62,6 +81,7 @@ export function tick(world: WorldState, config: SimConfig): void {
   const maxW = boundsMax.w;
 
   const maxSpeedSquared = mulFixed(maxSpeed, maxSpeed);
+  const collectRadiusSquared = mulFixed(config.collectRadius, config.collectRadius);
 
   for (let slot = 0; slot < capacity; slot += 1) {
     const base = slot * ENTITY_STRIDE;
@@ -71,6 +91,54 @@ export function tick(world: WorldState, config: SimConfig): void {
     // slot order — so a compacting tick would report divergence between two runs
     // that are physically identical.
     if ((buffer[base + OFFSET_FLAGS]! & FLAG_ALIVE) === 0) continue;
+
+    // --- Step 0: kind dispatch --------------------------------------------
+    // Physics is not universal. The player is host-owned so the tick must not
+    // move it — input would fight gravity and control would feel wrong. Targets
+    // are static so that BOTH executors can know where they are without either
+    // reading the other's state, which is what lets the host score the game
+    // instantly while the GPU marks the same targets from the same rule.
+    const kind = buffer[base + OFFSET_KIND]!;
+
+    if (kind === KIND_PLAYER) {
+      buffer[base + OFFSET_AGE] = (buffer[base + OFFSET_AGE]! + 1) | 0;
+      continue;
+    }
+
+    if (kind === KIND_TARGET) {
+      // Collection is a FOUR-dimensional test. Matching x, y and z while sitting
+      // at a different w is a miss — that is the entire game.
+      const dx = (buffer[base + OFFSET_POS_X]! - player.x) | 0;
+      const dy = (buffer[base + OFFSET_POS_X + 1]! - player.y) | 0;
+      const dz = (buffer[base + OFFSET_POS_X + 2]! - player.z) | 0;
+      const dw = (buffer[base + OFFSET_POS_X + 3]! - player.w) | 0;
+
+      // Per-axis reject before squaring. A distant target has a delta whose
+      // square nears 2^31; four of them overflow i32, `| 0` wraps the sum
+      // negative, and a negative sum is trivially <= radiusSquared — so the
+      // FARTHEST targets would collect themselves. Rejecting first bounds every
+      // square by radius^2, and is exact: any axis beyond radius is a miss.
+      const radius = config.collectRadius;
+      if (dx > radius || dx < -radius || dy > radius || dy < -radius ||
+          dz > radius || dz < -radius || dw > radius || dw < -radius) {
+        buffer[base + OFFSET_AGE] = (buffer[base + OFFSET_AGE]! + 1) | 0;
+        continue;
+      }
+
+      let distanceSquared = 0;
+      distanceSquared = (distanceSquared + mulFixed(dx, dx)) | 0;
+      distanceSquared = (distanceSquared + mulFixed(dy, dy)) | 0;
+      distanceSquared = (distanceSquared + mulFixed(dz, dz)) | 0;
+      distanceSquared = (distanceSquared + mulFixed(dw, dw)) | 0;
+
+      if (distanceSquared <= collectRadiusSquared) {
+        // Cleared of ALIVE so the tick and the renderer skip it; COLLECTED marks
+        // it as taken rather than never-spawned.
+        buffer[base + OFFSET_FLAGS] = FLAG_COLLECTED;
+      }
+      buffer[base + OFFSET_AGE] = (buffer[base + OFFSET_AGE]! + 1) | 0;
+      continue;
+    }
 
     const vx = base + OFFSET_VEL_X;
     const vy = base + OFFSET_VEL_X + 1;

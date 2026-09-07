@@ -1,36 +1,53 @@
 {
-  "$comment": "Authoritative simulation constants. Values are decimal; the loader converts them to Q16.16 once at startup and the simulation never sees a float again. Editing this file is the supported way to rebalance — no constant that affects gameplay is allowed to live in a .ts or .wgsl source.",
-
+  "$comment": "Authoritative simulation constants. Values are decimal; the loader converts them to Q16.16 once at startup and the simulation never sees a float again. Editing this file is the supported way to rebalance \u2014 no constant that affects gameplay is allowed to live in a .ts or .wgsl source.",
   "world": {
     "capacity": 4096,
-    "boundsMin": { "x": -64.0, "y": -64.0, "z": -64.0, "w": -16.0 },
-    "boundsMax": { "x": 64.0, "y": 64.0, "z": 64.0, "w": 16.0 },
+    "boundsMin": {
+      "x": -64.0,
+      "y": -64.0,
+      "z": -64.0,
+      "w": -16.0
+    },
+    "boundsMax": {
+      "x": 64.0,
+      "y": 64.0,
+      "z": 64.0,
+      "w": 16.0
+    },
     "$comment": "The w extent is deliberately narrower than x/y/z. A 4D world with equal extents in all four axes puts almost every entity far off the viewing hyperplane at any moment, and reads as an empty room. Compressing w keeps the population near the slice the player occupies."
   },
-
   "tick": {
     "hz": 60,
     "maxCatchUpTicks": 5,
-    "$comment": "maxCatchUpTicks bounds the accumulator so a stalled tab cannot queue thousands of ticks and freeze on resume — the spiral-of-death guard. Time past the bound is discarded, not simulated."
+    "$comment": "maxCatchUpTicks bounds the accumulator so a stalled tab cannot queue thousands of ticks and freeze on resume \u2014 the spiral-of-death guard. Time past the bound is discarded, not simulated."
   },
-
   "physics": {
-    "gravity": { "x": 0.0, "y": -9.81, "z": 0.0, "w": 0.0 },
+    "gravity": {
+      "x": 0.0,
+      "y": -9.81,
+      "z": 0.0,
+      "w": 0.0
+    },
     "linearDamping": 0.995,
     "restitution": 0.72,
     "maxSpeed": 96.0,
-    "$comment": "Gravity acts only along y. A 4D world has no privileged 'down' — the choice is a design decision that gives the player a stable frame of reference, not a physical necessity. restitution below 1 guarantees bounce energy strictly decreases, which is what keeps the boundary response from pumping energy into the system."
+    "$comment": "Gravity acts only along y. A 4D world has no privileged 'down' \u2014 the choice is a design decision that gives the player a stable frame of reference, not a physical necessity. restitution below 1 guarantees bounce energy strictly decreases, which is what keeps the boundary response from pumping energy into the system."
   },
-
   "rendering": {
     "mode": "project",
     "viewerW": 24.0,
     "sliceThickness": 0.75,
     "$comment": "mode is 'project' (4D perspective divide along w) or 'slice' (3D cross-section at the viewer's w). Projection shows the whole object distorted; slicing shows a true cross-section that changes shape as objects move through w."
   },
-
   "gpu": {
     "workgroupSize": 64,
     "$comment": "64 lanes is the common denominator that maps cleanly onto AMD wave64, NVIDIA warp32 (two per group) and Apple SIMD32. Raising it risks occupancy loss on tile GPUs; the WGSL @workgroup_size attribute must be edited to match, as WGSL requires a compile-time literal."
+  },
+  "game": {
+    "targetCount": 24,
+    "collectRadius": 3.5,
+    "playerSpeed": 26.0,
+    "playerWSpeed": 6.0,
+    "$comment": "collectRadius is measured in FOUR dimensions. A target sitting at the same x,y,z as the player but a different w is NOT collectable \u2014 closing that gap means moving along w, which is the whole game. playerWSpeed is deliberately slower than playerSpeed: travel through the fourth dimension should feel like a deliberate act, not a fourth way to strafe."
   }
 }

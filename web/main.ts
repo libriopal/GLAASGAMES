@@ -15,9 +15,23 @@
 
 import { FixedTimestep } from '../engine/host/loop.js';
 import { orientationToMatrix, type Orientation4 } from '../engine/math/rotor4.js';
-import { packConfigForGpu, parseSimConfig, type RawConfig, type SimConfig } from '../engine/sim/config-parse.js';
+import {
+  PLAYER_POS_BYTE_OFFSET,
+  packConfigForGpu,
+  parseSimConfig,
+  type RawConfig,
+  type SimConfig,
+} from '../engine/sim/config-parse.js';
+import { Game, nearestTarget, type Input } from '../engine/sim/game.js';
 import { formatHash, hashState } from '../engine/sim/hash.js';
-import { ENTITY_STRIDE, WorldState } from '../engine/sim/state.js';
+import {
+  ENTITY_STRIDE,
+  KIND_DRIFTER,
+  KIND_PLAYER,
+  KIND_TARGET,
+  OFFSET_POS_X,
+  WorldState,
+} from '../engine/sim/state.js';
 
 const FIXED_ONE = 65536;
 
@@ -55,10 +69,41 @@ function makeRng(seed: number): () => number {
   };
 }
 
-function populate(world: WorldState, config: SimConfig, seed: number, count: number): void {
+/**
+ * Composes the world: the player first, then targets, then ambient drifters.
+ *
+ * The player takes slot 0 deliberately — the host rewrites that record every
+ * tick, and a fixed slot makes it a constant-offset write rather than a lookup.
+ * Drifters come last so that exhausting capacity costs scenery rather than
+ * anything the game depends on.
+ */
+function populate(world: WorldState, config: SimConfig, seed: number, drifters: number): number {
   const rng = makeRng(seed);
   const span = (lo: number, hi: number): number => lo + (Math.abs(rng()) % (hi - lo));
-  for (let i = 0; i < count; i += 1) {
+
+  const playerSlot = world.spawn({
+    posX: (config.boundsMin.x + config.boundsMax.x) >> 1,
+    posY: (config.boundsMin.y + config.boundsMax.y) >> 1,
+    posZ: (config.boundsMin.z + config.boundsMax.z) >> 1,
+    posW: (config.boundsMin.w + config.boundsMax.w) >> 1,
+    velX: 0, velY: 0, velZ: 0, velW: 0,
+    kind: KIND_PLAYER,
+  });
+
+  for (let i = 0; i < config.targetCount; i += 1) {
+    world.spawn({
+      posX: span(config.boundsMin.x, config.boundsMax.x),
+      posY: span(config.boundsMin.y, config.boundsMax.y),
+      posZ: span(config.boundsMin.z, config.boundsMax.z),
+      // Targets use the full w extent. A target you can see but cannot reach
+      // until you travel through w is the entire point of the game.
+      posW: span(config.boundsMin.w, config.boundsMax.w),
+      velX: 0, velY: 0, velZ: 0, velW: 0,
+      kind: KIND_TARGET,
+    });
+  }
+
+  for (let i = 0; i < drifters; i += 1) {
     world.spawn({
       posX: span(config.boundsMin.x, config.boundsMax.x),
       posY: span(config.boundsMin.y, config.boundsMax.y),
@@ -68,9 +113,10 @@ function populate(world: WorldState, config: SimConfig, seed: number, count: num
       velY: rng() % (24 * FIXED_ONE),
       velZ: rng() % (24 * FIXED_ONE),
       velW: rng() % (7 * FIXED_ONE),
-      kind: Math.abs(rng()) % 4,
+      kind: KIND_DRIFTER,
     });
   }
+  return playerSlot;
 }
 
 interface Controls {
@@ -126,7 +172,11 @@ async function main(): Promise<void> {
   const config = parseSimConfig((await configResponse.json()) as RawConfig);
 
   const world = new WorldState(config.capacity);
-  populate(world, config, 0xfeed_4d17 | 0, Math.min(3000, config.capacity));
+  const playerSlot = populate(world, config, 0xfeed_4d17 | 0,
+    Math.min(2200, config.capacity - config.targetCount - 1));
+
+  const game = new Game(config);
+  game.begin(world);
 
   const [simSource, renderSource] = await Promise.all([
     fetch('/engine/gpu/shaders/sim.wgsl').then((r) => r.text()),
@@ -143,7 +193,7 @@ async function main(): Promise<void> {
 
   const simParamsBuffer = device.createBuffer({
     label: 'glaas-sim-params',
-    size: 24 * 4,
+    size: 32 * 4,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
   device.queue.writeBuffer(simParamsBuffer, 0, packConfigForGpu(config));
@@ -291,10 +341,62 @@ async function main(): Promise<void> {
     controls.distance = 150;
   });
 
+  // --- Input ----------------------------------------------------------------
+  // Held directions rather than per-frame deltas: the simulation is fixed-step,
+  // so input must be a state the tick samples, not an event stream whose rate
+  // depends on the device.
+  const held = { xPos: false, xNeg: false, zPos: false, zNeg: false,
+                 yPos: false, yNeg: false, wPos: false, wNeg: false };
+
+  const axisOf = (positive: boolean, negative: boolean): number =>
+    (positive ? FIXED_ONE : 0) - (negative ? FIXED_ONE : 0);
+
+  const currentInput = (): Input => ({
+    x: axisOf(held.xPos, held.xNeg),
+    y: axisOf(held.yPos, held.yNeg),
+    z: axisOf(held.zPos, held.zNeg),
+    w: axisOf(held.wPos, held.wNeg),
+  });
+
+  const KEYS: Record<string, keyof typeof held> = {
+    KeyD: 'xPos', ArrowRight: 'xPos',
+    KeyA: 'xNeg', ArrowLeft: 'xNeg',
+    KeyW: 'zNeg', ArrowUp: 'zNeg',
+    KeyS: 'zPos', ArrowDown: 'zPos',
+    Space: 'yPos', ShiftLeft: 'yNeg',
+    KeyE: 'wPos', KeyQ: 'wNeg',
+  };
+  addEventListener('keydown', (e) => {
+    const slot = KEYS[e.code];
+    if (slot !== undefined) { held[slot] = true; e.preventDefault(); }
+  });
+  addEventListener('keyup', (e) => {
+    const slot = KEYS[e.code];
+    if (slot !== undefined) { held[slot] = false; e.preventDefault(); }
+  });
+
+  // Touch pad. pointerdown/up rather than click so a held button keeps moving,
+  // and pointerleave/cancel so dragging off a button releases it instead of
+  // sticking on — a stuck direction is the classic mobile control bug.
+  for (const [id, slot] of Object.entries({
+    'pad-up': 'zNeg', 'pad-down': 'zPos', 'pad-left': 'xNeg', 'pad-right': 'xPos',
+    'pad-rise': 'yPos', 'pad-fall': 'yNeg', 'pad-ana': 'wPos', 'pad-kata': 'wNeg',
+  } as Record<string, keyof typeof held>)) {
+    const el = document.getElementById(id);
+    if (el === null) continue;
+    const press = (on: boolean) => (e: Event): void => { held[slot] = on; e.preventDefault(); };
+    el.addEventListener('pointerdown', press(true));
+    el.addEventListener('pointerup', press(false));
+    el.addEventListener('pointerleave', press(false));
+    el.addEventListener('pointercancel', press(false));
+  }
+
   // --- Loop -----------------------------------------------------------------
   const timestep = new FixedTimestep(config);
   const workgroups = Math.ceil(config.capacity / config.workgroupSize);
   const cameraData = new Float32Array(28);
+  const playerUniform = new Int32Array(4);
+  const playerRecord = new Int32Array(ENTITY_STRIDE);
 
   let ticks = 0;
   let frames = 0;
@@ -353,15 +455,42 @@ async function main(): Promise<void> {
     droppedTotal += step.droppedTicks;
 
     if (step.ticks > 0) {
-      const encoder = device.createCommandEncoder();
+      const input = currentInput();
       for (let i = 0; i < step.ticks; i += 1) {
+        // Game before simulation: the shader scores against the player position
+        // the host uploads, so the host must decide that position first. The
+        // other order leaves the two a tick apart and they disagree about which
+        // frame a target was taken on.
+        game.advance(world, input);
+        const player = game.state.player;
+
+        // 16 bytes into the existing uniform — no new binding, no re-pack.
+        playerUniform[0] = player.x;
+        playerUniform[1] = player.y;
+        playerUniform[2] = player.z;
+        playerUniform[3] = player.w;
+        device.queue.writeBuffer(simParamsBuffer, PLAYER_POS_BYTE_OFFSET, playerUniform);
+
+        // Keep the player's own entity record in step so the renderer draws it
+        // where the rules say it is. One 48-byte write, not a whole upload.
+        playerRecord.set(world.buffer.subarray(
+          playerSlot * ENTITY_STRIDE, (playerSlot + 1) * ENTITY_STRIDE));
+        playerRecord[OFFSET_POS_X] = player.x;
+        playerRecord[OFFSET_POS_X + 1] = player.y;
+        playerRecord[OFFSET_POS_X + 2] = player.z;
+        playerRecord[OFFSET_POS_X + 3] = player.w;
+        world.buffer.set(playerRecord, playerSlot * ENTITY_STRIDE);
+        device.queue.writeBuffer(
+          worldBuffer, playerSlot * ENTITY_STRIDE * 4, playerRecord);
+
+        const encoder = device.createCommandEncoder();
         const pass = encoder.beginComputePass();
         pass.setPipeline(computePipeline);
         pass.setBindGroup(0, computeBindGroup);
         pass.dispatchWorkgroups(workgroups);
         pass.end();
+        device.queue.submit([encoder.finish()]);
       }
-      device.queue.submit([encoder.finish()]);
       ticks += step.ticks;
     }
 
@@ -379,7 +508,7 @@ async function main(): Promise<void> {
     for (let i = 0; i < 16; i += 1) cameraData[i] = fixedMatrix[i]! / FIXED_ONE;
 
     cameraData[16] = config.viewerW / FIXED_ONE;
-    cameraData[17] = controls.sliceW;
+    cameraData[17] = game.state.player.w / FIXED_ONE;
     cameraData[18] = config.sliceThickness / FIXED_ONE;
     cameraData[19] = controls.mode === 'project' ? 0 : 1;
     cameraData[20] = controls.yaw;
@@ -412,11 +541,27 @@ async function main(): Promise<void> {
 
     // --- overlay -----------------------------------------------------------
     frames += 1;
-    if (now - lastFpsAt >= 500) {
+    if (now - lastFpsAt >= 250) {
+      const gameState = game.state;
       setText('fps', (frames * 1000 / (now - lastFpsAt)).toFixed(0));
       setText('ticks', ticks.toLocaleString());
       setText('dropped', String(droppedTotal));
       setText('digest', digest);
+      setText('score', `${gameState.collected} / ${gameState.total}`);
+      setText('clock', `${game.seconds.toFixed(1)}s`);
+
+      // The readout that makes 4D fair: a target can sit dead centre on screen
+      // and still be unreachable. Saying so turns "broken" into "hard".
+      const near = nearestTarget(world, gameState.player);
+      setText('nearest', near === null
+        ? '—'
+        : `${near.spatial.toFixed(1)} away, ${near.alongW >= 0 ? '+' : ''}${near.alongW.toFixed(1)} along w`);
+      setText('phase', gameState.phase === 'won'
+        ? `COMPLETE in ${game.seconds.toFixed(1)}s`
+        : gameState.phase);
+      setText('playerw', game.state.player.w >= 0
+        ? `+${(gameState.player.w / FIXED_ONE).toFixed(2)}`
+        : (gameState.player.w / FIXED_ONE).toFixed(2));
       frames = 0;
       lastFpsAt = now;
     }

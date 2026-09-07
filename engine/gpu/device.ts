@@ -183,7 +183,7 @@ export class GpuSimExecutor {
 
     this.paramsBuffer = device.createBuffer({
       label: 'glaas-sim-params',
-      size: 24 * 4,
+      size: 32 * 4,
       usage: USAGE_UNIFORM | USAGE_COPY_DST,
     });
 

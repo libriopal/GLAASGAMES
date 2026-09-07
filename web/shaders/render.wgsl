@@ -21,6 +21,10 @@
 const ENTITY_STRIDE: u32 = 12u;
 const OFFSET_POS_X: u32 = 0u;
 const OFFSET_VEL_X: u32 = 4u;
+const OFFSET_KIND: u32 = 8u;
+
+const KIND_PLAYER: i32 = 1;
+const KIND_TARGET: i32 = 2;
 const OFFSET_FLAGS: u32 = 9u;
 const FLAG_ALIVE: i32 = 1;
 
@@ -156,9 +160,16 @@ fn vs(
   // well would apply the falloff twice, and multiplying the result back by
   // clip.w (which IS view.z) cancels it entirely, leaving pointSize as a raw
   // clip-space offset that covers most of the screen.
+  // Kind drives size and colour. Without this the player is one indistinguishable
+  // speck among two thousand and the game is unplayable regardless of the rules.
+  let kind: i32 = world[base + OFFSET_KIND];
+  var sizeScale: f32 = 1.0;
+  if (kind == KIND_PLAYER) { sizeScale = 4.2; }
+  else if (kind == KIND_TARGET) { sizeScale = 2.6; }
+
   let corner = quadCorner(vertexIndex);
-  clip.x = clip.x + corner.x * camera.pointSize * focal / camera.aspect;
-  clip.y = clip.y + corner.y * camera.pointSize * focal;
+  clip.x = clip.x + corner.x * camera.pointSize * sizeScale * focal / camera.aspect;
+  clip.y = clip.y + corner.y * camera.pointSize * sizeScale * focal;
 
   var out: VertexOut;
   out.clip = clip;
@@ -168,10 +179,19 @@ fn vs(
   // scene collapses into an indistinguishable 3D cloud and the one thing that
   // makes this engine interesting becomes invisible.
   let wNorm = clamp((r4.w - camera.wMin) / max(camera.wMax - camera.wMin, 0.0001), 0.0, 1.0);
-  out.colour = hueToRgb(0.62 - 0.62 * wNorm);
+  if (kind == KIND_PLAYER) {
+    out.colour = vec3<f32>(1.0, 1.0, 1.0);          // always findable
+  } else if (kind == KIND_TARGET) {
+    // Targets keep the w hue so you can read how far through w they sit, but
+    // brightened well clear of the drifting scenery.
+    out.colour = mix(hueToRgb(0.62 - 0.62 * wNorm), vec3<f32>(1.0, 1.0, 1.0), 0.45) * 1.6;
+  } else {
+    out.colour = hueToRgb(0.62 - 0.62 * wNorm) * 0.55;   // scenery, dimmed
+  }
 
   // Fade with distance so the far side of the cloud recedes.
   out.fade = clamp(1.4 - view.z / max(camera.distance * 2.0, 1.0), 0.15, 1.0);
+  if (kind == KIND_PLAYER) { out.fade = 1.0; }
   return out;
 }
 

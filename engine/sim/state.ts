@@ -32,6 +32,28 @@ export const OFFSET_RESERVED = 11;
 /** Bit 0 of OFFSET_FLAGS. A slot with this clear is free and must be skipped. */
 export const FLAG_ALIVE = 1;
 
+/**
+ * Bit 1 of OFFSET_FLAGS. Set when a target has been collected. The slot is also
+ * cleared of FLAG_ALIVE, so the tick loop skips it and the renderer culls it —
+ * this bit exists so a collected target is distinguishable from an empty slot,
+ * which matters because the state hash covers free slots too.
+ */
+export const FLAG_COLLECTED = 2;
+
+/**
+ * OFFSET_KIND values. Kind selects which rules apply, and is the reason the
+ * field existed from the start:
+ *   DRIFTER — ambient matter, full physics. Scenery that makes 4D legible.
+ *   PLAYER  — host-owned. The tick applies no physics to it; the host writes its
+ *             position each tick from input, so control is immediate rather than
+ *             mediated by gravity and damping.
+ *   TARGET  — static and collectible. No physics, so its position is knowable in
+ *             advance by both executors without either reading the other's state.
+ */
+export const KIND_DRIFTER = 0;
+export const KIND_PLAYER = 1;
+export const KIND_TARGET = 2;
+
 export interface EntitySpawn {
   readonly posX: number;
   readonly posY: number;

@@ -24,6 +24,10 @@ const OFFSET_FLAGS: u32 = 9u;
 const OFFSET_AGE: u32 = 10u;
 
 const FLAG_ALIVE: i32 = 1;
+const FLAG_COLLECTED: i32 = 2;
+
+const KIND_PLAYER: i32 = 1;
+const KIND_TARGET: i32 = 2;
 
 // Field order must match packConfigForGpu in engine/sim/config.ts.
 struct SimParams {
@@ -38,6 +42,15 @@ struct SimParams {
   tickIndex: i32,
   pad0: i32,
   pad1: i32,
+
+  // Rewritten every tick by the host at PLAYER_POS_BYTE_OFFSET (80). vec4<i32>
+  // needs 16-byte alignment and byte 80 satisfies it.
+  playerPos: vec4<i32>,
+
+  collectRadiusSq: i32,
+  collectRadius: i32,
+  pad3: i32,
+  pad4: i32,
 };
 
 @group(0) @binding(0) var<storage, read_write> world: array<i32>;
@@ -196,6 +209,48 @@ fn tick(@builtin(global_invocation_id) gid: vec3<u32>) {
   // communicate, so an inactive lane costs its slot in the dispatch and nothing
   // more.
   if ((world[base + OFFSET_FLAGS] & FLAG_ALIVE) == 0) {
+    return;
+  }
+
+  // --- Step 0: kind dispatch -------------------------------------------------
+  // Mirrors kernel.ts exactly. The player is host-owned and receives no physics;
+  // targets are static and collectible. Neither reads another entity's slot, so
+  // the kernel stays embarrassingly parallel.
+  let kind: i32 = world[base + OFFSET_KIND];
+
+  if (kind == KIND_PLAYER) {
+    world[base + OFFSET_AGE] = world[base + OFFSET_AGE] + 1;
+    return;
+  }
+
+  if (kind == KIND_TARGET) {
+    // Four-dimensional proximity. Accumulated x, y, z, w in that order because
+    // fixed-point addition is not associative and kernel.ts sums the same way.
+    let dx: i32 = world[base + OFFSET_POS_X]      - params.playerPos.x;
+    let dy: i32 = world[base + OFFSET_POS_X + 1u] - params.playerPos.y;
+    let dz: i32 = world[base + OFFSET_POS_X + 2u] - params.playerPos.z;
+    let dw: i32 = world[base + OFFSET_POS_X + 3u] - params.playerPos.w;
+
+    // Per-axis reject before squaring — mirrors kernel.ts. Without it the sum of
+    // four squared deltas overflows i32 for distant targets, wraps negative, and
+    // the farthest targets in the world collect themselves.
+    let radius: i32 = params.collectRadius;
+    if (dx > radius || dx < -radius || dy > radius || dy < -radius ||
+        dz > radius || dz < -radius || dw > radius || dw < -radius) {
+      world[base + OFFSET_AGE] = world[base + OFFSET_AGE] + 1;
+      return;
+    }
+
+    var distance_squared: i32 = 0;
+    distance_squared = distance_squared + mul_fixed(dx, dx);
+    distance_squared = distance_squared + mul_fixed(dy, dy);
+    distance_squared = distance_squared + mul_fixed(dz, dz);
+    distance_squared = distance_squared + mul_fixed(dw, dw);
+
+    if (distance_squared <= params.collectRadiusSq) {
+      world[base + OFFSET_FLAGS] = FLAG_COLLECTED;
+    }
+    world[base + OFFSET_AGE] = world[base + OFFSET_AGE] + 1;
     return;
   }
 
