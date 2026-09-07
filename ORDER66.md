@@ -90,6 +90,51 @@ Neither is a defect, and neither may be faked.
   half as failed rather than passed, because an unreachable dependency is not
   evidence.
 
+## Before you propose anything — three rules
+
+These exist because both were violated on this repo's first two attempts. They
+cost nothing to follow and they catch the exact mistakes that got made.
+
+**1. Cite a file and line you actually opened.** Every claim about this codebase
+must name `path:line`. If you cannot cite it, you have not established it — say
+"I don't know" instead. Words like "likely", "probably" and "presumably" about
+code are forbidden: the file is right there, open it.
+
+*What went wrong:* an agent claimed the engine "likely relies on pairwise checks
+which scale at O(n²)" and proposed spatial hashing. There is no collision system.
+`tick()` has exactly one flat loop over slots, and in `sim.wgsl` every access is
+`base + offset` — no invocation reads another entity's slot. The simulation is
+O(n). It had read `CLAUDE.md`'s forward-looking note about spatial hashing and
+reported the guidance back as an observation about the code.
+
+**2. Measure before calling anything hot.** A performance claim without a number
+is a guess. Instrument the real kernel, run it, quote the count.
+
+*What went wrong:* an agent called `integerSqrtFixed` a "high-frequency hot path".
+It is reached only when `speedSquared > maxSpeedSquared`. Measured over 1000
+entities × 2000 ticks — 2,000,000 entity-ticks — it fired **zero** times, because
+linear damping holds peak speed near 32.9 against a clamp of 96. It is the
+coldest path in the kernel, not the hottest.
+
+**3. Check for a WGSL twin, and check the integer width.** Before changing any
+function in `engine/`, grep `engine/gpu/shaders/sim.wgsl` for its counterpart. If
+one exists, your proposal must state how the shader will be changed identically —
+and read the docblock above the function first, because several of them record
+exactly why they are written the way they are.
+
+*What went wrong:* the same agent proposed replacing a `bit /= 4` descent loop
+with `Math.clz32`. Two independent problems. `Math.clz32` coerces via ToUint32,
+and the radicand is `value * 65536` — up to 48 bits — so for `412316860416` it
+sees `0` and reports high bit `-1` instead of `38`: wrong root, failed parity.
+And the docblock eight lines above the function it targeted says the function is
+duplicated deliberately to mirror `sim.wgsl`, where `sqrt_fixed` carries the
+radicand as a hi/lo `u32` pair for that same 48-bit reason — so no symmetric
+change exists.
+
+**The pattern to avoid:** confident, well-argued, and false. Every proposal here
+is a claim to be checked, including your own. Reporting "I could not establish
+this" is a good outcome. Asserting something you did not verify is not.
+
 ## How to work
 
 You are running on a much smaller model than the one that wrote this engine, and

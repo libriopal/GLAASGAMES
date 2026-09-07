@@ -73,6 +73,27 @@ That changes tactics, not standards:
 - If a task needs more context than fits, do the smallest verifiable slice and
   say what remains. Do not guess at code you have not read.
 
+**Three rules for any claim about this codebase.** Each exists because it was
+broken on the first two attempts, and each failure was confident and articulate.
+
+1. **Cite `path:line` you actually opened.** No citation means not established —
+   say so. "Likely", "probably" and "presumably" about code are forbidden; the
+   file is right there. (Failure: claiming the engine "likely" does O(n²)
+   pairwise checks. There is no collision system; `tick()` is one flat loop and
+   no WGSL invocation reads another entity's slot. The agent had read this file's
+   forward-looking spatial-hashing note and reported it back as an observation.)
+2. **Measure before calling anything hot.** Instrument, run, quote the number.
+   (Failure: calling `integerSqrtFixed` a hot path. Measured over 2,000,000
+   entity-ticks it fires **zero** times — damping holds peak speed near 32.9
+   against a clamp of 96. It is the coldest path in the kernel.)
+3. **Check for a WGSL twin and check the integer width.** Grep `sim.wgsl` for a
+   counterpart before changing anything in `engine/`, and read the docblock above
+   the function — several record why they are written as they are. (Failure:
+   proposing `Math.clz32` for a 48-bit radicand. ToUint32 truncates it, so
+   `412316860416` reads as `0` and high bit `-1` instead of `38`; and the twin
+   `sqrt_fixed` carries the radicand as a hi/lo `u32` pair for that same reason,
+   so no symmetric change exists.)
+
 ---
 
 ## Role
