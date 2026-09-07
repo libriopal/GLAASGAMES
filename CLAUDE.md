@@ -33,9 +33,21 @@ skip.
    Termux, so the GPU half of the engine does not execute on-device.
    `verify-parity` still proves the CPU/GPU **layout contract** statically —
    that half needs no adapter — and reports its execution half as a loud skip.
-   **GPU parity is a desktop or CI job.** Run
-   `npm run verify:parity -- --require-gpu` on hardware with an adapter, where a
-   missing device becomes a build failure instead of a skip.
+
+   **GPU parity is a CI job, and it is free.** `.github/workflows/gpu-parity.yml`
+   installs Mesa lavapipe — a software Vulkan device — on GitHub's standard
+   runners and executes the real kernel under Deno's native WebGPU. No GPU is
+   rented. `git push` is how the shader gets verified from a phone.
+
+   **Status: proven.** The WGSL has been executed against the reference executor
+   and matched bit for bit — 600 ticks x 1024 entities, chained digest
+   `0x77f11d60`. What that establishes is that the port is *correct*: the
+   limb-based multiply, the restoring sqrt over a hi/lo pair, the long division
+   and the boundary response all compute what `kernel.ts` computes. What it does
+   **not** establish is cross-vendor agreement on real NVIDIA/AMD/Intel/Apple
+   silicon — the integer-only design argues that divergence cannot arise, but an
+   argument is not a measurement. Run `npm run verify:gpu` on real hardware to
+   measure it.
 2. **No Postgres.** `verify:store` proves its SQLite half and reports its
    Postgres half as failed rather than passed — governance rule H8, an
    unreachable dependency is not evidence. This is why `npm run verify` exits
@@ -240,8 +252,13 @@ npx tsc --noEmit               # typecheck (strict, noUncheckedIndexedAccess)
 
 # Desktop / CI only — these need hardware the phone does not have:
 npm run verify                 # full suite; exits 1 on Android (no Postgres) by design
+npm run verify:gpu             # installs software Vulkan if needed, executes the WGSL
 npm run verify:parity -- --require-gpu   # makes a missing GPU adapter fatal
 ```
+
+`verify:gpu` runs the shader anywhere with a Vulkan device, real or software —
+it installs Mesa lavapipe when none is present. It refuses to run on Android and
+says why, rather than failing with a confusing adapter error.
 
 `verify:parity` skips its execution half where no WebGPU adapter exists and says
 so. That is expected in containers and on CI without a GPU; pass `--require-gpu`

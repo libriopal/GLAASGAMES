@@ -1,0 +1,86 @@
+# GPU parity — executes the WGSL simulation kernel and proves it bit-identical
+# to the TypeScript reference executor.
+#
+# WHY THIS EXISTS: the phone this repo is developed on has no WebGPU adapter, so
+# engine/gpu/shaders/sim.wgsl cannot be executed there. Without this workflow the
+# shader would ship on the strength of code review alone — and a fixed-point port
+# with hand-assembled 64-bit arithmetic is precisely the kind of code that reads
+# correct and computes wrong.
+#
+# WHY IT IS FREE: no GPU is rented. Mesa's lavapipe provides a software Vulkan
+# device, and Deno's native WebGPU (wgpu) binds to it. GitHub's standard hosted
+# runners are enough. This is a real execution of the real kernel, not a mock.
+#
+# WHAT IT DOES AND DOES NOT PROVE:
+#   Proves    — the WGSL is correct: the limb multiply, the restoring sqrt over a
+#               hi/lo pair, the long division and the boundary response all agree
+#               with the reference bit for bit, across every tick.
+#   Does not  — cross-vendor agreement on real NVIDIA/AMD/Intel/Apple silicon.
+#               The engine is integer-only specifically so that vendor divergence
+#               cannot arise, but that is an argument, not a measurement. Run the
+#               same command on real hardware to measure it.
+
+name: gpu-parity
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Mesa lavapipe (software Vulkan)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mesa-vulkan-drivers vulkan-tools
+
+      - name: Confirm a Vulkan device exists
+        run: |
+          # Fail here rather than later with a confusing "no adapter" message.
+          vulkaninfo --summary | grep -E 'deviceName|driverName'
+          vulkaninfo --summary | grep -q 'llvmpipe' \
+            || { echo "::error::lavapipe not present — WebGPU will find no adapter"; exit 1; }
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Engine suite (CPU)
+        run: npm run verify:engine
+
+      # The parity pass runs under Deno rather than Node because Deno implements
+      # WebGPU natively; Node needs a separate Dawn binding. --require-gpu turns a
+      # missing adapter from a skip into a failure, which is the whole point of
+      # running here: on the phone a skip is honest, in CI it would be a lie.
+      #
+      # --unstable-sloppy-imports lets Deno resolve the repo's ".js" specifiers to
+      # their ".ts" sources, matching the tsconfig's bundler resolution.
+      - name: GPU parity (WGSL executed on lavapipe)
+        run: deno run --allow-all --unstable-sloppy-imports engine/verify/verify-parity.ts --require-gpu
+
+      - name: GLASSBOX governance suite
+        run: |
+          npm run verify:genome && npm run verify:expression && npm run verify:telemetry
+          npm run verify:harvest && npm run verify:corpus && npm run verify:fitness
+          npm run verify:gates && npm run verify:kot && npm run verify:determinism
+          npm run verify:branch-a && npm run verify:breeder && npm run verify:economy
+          npm run verify:suite
+
+      - name: Secrets scans
+        run: npm run verify:no-secrets && npm run verify:no-prod-credentials-local

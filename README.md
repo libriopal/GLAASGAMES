@@ -53,6 +53,27 @@ npm run verify:parity -- --require-gpu    # make a missing adapter fatal
 real execution parity where a WebGPU adapter exists — it reports a skip, loudly,
 where none does.
 
+**GPU parity is proven, and verifying it costs nothing.** The WGSL kernel has
+been executed against the reference executor and matched bit for bit: 600 ticks
+x 1024 entities, chained digest `0x77f11d60`. No GPU was rented —
+`.github/workflows/gpu-parity.yml` runs Mesa lavapipe, a software Vulkan device,
+on GitHub's standard runners, under Deno's native WebGPU. `npm run verify:gpu`
+does the same locally, installing lavapipe if the machine has no adapter.
+
+That proves the port is correct. It does not prove cross-vendor agreement on
+real silicon: the integer-only design argues vendor divergence cannot arise, but
+that argument is not a measurement. Run `npm run verify:gpu` on a real GPU to
+measure it.
+
+## Getting started on Android
+
+    git clone https://github.com/libriopal/GLAASGAMES.git
+    cd GLAASGAMES && bash CHOAS66.SH
+
+`CHOAS66.SH` is idempotent and does the whole bootstrap: packages, credentials,
+config generation, endpoint smoke test, on-device verification. Then paste
+`ORDER66.md` into OpenClaude as its first message.
+
 ---
 
 # Inherited: GLASSBOX Governance Package & Scite Deep-Research Deliverables
