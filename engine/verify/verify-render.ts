@@ -112,7 +112,11 @@ const config = loadSimConfig();
 // since this pass runs in under a second. verify-parity has the same flag for
 // the same reason.
 const requireGpu = process.argv.includes('--require-gpu');
-const unavailable = (reason: string): never => {
+// A function declaration, not a const arrow: TypeScript only narrows control
+// flow through a never-returning call when it can resolve the signature that
+// way, so an arrow assigned to a const leaves `gpu` and `adapter` still
+// nullable after the call.
+function unavailable(reason: string): never {
   if (requireGpu) {
     console.error(`verify-render: FAIL — --require-gpu was passed but ${reason}`);
     process.exit(1);
@@ -120,7 +124,7 @@ const unavailable = (reason: string): never => {
   console.log(`  render: SKIPPED — ${reason}`);
   console.log('verify-render: SKIPPED');
   process.exit(0);
-};
+}
 
 const gpu = (globalThis as { navigator?: { gpu?: GPU } }).navigator?.gpu;
 if (gpu === undefined) {
