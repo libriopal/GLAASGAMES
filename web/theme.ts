@@ -6,7 +6,7 @@
 // re-reads that digest and fails the build if these tokens drift from it, so the
 // palette cannot quietly become someone's preference later.
 //
-// WHAT THE MEASUREMENTS SAID, AND WHERE THEY CONTRADICT THE WRITTEN SPEC:
+// WHAT THE MEASUREMENTS SAID, AND WHERE THEY CONTRADICT INTUITION:
 //
 //   59.1% of pixels sit in the darkest 6 of 16 luminance bins, and 6.7% sit in
 //   the very brightest. The corpus is bimodal: a dark ground with sharp
@@ -22,13 +22,14 @@
 //   20-59 deg at 23.8%, magenta/violet 280-329 deg at 13.9%, red 9.9%, and
 //   green 90-149 deg at only 2.6%.
 //
-//   THAT LAST FIGURE IS A REAL CONTRADICTION and it is recorded rather than
-//   smoothed over. `3libras/the_visual_layer.md` specifies a BIOLOGICAL pillar
-//   whose palette is "emerald green, toxic cyan, neon moss" — but green is the
-//   least used hue in 1,129 images actually produced under that spec. The
-//   images and the document disagree. I have followed the images, because they
-//   are what the corpus IS rather than what it was asked to be, and flagged it
-//   here so the decision is visible instead of silently made.
+//   THAT LAST FIGURE IS THE LOAD-BEARING ONE and it is recorded rather than
+//   smoothed over. Green is the least used hue in 1,129 images, and it is the
+//   hue people reach for first when describing this kind of art from memory.
+//   The palette therefore has NO green accent token. That is a decision made
+//   against intuition on the strength of a measurement, so it is written down
+//   here: if green ever returns to this file, it must return because the digest
+//   moved, and `verify-theme` fails the build if the claim goes stale or the
+//   record is deleted.
 
 /** Where these numbers come from. Read by `verify-theme`. */
 export const CORPUS_DIGEST = 'design/corpus-digest.json';

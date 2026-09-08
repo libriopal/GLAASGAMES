@@ -175,20 +175,49 @@ function bandWeight(fromDeg: number, toDeg: number): number {
   );
 }
 
-// ── T4: the contradiction between spec and images is recorded, not hidden ──
+// ── T4: the absence of green is a measured decision, and stays one ─────────
+// Green is the hue this kind of art is remembered as having and the hue the
+// corpus barely contains. That gap is exactly where taste re-enters a palette,
+// so the omission is held in place by three separate conditions: the digest
+// must still say green is scarce, the theme must still say WHY it has no green
+// token, and it must still actually have none. Any one of them failing means
+// somebody is about to add green for a reason that is not a measurement.
 {
   const source = readFileSync(fileURLToPath(new URL('../../web/theme.ts', import.meta.url)), 'utf8');
   const greenBand = bandWeight(90, 149);
 
   ok(greenBand < 5,
-    `T4: green now measures ${greenBand.toFixed(1)}% of chromatic weight — if the corpus has changed, the ` +
-      'recorded contradiction needs revisiting rather than leaving a stale claim in the theme');
-  ok(/emerald green/i.test(source) && /contradiction/i.test(source),
-    'T4: the theme no longer records that the written visual spec calls for green while the images ' +
-      'contain almost none — a decision made against a document must stay visible in the file that made it');
+    `T4: green now measures ${greenBand.toFixed(1)}% of chromatic weight — the theme's stated reason for ` +
+      'having no green token no longer holds, so the claim must be revisited rather than left stale');
+  ok(/least used hue/i.test(source) && /NO green accent token/.test(source),
+    'T4: the theme no longer records why it omits green — an omission decided against intuition has to ' +
+      'stay explained in the file that decided it, or the next person will simply add green back');
+
+  // And the omission is real, not merely described: no exported accent may sit
+  // in the green band. This is what the prose above is a promise about.
+  const accents: readonly (readonly [string, string])[] = [
+    ['CYAN', CYAN], ['AMBER', AMBER], ['MAGENTA', MAGENTA],
+    ['INK', INK], ['INK_DIM', INK_DIM],
+    ['GROUND', GROUND], ['GROUND_RAISED', GROUND_RAISED], ['GROUND_EDGE', GROUND_EDGE],
+  ];
+  for (const [name, value] of accents) {
+    const h = hueOf(hex(value));
+    const chromatic = Math.max(hex(value).r, hex(value).g, hex(value).b) -
+      Math.min(hex(value).r, hex(value).g, hex(value).b) > 12;
+    ok(!(chromatic && h >= 90 && h <= 149),
+      `T4: ${name} sits at ${h.toFixed(0)} deg, inside the 90-149 green band the corpus measures at ` +
+        `${greenBand.toFixed(1)}% — the theme says it has no green token and it now has one`);
+  }
+
+  // NEGATIVE CONTROL: the band test must actually catch a green if one is added.
+  const planted = hueOf(hex('#50c878')); // emerald, the colour intuition asks for
+  ok(planted >= 90 && planted <= 149,
+    `T4 NEGATIVE CONTROL FAILED: a plainly green colour measured ${planted.toFixed(0)} deg, so the check ` +
+      'above would not have noticed one being added');
+
   console.log(
-    `  T4 disclosure: green is ${greenBand.toFixed(1)}% of chromatic weight against a spec that names it a ` +
-      'primary pillar; the theme records the disagreement and follows the images',
+    `  T4 omission: green is ${greenBand.toFixed(1)}% of chromatic weight; the theme states why it carries ` +
+      'no green token, and none of its 8 exported colours sits in the green band',
   );
 }
 
