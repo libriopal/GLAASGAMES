@@ -1,5 +1,8 @@
 # The imagination protocol, and the one thing it found
 
+> The reusable, project-independent form of this protocol is **[`EINCOL.md`](../EINCOL.md)**
+> at the repository root. This document is the session that produced it.
+
 You asked for two things: research into how an LLM is actually made to explore,
 and then the use of that research on myself, to find something real about the
 sovereignty of this project's source of truth. The analogy you gave was

@@ -1,5 +1,8 @@
 # Project-wide sovereignty audit
 
+> Run of the protocol now written up reusably as **[`EINCOL.md`](../EINCOL.md)**.
+> The classifier in the next section is §3 of that document.
+
 The imagination protocol from `design/imagination-protocol.md`, applied to the
 whole repository instead of one file. Same five steps: load the cue with real
 material, verbalize a distribution rather than an answer, take the tail
