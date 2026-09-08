@@ -16,10 +16,11 @@
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { Board, CELL_COUNT, NO_LINK } from '../../lattice/board.js';
+import { Board, CELL_COUNT, EMPTY, NO_LINK, OFFSET_FACE, OFFSET_LINK } from '../../lattice/board.js';
 import { checkReveal, commit, seedFromReveal } from '../../lattice/commit.js';
 import { generateLattice } from '../../lattice/lattice-gen.js';
-import { DEFAULT_ROUND, playRound, verifyRound } from '../../lattice/round.js';
+import { DEFAULT_ROUND, MAX_RESHUFFLE_ATTEMPTS, isStagnant, playRound, verifyRound } from '../../lattice/round.js';
+import { buildReveal, directionOf, reconstructLattice, scoreInference } from '../../lattice/reveal.js';
 import { linkObservationJoint, mutualInformation } from '../../lattice/information.js';
 import { cellCentre, tileTransform, type BoardLayout } from '../../lattice/tile-transform.js';
 import { fundingIsClean, payoutEqualsPrincipal, postBond, releaseBond } from '../../lattice/bond.js';
@@ -30,17 +31,6 @@ const ok = (condition: boolean, detail: string): void => {
   if (!condition) fail(detail);
 };
 
-/** Direction from one cell to another: 0 up, 1 right, 2 down, 3 left, 4 none. */
-function directionOf(from: number, to: number): number {
-  if (to < 0) return 4;
-  const dx = Board.columnOf(to) - Board.columnOf(from);
-  const dy = Board.rowOf(to) - Board.rowOf(from);
-  if (dx === 0 && dy === -1) return 0;
-  if (dx === 1 && dy === 0) return 1;
-  if (dx === 0 && dy === 1) return 2;
-  if (dx === -1 && dy === 0) return 3;
-  return 4;
-}
 
 /** A deterministic policy that only ever sees the observable board. */
 function greedy(observable: Int32Array, turn: number): number {
@@ -196,6 +186,116 @@ const SEED = 0x3f1a7c05 | 0;
   ok(!fundingIsClean({ accountId: 'a', amount: 100, source: 'bondPool', rank: 1 }),
     'S1 NEGATIVE CONTROL FAILED: a bond-funded prize passed the funding check');
   console.log('  S1 economy: principal returned on won/lost/abandoned, bonus rejected, bond-funded prize rejected');
+}
+
+// ── D1: stagnation is detected, and answered without knowing the score ─────
+{
+  // A board built to be stagnant on purpose: every cell links at an EMPTY cell,
+  // so no bank can move charge. This is the condition the detector exists for
+  // and it must be constructed rather than waited for.
+  const stagnant = new Board();
+  for (let i = 0; i < CELL_COUNT; i += 1) {
+    // Odd cells hold a face and link at the next (empty) even cell.
+    const holdsFace = i % 2 === 1;
+    stagnant.set(i, OFFSET_FACE, holdsFace ? 4 : EMPTY);
+    stagnant.set(i, OFFSET_LINK, holdsFace && i + 1 < CELL_COUNT ? i + 1 : NO_LINK);
+  }
+  ok(isStagnant(stagnant), 'D1: a board where every link points at an empty cell was not detected as stagnant');
+
+  // NEGATIVE CONTROL: one live link must be enough to clear the diagnosis. If a
+  // detector says "stagnant" here it would reshuffle healthy boards forever.
+  const live = new Board();
+  for (let i = 0; i < CELL_COUNT; i += 1) {
+    live.set(i, OFFSET_FACE, 3);
+    live.set(i, OFFSET_LINK, NO_LINK);
+  }
+  live.set(0, OFFSET_LINK, 1);
+  ok(!isStagnant(live), 'D1 NEGATIVE CONTROL FAILED: a board with a live link was called stagnant');
+
+  // An all-empty board is stagnant too — nothing to bank is a special case of
+  // nothing can flow.
+  ok(isStagnant(new Board()), 'D1: an empty board was not detected as stagnant');
+
+  // The detector must be blind to everything but the board. Its whole parameter
+  // list is one Board, which is checked structurally rather than by inspection.
+  ok(isStagnant.length === 1,
+    `D1: the stagnation detector takes ${isStagnant.length} parameters — it can only be allowed to see the board`);
+
+  // And a real round must not be tripping it constantly; a reshuffle on most
+  // turns would mean the threshold is wrong, not that boards are unlucky.
+  const round = playRound(SEED, DEFAULT_ROUND, greedy);
+  ok(round.reshuffles <= DEFAULT_ROUND.turns,
+    `D1: ${round.reshuffles} reshuffles in ${DEFAULT_ROUND.turns} turns — the detector is firing on healthy boards`);
+  ok(!round.conceded, 'D1: a normal round conceded, so stagnation could not be cleared on an ordinary lattice');
+  console.log(`  D1 stagnation: detected on a built-stagnant board and on an empty one, cleared on a live one, ${round.reshuffles} reshuffles in a real round (cap ${MAX_RESHUFFLE_ATTEMPTS}/turn)`);
+}
+
+// ── P2: the lattice is revealed, and the reveal is independently checkable ──
+{
+  const serverSeed = 'reveal-server-c41f';
+  const clientSeed = 'reveal-client-90ab';
+  const c = await commit(serverSeed, clientSeed);
+  const seed = await seedFromReveal({ serverSeed, clientSeed });
+  const round = playRound(seed, DEFAULT_ROUND, greedy);
+
+  const revealed = await buildReveal(c, { serverSeed, clientSeed }, seed);
+  ok(revealed.commitmentHolds, 'P2: the reveal did not satisfy the commitment published before the round');
+
+  // The reveal must reconstruct EXACTLY the lattice the round was played on,
+  // from the seed alone. Anything less and the reveal is a story about the
+  // round rather than a disclosure of it.
+  ok(revealed.links.length === round.finalLinks.length, 'P2: reveal and round disagree on board size');
+  let mismatched = 0;
+  for (let i = 0; i < CELL_COUNT; i += 1) {
+    if (revealed.links[i] !== round.finalLinks[i]) mismatched += 1;
+  }
+  ok(mismatched === 0, `P2: the revealed lattice differs from the played one in ${mismatched} cells`);
+
+  // NEGATIVE CONTROL: a reveal built from a different seed must NOT match.
+  let differs = 0;
+  const otherLinks = reconstructLattice((seed ^ 0x5eed) | 0);
+  for (let i = 0; i < CELL_COUNT; i += 1) if (otherLinks[i] !== round.finalLinks[i]) differs += 1;
+  ok(differs > 0, 'P2 NEGATIVE CONTROL FAILED: a lattice reconstructed from a different seed matched the played one');
+
+  // Inference scoring: a perfect guess, and a blind one.
+  const truth = revealed.links;
+  const perfect: number[] = [];
+  for (let i = 0; i < CELL_COUNT; i += 1) {
+    const link = truth[i]!;
+    perfect.push(link === NO_LINK ? 4 : directionOf(i, link));
+  }
+  const perfectScore = scoreInference(perfect, truth);
+  ok(perfectScore.accuracy === 1, `P2: a perfect inference scored ${perfectScore.accuracy.toFixed(3)} rather than 1`);
+
+  const blind = new Array<number>(CELL_COUNT).fill(0);
+  const blindScore = scoreInference(blind, truth);
+  ok(blindScore.accuracy < perfectScore.accuracy,
+    'P2 NEGATIVE CONTROL FAILED: guessing one direction for every cell scored as well as knowing the answer');
+  // THE BASELINE MUST NOT UNDERSTATE WHAT NO SKILL ACHIEVES. A fixed guess of
+  // one direction for every cell is the cheapest possible no-skill strategy; if
+  // the reported baseline sits below what that scores, the player is being told
+  // they beat chance when they did not. This control caught exactly that: the
+  // first implementation reported a uniform 1/5 while a constant guess scored
+  // 0.389 against this lattice's prevailing flow.
+  const constantGuessBest = Math.max(
+    ...[0, 1, 2, 3, 4].map((d) => scoreInference(new Array<number>(CELL_COUNT).fill(d), truth).accuracy),
+  );
+  ok(perfectScore.chanceBaseline >= constantGuessBest - 1e-9,
+    `P2: the reported baseline ${perfectScore.chanceBaseline.toFixed(3)} is below the best constant guess ` +
+      `${constantGuessBest.toFixed(3)} — a player scoring between them would be told they beat chance when they did not`);
+  ok(perfectScore.chanceBaseline < 1,
+    'P2: the baseline is 1.0, which would tell every player they never beat chance');
+
+  // A player who guessed nothing must not be told they were accurate.
+  ok(scoreInference(new Array<number>(CELL_COUNT).fill(-1), truth).accuracy === 0,
+    'P2: an empty inference reported non-zero accuracy');
+
+  console.log(
+    `  P2 reveal: commitment holds, lattice reconstructs from the seed alone with 0 mismatches ` +
+      `(different seed differs in ${differs}/${CELL_COUNT}), perfect inference 1.000 vs blind ` +
+      `${blindScore.accuracy.toFixed(3)}, best constant guess ${constantGuessBest.toFixed(3)}, ` +
+      `reported no-skill baseline ${perfectScore.chanceBaseline.toFixed(3)}`,
+  );
 }
 
 // ── Integration: the seam Slice 0 exists to prove ──────────────────────────

@@ -62,6 +62,8 @@ export interface RoundResult {
   readonly score: number;
   readonly turnsPlayed: number;
   readonly reshuffles: number;
+  /** True when stagnation could not be cleared and the round ended early. */
+  readonly conceded: boolean;
   readonly observations: readonly Observation[];
   /** Chained hash over the board after every turn. */
   readonly digest: number;
@@ -79,10 +81,30 @@ function drawFace(rng: () => number, weights: readonly number[]): number {
   return 6;
 }
 
-/** True when no cell can be banked — every cell empty. */
-function isDeadlocked(board: Board): boolean {
+/** How many times a stagnant board may be reshuffled before the round concedes. */
+export const MAX_RESHUFFLE_ATTEMPTS = 4;
+
+/**
+ * True when the board is STAGNANT — the real dead-board condition for this game.
+ *
+ * "No moves left" is the wrong test here, because a player can always bank any
+ * non-empty cell. What actually dies is the thing the game is about: if every
+ * bankable cell either has no link or links at an empty cell, then NOTHING the
+ * player does can move charge. The hidden lattice becomes unobservable and
+ * unexploitable, scoring flattens to bare face values, and the round degenerates
+ * into picking the biggest number on the board.
+ *
+ * That is the failure the OWC was reaching for when it boosted draw weights. It
+ * is detected here instead, at a turn boundary, by a function that cannot see
+ * the score, the turn number, or who is ahead — the whole parameter list is one
+ * board.
+ */
+export function isStagnant(board: Board): boolean {
   for (let i = 0; i < CELL_COUNT; i += 1) {
-    if (board.get(i, OFFSET_FACE) !== EMPTY) return false;
+    if (board.get(i, OFFSET_FACE) === EMPTY) continue;
+    const link = board.get(i, OFFSET_LINK);
+    if (link === NO_LINK) continue;
+    if (board.get(link, OFFSET_FACE) !== EMPTY) return false;
   }
   return true;
 }
@@ -116,20 +138,32 @@ export function playRound(
 
   let score = 0;
   let reshuffles = 0;
+  let conceded = false;
   const observations: Observation[] = [];
   let chained = 0x811c9dc5;
 
   let turn = 0;
   for (; turn < config.turns; turn += 1) {
-    if (isDeadlocked(board)) {
-      // Visible reshuffle. Symmetric, player-agnostic, at a turn boundary — it
-      // repopulates the board from the same fixed weights and knows nothing
-      // about the score.
+    // ── D1: stagnation is detected and answered VISIBLY ────────────────────
+    // Bounded attempts, because a reshuffle cannot rescue every lattice — if a
+    // region's links all point off the board there may be no arrangement of
+    // faces that restores flow. Looping forever would hang; looping silently
+    // would hide it. The round concedes instead and reports how many attempts
+    // it made, so an unplayable lattice shows up as a number rather than as a
+    // freeze.
+    let attempts = 0;
+    while (isStagnant(board) && attempts < MAX_RESHUFFLE_ATTEMPTS) {
       for (let i = 0; i < CELL_COUNT; i += 1) {
         board.set(i, OFFSET_FACE, drawFace(rng, weights));
         board.set(i, OFFSET_STATE, STATE_IDLE);
+        board.set(i, OFFSET_CHARGE, 0);
       }
       reshuffles += 1;
+      attempts += 1;
+    }
+    if (attempts >= MAX_RESHUFFLE_ATTEMPTS && isStagnant(board)) {
+      conceded = true;
+      break;
     }
 
     const banked = chooseAction(board.observable(), turn);
@@ -180,6 +214,7 @@ export function playRound(
     score,
     turnsPlayed: turn,
     reshuffles,
+    conceded,
     observations,
     digest: chained >>> 0,
     finalLinks: board.hiddenLinks(),
