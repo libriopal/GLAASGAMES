@@ -6,6 +6,7 @@
 // R3  a rule-constant edit DOES move the hash           (NEGATIVE CONTROL)
 // R4  the seed commitment now rejects a rules mismatch, and needs a third party to
 // R5  a mismatch names the file, not merely the fact
+// R6  the code/comment scanner survives adversarial source (found by verify-oracles)
 //
 // R3 is the one that matters. Every other check here can be satisfied by a
 // function that returns a constant string. This project's standing rule is that
@@ -16,7 +17,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { checkReveal, commit, type Commitment, type Reveal } from '../../lattice/commit.js';
-import { computeRules, RULE_SOURCES, sameRules, semanticText, type RulesDigest } from '../../lattice/ruleset.js';
+import { codeSpans, computeRules, RULE_SOURCES, sameRules, semanticText, type RulesDigest } from '../../lattice/ruleset.js';
 
 const failures: string[] = [];
 const fail = (detail: string): void => void failures.push(detail);
@@ -175,6 +176,76 @@ const baseline = computeRules();
     `R5: the mismatch reported ${JSON.stringify(comparison.differing)} instead of naming lattice/board.ts alone`);
   ok(sameRules(baseline, computeRules()).agree, 'R5: an unmodified tree reported a difference');
   console.log(`  R5 attribution: mismatch reported as "${comparison.differing[0]}", not merely as disagreement`);
+}
+
+// ── R6: the code/comment scanner survives adversarial source ───────────────
+//
+// FOUND BY verify-oracles TIER 2. Three generated mutants survived inside
+// `codeSpans`: inverting the backslash-escape test, changing its stride, and
+// flipping the isString flag. All three survived for the same reason — no file
+// in RULE_SOURCES happens to contain a string with an escaped quote, a
+// comment-like sequence inside a string, or a run of spaces inside a string, so
+// those branches were never executed by anything.
+//
+// That is not a cosmetic gap. `codeSpans` decides what counts as executable
+// text for the rules hash AND for the mutation harness. If it mistakes a string
+// for code, an edit to a message moves the rules hash and raises a false
+// mismatch; if it mistakes code for a comment, a REAL rule change stops moving
+// the hash and the binding silently fails open. The second is the one that
+// matters, and it was resting on inputs that never tested it.
+//
+// So the scanner is tested directly, on source that no rule file contains yet.
+{
+  const cases: readonly (readonly [string, string, string])[] = [
+    [
+      'an escaped quote does not end the string',
+      "const a = 'it\\'s'; const b = 1;",
+      'b=1 must survive as code',
+    ],
+    [
+      'a comment marker inside a string is not a comment',
+      "const url = 'https://x/y'; const after = 2;",
+      'the // inside the literal must not eat the rest of the line',
+    ],
+    [
+      'a quote inside a comment does not open a string',
+      "// don't stop here\nconst c = 3;",
+      'the apostrophe must not swallow the following code',
+    ],
+    [
+      'a block comment containing a quote closes normally',
+      "/* it's fine */ const d = 4;",
+      'the declaration after the comment must remain code',
+    ],
+  ];
+
+  for (const [name, source, why] of cases) {
+    const semantic = semanticText(source);
+    // In every case the trailing declaration is real code and must survive.
+    const trailing = source.slice(source.lastIndexOf('const'));
+    const stripped = trailing.replace(/\s+/g, ' ').trim();
+    ok(semantic.includes(stripped),
+      `R6: ${name} — ${why}. semanticText(${JSON.stringify(source)}) = ${JSON.stringify(semantic)}`);
+  }
+
+  // Whitespace inside a string literal is BEHAVIOUR and must be preserved.
+  // The isString flag is what protects it; the mutant that flipped it survived
+  // because nothing checked this.
+  const spaced = semanticText("const msg = 'a  b';");
+  ok(spaced.includes("'a  b'"),
+    `R6: a double space inside a string literal was collapsed — ${JSON.stringify(spaced)}. Two programs ` +
+      'printing different text would hash identically.');
+
+  // NEGATIVE CONTROL: the scanner must still remove a real comment.
+  ok(!semanticText('const e = 5; // remove me').includes('remove me'),
+    'R6 NEGATIVE CONTROL FAILED: a line comment survived semanticText, so nothing is being stripped at all');
+
+  // And the string/code distinction must be visible in the spans themselves.
+  const spans = codeSpans("const f = 'x';");
+  ok(spans.some((s) => s.isString) && spans.some((s) => !s.isString),
+    'R6: codeSpans did not report both a string span and a code span for a line that plainly has both');
+
+  console.log(`  R6 scanner: ${cases.length} adversarial sources parse correctly, string whitespace preserved, comments still stripped`);
 }
 
 if (failures.length > 0) {

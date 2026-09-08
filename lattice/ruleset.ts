@@ -74,70 +74,110 @@ export const RULE_SOURCES: readonly string[] = [
   'engine/sim/hash.ts',
 ];
 
+/** A half-open [start, end) range of the source that is executable text. */
+export interface CodeSpan {
+  readonly start: number;
+  readonly end: number;
+  /** True when the span is the inside of a string literal, quotes excluded. */
+  readonly isString: boolean;
+}
+
 /**
- * Strips what cannot change behaviour: line comments, block comments, and
- * runs of whitespace.
+ * Splits a source file into the regions that are executable and the regions
+ * that are not, without parsing it.
  *
- * This is deliberately conservative rather than a parser. It can only ever
- * remove characters, so the failure mode is a hash that moves when it did not
- * strictly need to — a false mismatch, which is loud and gets investigated.
- * The dangerous failure would be the opposite: normalising away something that
- * DOES change behaviour, producing two builds that play differently under one
- * hash. Nothing here can do that, because nothing here rewrites a token.
+ * Deliberately conservative: it can only ever classify code AS comment by
+ * mistake in ways that make the hash move more often, never less. The
+ * dangerous direction — treating something behaviour-bearing as inert — would
+ * let two builds play differently under one hash, and nothing here can do that
+ * because nothing here rewrites a token.
+ *
+ * Shared with the mutation harness in `engine/verify/mutate.ts`, which needs
+ * exactly the same distinction for the opposite reason: a mutation planted in
+ * a comment tests nothing, and a negative control that perturbs a comment while
+ * announcing itself as a negative control is how this project's own oracle was
+ * briefly vacuous. One scanner, so the hash and the mutator can never disagree
+ * about what counts as code.
  */
-export function semanticText(source: string): string {
-  let out = '';
-  let i = 0;
+export function codeSpans(source: string): readonly CodeSpan[] {
+  const spans: CodeSpan[] = [];
   const n = source.length;
-  let inString: string | null = null;
+  let i = 0;
+  let spanStart = 0;
+
+  const close = (end: number, isString = false): void => {
+    if (end > spanStart) spans.push({ start: spanStart, end, isString });
+  };
 
   while (i < n) {
     const c = source[i]!;
     const next = source[i + 1];
 
-    if (inString !== null) {
-      out += c;
-      if (c === '\\') {
-        // Escape: consume the escaped character verbatim so a backslash before
-        // a quote cannot be mistaken for the end of the string.
-        if (i + 1 < n) out += source[i + 1]!;
-        i += 2;
-        continue;
-      }
-      if (c === inString) inString = null;
-      i += 1;
-      continue;
-    }
-
     if (c === '"' || c === "'" || c === '`') {
-      inString = c;
-      out += c;
+      close(i);
+      const quote = c;
+      const literalStart = i;
       i += 1;
+      while (i < n) {
+        if (source[i] === '\\') { i += 2; continue; }
+        if (source[i] === quote) break;
+        i += 1;
+      }
+      i += 1;
+      // The QUOTES ARE PART OF THE SPAN. Excluding them would make the literal
+      // 'x' and the identifier x hash identically, which is a collision
+      // between two different programs and exactly what this file exists to
+      // prevent.
+      spans.push({ start: literalStart, end: Math.min(i, n), isString: true });
+      spanStart = i;
       continue;
     }
 
     if (c === '/' && next === '/') {
+      close(i);
       while (i < n && source[i] !== '\n') i += 1;
+      spanStart = i;
       continue;
     }
 
     if (c === '/' && next === '*') {
+      close(i);
       i += 2;
       while (i < n && !(source[i] === '*' && source[i + 1] === '/')) i += 1;
       i += 2;
+      spanStart = i;
       continue;
     }
 
-    if (c === ' ' || c === '\t' || c === '\r' || c === '\n') {
-      // Collapse to a single space. Whitespace between tokens is not zero —
-      // `const x` is not `constx` — so it is reduced, never deleted.
-      if (out.length > 0 && out[out.length - 1] !== ' ') out += ' ';
-      i += 1;
-      continue;
-    }
-
-    out += c;
     i += 1;
+  }
+  close(n);
+  return spans;
+}
+
+/**
+ * Strips what cannot change behaviour: line comments, block comments, and
+ * runs of whitespace. Built on `codeSpans` so the rules hash and the mutation
+ * harness share one definition of "code".
+ */
+export function semanticText(source: string): string {
+  let out = '';
+  for (const span of codeSpans(source)) {
+    const text = source.slice(span.start, span.end);
+    if (span.isString) {
+      // String contents are behaviour. Preserved verbatim, whitespace included.
+      out += text;
+      continue;
+    }
+    for (const ch of text) {
+      if (ch === ' ' || ch === '\t' || ch === '\r' || ch === '\n') {
+        // Collapse to a single space. Whitespace between tokens is not zero —
+        // `const x` is not `constx` — so it is reduced, never deleted.
+        if (out.length > 0 && out[out.length - 1] !== ' ') out += ' ';
+      } else {
+        out += ch;
+      }
+    }
   }
   return out.trim();
 }

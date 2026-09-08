@@ -45,6 +45,7 @@
     "build:store-assets": "node scripts/build-store-assets.mjs",
     "verify:lattice": "tsx engine/verify/verify-lattice.ts",
     "verify:ruleset": "tsx engine/verify/verify-ruleset.ts",
+    "verify:oracles": "tsx engine/verify/verify-oracles.ts",
     "verify:theme": "tsx engine/verify/verify-theme.ts",
     "ingest:corpus": "python3 design/ingest-corpus.py"
   },

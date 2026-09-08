@@ -70,7 +70,22 @@ export interface RoundResult {
   readonly finalLinks: Int32Array;
 }
 
-function drawFace(rng: () => number, weights: readonly number[]): number {
+/**
+ * Draws one die face.
+ *
+ * EXPORTED SO IT CAN BE MEASURED. This is the entire fairness surface of the
+ * game — every face that ever reaches the board comes through here — and L1y in
+ * `verify-lattice` samples it directly rather than inferring the distribution
+ * from played rounds. Exposing the faces on `RoundResult` would have been the
+ * alternative, and would have widened the game's public result shape to suit a
+ * test; this widens nothing a player sees.
+ *
+ * Note `Math.abs(rng()) % total` is a modulo over an i32, so a `total` that is
+ * not a divisor of the RNG's range introduces a small modulo bias. With six
+ * equal weights of 4 the total is 24, and L1y measures the resulting
+ * distribution empirically rather than assuming the bias is negligible.
+ */
+export function drawFace(rng: () => number, weights: readonly number[]): number {
   let total = 0;
   for (let f = 1; f <= 6; f += 1) total += weights[f]!;
   let pick = Math.abs(rng()) % total;
