@@ -18,6 +18,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { Board, CELL_COUNT, EMPTY, NO_LINK, OFFSET_FACE, OFFSET_LINK } from '../../lattice/board.js';
 import { checkReveal, commit, seedFromReveal } from '../../lattice/commit.js';
+import { computeRules } from '../../lattice/ruleset.js';
 import { generateLattice, generateLattice as genLattice } from '../../lattice/lattice-gen.js';
 import { DEFAULT_ROUND, MAX_RESHUFFLE_ATTEMPTS, isStagnant, playRound, verifyRound } from '../../lattice/round.js';
 import { buildReveal, directionOf, reconstructLattice, scoreInference } from '../../lattice/reveal.js';
@@ -89,25 +90,29 @@ const SEED = 0x3f1a7c05 | 0;
   console.log(`  P1 honesty: hidden lattice carries ${mi.toFixed(3)} bits about what the player can see (randomised control: ${noiseMi.toFixed(3)} bits)`);
 }
 
+// The verifier's OWN rules digest. Every commitment below is checked against
+// this rather than against the operator's claim — see lattice/ruleset.ts.
+const RULES = computeRules().hash;
+
 // ── H1: commit-reveal binds the seed ───────────────────────────────────────
 {
   const serverSeed = 'slice0-server-seed-8f1e';
   const clientSeed = 'player-chosen-4d2a';
-  const c = await commit(serverSeed, clientSeed);
+  const c = await commit(serverSeed, clientSeed, RULES);
 
-  ok(await checkReveal(c, { serverSeed, clientSeed }), 'H1: an honest reveal failed its own commitment');
+  ok(await checkReveal(c, { serverSeed, clientSeed, rulesHash: RULES }, RULES), 'H1: an honest reveal failed its own commitment');
 
   // Negative controls: a changed server seed, and a changed client seed.
-  ok(!(await checkReveal(c, { serverSeed: `${serverSeed}x`, clientSeed })),
+  ok(!(await checkReveal(c, { serverSeed: `${serverSeed}x`, clientSeed, rulesHash: RULES }, RULES)),
     'H1 NEGATIVE CONTROL FAILED: a different server seed satisfied the commitment');
-  ok(!(await checkReveal(c, { serverSeed, clientSeed: 'someone-elses' })),
+  ok(!(await checkReveal(c, { serverSeed, clientSeed: 'someone-elses', rulesHash: RULES }, RULES)),
     'H1 NEGATIVE CONTROL FAILED: a different client seed satisfied the commitment');
 
-  const seedA = await seedFromReveal({ serverSeed, clientSeed });
-  const seedB = await seedFromReveal({ serverSeed, clientSeed });
+  const seedA = await seedFromReveal({ serverSeed, clientSeed, rulesHash: RULES });
+  const seedB = await seedFromReveal({ serverSeed, clientSeed, rulesHash: RULES });
   ok(seedA === seedB, 'H1: the same reveal produced two different seeds');
   ok(Number.isInteger(seedA), `H1: the folded seed is not an integer: ${seedA}`);
-  ok(seedA !== await seedFromReveal({ serverSeed: `${serverSeed}x`, clientSeed }),
+  ok(seedA !== await seedFromReveal({ serverSeed: `${serverSeed}x`, clientSeed, rulesHash: RULES }),
     'H1: two different server seeds folded to the same lattice seed');
   console.log(`  H1 commitment: honest reveal verifies, both tampered reveals rejected, seed folds to i32 ${seedA}`);
 }
@@ -235,11 +240,11 @@ const SEED = 0x3f1a7c05 | 0;
 {
   const serverSeed = 'reveal-server-c41f';
   const clientSeed = 'reveal-client-90ab';
-  const c = await commit(serverSeed, clientSeed);
-  const seed = await seedFromReveal({ serverSeed, clientSeed });
+  const c = await commit(serverSeed, clientSeed, RULES);
+  const seed = await seedFromReveal({ serverSeed, clientSeed, rulesHash: RULES });
   const round = playRound(seed, DEFAULT_ROUND, greedy);
 
-  const revealed = await buildReveal(c, { serverSeed, clientSeed }, seed);
+  const revealed = await buildReveal(c, { serverSeed, clientSeed, rulesHash: RULES }, seed, RULES);
   ok(revealed.commitmentHolds, 'P2: the reveal did not satisfy the commitment published before the round');
 
   // The reveal must reconstruct EXACTLY the lattice the round was played on,
@@ -363,9 +368,9 @@ const SEED = 0x3f1a7c05 | 0;
 {
   const serverSeed = 'integration-server';
   const clientSeed = 'integration-client';
-  const c = await commit(serverSeed, clientSeed);
-  ok(await checkReveal(c, { serverSeed, clientSeed }), 'integration: reveal failed');
-  const seed = await seedFromReveal({ serverSeed, clientSeed });
+  const c = await commit(serverSeed, clientSeed, RULES);
+  ok(await checkReveal(c, { serverSeed, clientSeed, rulesHash: RULES }, RULES), 'integration: reveal failed');
+  const seed = await seedFromReveal({ serverSeed, clientSeed, rulesHash: RULES });
 
   const actions: number[] = [];
   const played = playRound(seed, DEFAULT_ROUND, (observable, turn) => {

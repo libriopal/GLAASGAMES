@@ -13,6 +13,19 @@
 //
 // The client seed is mixed in so the operator cannot pick a server seed AFTER
 // seeing what the player will do. Neither side alone determines the lattice.
+//
+// AND IT DID NOT ORIGINALLY BIND THE RULES, WHICH WAS THE LARGER HOLE. A seed
+// commitment constrains the input; the operator was still free to choose the
+// function. `ruleset.ts` documents the attack that survived every check in this
+// repo, and `rulesHash` below is what closes it.
+//
+// REJECTED ALTERNATIVE, recorded because it is the obvious one: fold the rules
+// hash into `seedFromReveal` so a modified build simply generates a different
+// lattice. That is strictly stronger as a deterrent — divergence becomes
+// immediate rather than merely detectable — but it makes "we disagree about the
+// rules" and "we disagree about the seed" indistinguishable at the point of
+// failure, which is the exact mistake `frame.ts` exists to avoid. Detection
+// that names its cause was preferred over silent divergence.
 
 const encoder = new TextEncoder();
 
@@ -21,11 +34,23 @@ export interface Commitment {
   readonly hash: string;
   /** Published before the round; chosen by the player. */
   readonly clientSeed: string;
+  /**
+   * The rules the round will be played under — see `ruleset.ts`.
+   *
+   * Committing a seed without committing the rules proves only that the
+   * operator did not steer the INPUT. It leaves the FUNCTION free, and a
+   * function chosen after the fact is worth more to a dishonest operator than
+   * a seed is. This field is what stops two players verifying two different
+   * games and both getting `true`.
+   */
+  readonly rulesHash: string;
 }
 
 export interface Reveal {
   readonly serverSeed: string;
   readonly clientSeed: string;
+  /** The rules hash the executor that played this round actually computed. */
+  readonly rulesHash: string;
 }
 
 export async function sha256Hex(data: string): Promise<string> {
@@ -33,13 +58,33 @@ export async function sha256Hex(data: string): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-export async function commit(serverSeed: string, clientSeed: string): Promise<Commitment> {
-  return { hash: await sha256Hex(serverSeed), clientSeed };
+export async function commit(
+  serverSeed: string,
+  clientSeed: string,
+  rulesHash: string,
+): Promise<Commitment> {
+  return { hash: await sha256Hex(serverSeed), clientSeed, rulesHash };
 }
 
-/** True when the revealed seed is the one that was committed to. */
-export async function checkReveal(commitment: Commitment, reveal: Reveal): Promise<boolean> {
+/**
+ * True when the revealed seed is the one that was committed to AND the round
+ * was played under the rules that were committed to.
+ *
+ * `localRulesHash` is the caller's OWN independently-computed digest — see
+ * `ruleset.computeRules()`. It is a required argument rather than an optional
+ * one on purpose. Comparing the commitment's rules hash against the reveal's
+ * rules hash alone would check the operator's word against the operator's word
+ * and always pass; the check only has force when a third value, computed on
+ * hardware the operator does not control, is brought into the comparison.
+ */
+export async function checkReveal(
+  commitment: Commitment,
+  reveal: Reveal,
+  localRulesHash: string,
+): Promise<boolean> {
   if (reveal.clientSeed !== commitment.clientSeed) return false;
+  if (commitment.rulesHash !== reveal.rulesHash) return false;
+  if (commitment.rulesHash !== localRulesHash) return false;
   return (await sha256Hex(reveal.serverSeed)) === commitment.hash;
 }
 
