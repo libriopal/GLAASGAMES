@@ -70,9 +70,30 @@ await cp(
 // the Android host loads the assets root.
 await cp(join(root, 'web', 'app.html'), join(out, 'index.html'));
 
-// The WebGPU host is deliberately NOT shipped. It cannot run in a WebView, and
-// shipping a second entry point that always fails is worse than not shipping it.
-await rm(join(out, 'dist', 'web', 'main.js'), { force: true });
+// Neither WebGPU entry point is shipped. Both need an adapter that a WebView
+// does not provide, so both would fail on every device that installs this, and
+// an entry point that always fails is worse than an absent one. parity.js is
+// here for the same reason main.js is: it was added later, and this list is the
+// kind that silently goes stale, so it is asserted below rather than trusted.
+const WEBGPU_ONLY = ['main.js', 'parity.js'];
+for (const name of WEBGPU_ONLY) {
+  await rm(join(out, 'dist', 'web', name), { force: true });
+}
+
+// Nothing that reaches for WebGPU may survive into the bundle. A grep is a
+// blunt check, but it fails loudly when someone adds a third WebGPU entry point
+// and forgets this list — which is exactly how main.js came to be handled and
+// parity.js did not.
+for (const entry of await readdir(join(out, 'dist', 'web'))) {
+  if (!entry.endsWith('.js')) continue;
+  const text = await readFile(join(out, 'dist', 'web', entry), 'utf8');
+  if (/navigator\s*\.\s*gpu|requestAdapter/.test(text)) {
+    throw new Error(
+      `${entry} reaches for WebGPU but is being staged into the APK, where no ` +
+      `adapter exists. Add it to WEBGPU_ONLY in this script, or make it degrade.`,
+    );
+  }
+}
 
 const bytes = await totalBytes(out);
 console.log(`app assets staged at ${relative(root, out)} — ${(bytes / 1024).toFixed(0)} KB`);

@@ -1,9 +1,9 @@
-# The development loop — plan for approval
+# The development loop — plan, approved and delivered
 
-**Status: AWAITING HUMAN APPROVAL AT THE VERIFY GATE.**
-Nothing in the Design or Code sections has been started. This document is the
-output of the Research and Audit halves only, which is what the plan was asked
-to be built from.
+**Status: APPROVED at the verify gate. Increments 1–4 delivered.**
+The record of what was built, and what the loop caught while building it, is in
+§9. Everything above §9 is the plan as it was approved, unedited — a plan
+rewritten after the fact to match what happened is not a plan, it is a report.
 
 I am the architect. The auditor is a different model on a different vendor's
 inference stack, called directly over the Cloudflare Workers AI API
@@ -281,3 +281,62 @@ tell us something we cannot currently know, and it is sequenced last. If you
 would rather learn early whether the engine's central premise — bit-identical
 across vendors — actually holds on real hardware, move it to first. It is a
 measurement, not a build, and it would cost an afternoon.
+
+---
+
+## 9. Delivery record
+
+Increments 1–4 shipped, plus a second renderer and an Android app the plan did
+not anticipate needing. CI run #10 is green on both jobs.
+
+| Increment | State | Oracle | Value |
+|---|---|---|---|
+| 1 Replay verification | done | `verify-replay` | digest `0xa5ba1db3`, 7 negative controls |
+| 2 Control rework | done | `verify-controls` | 50 controls across 10 viewports |
+| 3 Daily seed | done | `verify-daily` | 1460 days, 0 collisions |
+| 4 Real-silicon parity | tool shipped | `web/parity.html` | measurement is the user's to take |
+
+### What the negative-control rule actually caught
+
+The rule cost one extra run per obligation and found three real defects in the
+first suite it was applied to. All three are the same species: a check that
+passes while testing nothing.
+
+1. A pilot that ran 1,800 ticks and collected nothing. Reproduced perfectly,
+   proved nothing.
+2. **The digest did not bind the player's trajectory.** The host wrote the
+   player's position into the world buffer every tick; the replay executor did
+   not. A run flown along a completely different path hashed identically so long
+   as it collected the same targets. This is the finding that justifies the
+   whole rule — no amount of reading the code would have surfaced it, because
+   the code looked right.
+3. The negative control itself was broken. It perturbed an input already sitting
+   on the −1.0 rail, so `clampUnit` folded the tamper straight back and the
+   "tampered" replay was byte-identical to the honest one.
+
+### An unanticipated architectural fact
+
+Android's WebView does not expose WebGPU. Chrome for Android has since 121, but
+an installed APK renders with the WebView, so a WebGPU-only engine cannot ship
+as an app. Hence two hosts over one engine, and the CPU host is the one that
+ships — which is the stronger position, since `kernel.ts` is the semantic
+definition rather than a port of one.
+
+### A finding about the auditor itself
+
+`@cf/google/gemma-4-26b-a4b-it` is a reasoning model, and on multi-part
+structured prompts it degenerates: the round-2 audit spent its full 9,000-token
+budget looping, and the audit of the shipped work spent 14,000 tokens repeating
+a single sentence and never answered. Both were recorded as `[NO ANSWER]` rather
+than silently read as "no findings" — `audit.py` was changed to make an empty
+completion loud, because an empty audit that reads as a clean one is worse than
+no audit.
+
+**One question per call, under 7,000 tokens, works reliably.** That is now the
+way to use it. Asked that way it returned a usable finding: that the player's
+velocity was probably still unbound by the digest. Checked against the code, it
+does not apply — the player has no velocity at all; position is input × speed
+with no momentum, the kernel skips physics for `KIND_PLAYER`, and velocity is
+only ever written as zero at spawn. The category was right and the instance was
+wrong, which is roughly what the literature predicts of an LLM critic and
+exactly why the deterministic oracles outrank it.
