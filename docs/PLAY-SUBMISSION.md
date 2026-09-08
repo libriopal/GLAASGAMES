@@ -109,10 +109,24 @@ hand-made once and lost:
 
 A first draft of the short description, to argue with rather than adopt:
 
-> A new four-dimensional world every day. Every run is verifiable. No ads.
+> A dice puzzle with a hidden layout. Read the pattern, check the result. No ads.
 
-The three claims in it are all things the build actually enforces, which is
-the only reason to make them.
+The claims are things the build enforces, which is the only reason to make them.
+
+**This was rewritten because the app changed and the listing did not.** The
+previous draft — "A new four-dimensional world every day" — described the 4D
+engine demo, which was the landing screen until the lattice game shipped. It is
+now reached through a link at the bottom of the game. `verify-listing` P2 fails
+the build if the listing drifts from what the app actually opens on, because
+nobody re-reads a listing after changing code.
+
+**On wording, and it is not a style question.** An independent reviewer, shown
+only what a Play reviewer sees, judged the earlier copy to read as SIMULATED
+GAMBLING — naming "Bank", and the proof panel's "commitment / server seed /
+digest / reveal & verify", as the Provably Fair vocabulary of crypto-casinos.
+The mechanism is unchanged and still fully disclosed; the words are now plain
+English ("take a cell", "round key", "fingerprint", "show the answer").
+`verify-listing` P3 holds that line.
 
 ## 8. Build commands
 

@@ -109,7 +109,7 @@
 <body>
   <div id="app">
     <h1>GLAAS · Lattice</h1>
-    <p class="sub">Bank a cell each turn. Charge moves along links you cannot see — until the reveal.</p>
+    <p class="sub">Take a cell each turn. Energy flows along hidden links — until you show the answer.</p>
 
     <div id="status">
       <div><b id="s-score">0</b><span>Score</span></div>
@@ -142,13 +142,13 @@
     <div id="board" role="grid" aria-label="Game board, 6 by 6"></div>
 
     <div id="actions">
-      <button class="primary" id="btn-reveal" disabled>Reveal &amp; verify</button>
+      <button class="primary" id="btn-reveal" disabled>Show the answer</button>
       <button class="primary" id="btn-new">New round</button>
     </div>
 
     <div id="proof">
-      <h2>Proof</h2>
-      <div id="proof-body">The commitment is published before the first turn.</div>
+      <h2>How this round was decided</h2>
+      <div id="proof-body">The hidden layout is locked in before your first move.</div>
     </div>
 
     <p><a href="engine.html">4D engine demo →</a></p>

@@ -172,7 +172,7 @@ try {
   await page.waitForFunction(
     () => {
       const doc = (globalThis as unknown as { document: { getElementById(id: string): { textContent: string | null } | null } }).document;
-      return (doc.getElementById('proof-body')?.textContent ?? '').includes('server seed');
+      return (doc.getElementById('proof-body')?.textContent ?? '').includes('round key');
     },
     undefined,
     { timeout: 15_000 },
@@ -186,9 +186,9 @@ try {
   // A4 PARITY. Recompute here, in Node, from values the page published, and
   // require agreement. The page verifying itself would be the app vouching for
   // the app.
-  const seedText = /server seed ([0-9a-f]+)/.exec(proof)?.[1];
-  const digestText = /digest 0x([0-9a-f]+)/.exec(proof)?.[1];
-  ok(seedText !== undefined, 'A4: the proof panel did not publish the server seed, so it cannot be checked');
+  const seedText = /round key ([0-9a-f]+)/.exec(proof)?.[1];
+  const digestText = /fingerprint 0x([0-9a-f]+)/.exec(proof)?.[1];
+  ok(seedText !== undefined, 'A4: the proof panel did not publish the round key, so it cannot be checked');
   ok(digestText !== undefined, 'A4: the proof panel did not publish the digest');
 
   if (seedText && digestText) {

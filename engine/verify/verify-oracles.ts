@@ -172,6 +172,14 @@ const CURATED: readonly Curated[] = [
       'still sold, which is the defect D1 was written after finding',
   },
   {
+    oracle: 'engine/verify/verify-listing.ts',
+    subject: 'web/lattice.html',
+    find: 'Take a cell each turn.',
+    replace: 'Bank a cell each turn. Server seed shown after every round.',
+    why: 'restores the provably-fair vernacular an independent reviewer judged to read as simulated gambling — ' +
+      'the exact copy regression P3 exists to stop',
+  },
+  {
     oracle: 'engine/verify/verify-fixed.ts',
     subject: 'engine/math/fixed.ts',
     find: 'export function mulFixed',

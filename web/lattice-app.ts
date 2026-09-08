@@ -143,7 +143,7 @@ function onBank(index: number): void {
   const view = session.bank(index);
   render(view);
   if (view.phase === 'ended') {
-    proofBody.textContent = 'Round over. Reveal to check the lattice against the commitment made before you played.';
+    proofBody.textContent = 'Round over. Show the answer to check the hidden layout against the lock made before you played.';
   }
 }
 
@@ -171,9 +171,9 @@ async function newRound(): Promise<void> {
   const rules = computeRulesFromManifest();
   session = await Session.open(seeds.server, seeds.client, rules, DEFAULT_ROUND);
   proofBody.innerHTML =
-    `Commitment published <span class="ok">before</span> turn 1.<br>` +
-    `H = <code>${session.commitment.hash.slice(0, 32)}…</code><br>` +
-    `rules = <code>${session.commitment.rulesHash.slice(0, 32)}…</code>`;
+    `Layout locked <span class="ok">before</span> turn 1.<br>` +
+    `lock <code>${session.commitment.hash.slice(0, 32)}…</code><br>` +
+    `rules <code>${session.commitment.rulesHash.slice(0, 32)}…</code>`;
   render(session.start());
 }
 
@@ -205,10 +205,10 @@ async function onReveal(): Promise<void> {
     `<span class="${good ? 'ok' : 'bad'}">${good ? '✓' : '✗'}</span> ${text}`;
 
   proofBody.innerHTML = [
-    mark(holds, 'the revealed seed matches the commitment published before turn 1'),
-    mark(check.ok, `replaying your ${bundle.actions.length} moves reproduces score ${check.score}`),
-    `<br>server seed <code>${bundle.reveal.serverSeed}</code>`,
-    `digest <code>0x${(bundle.digest >>> 0).toString(16)}</code>`,
+    mark(holds, 'the hidden layout matches the one locked in before turn 1 — it was not changed while you played'),
+    mark(check.ok, `replaying your ${bundle.actions.length} moves gives the same score, ${check.score}`),
+    `<br>round key <code>${bundle.reveal.serverSeed}</code>`,
+    `fingerprint <code>0x${(bundle.digest >>> 0).toString(16)}</code>`,
     `<br>Links are now shown on each cell as <span style="color:var(--link)">→n</span>.`,
   ].join('<br>');
 
