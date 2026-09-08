@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- No action bar: the game is the whole screen. The window background
+         matches the page's own #05050a so the launch transition does not flash
+         white before the WebView paints. -->
+    <style name="Theme.Glaas" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/ground</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="p">shortEdges</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
+</resources>

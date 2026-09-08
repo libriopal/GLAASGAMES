@@ -93,3 +93,73 @@ jobs:
 
       - name: Secrets scans
         run: npm run verify:no-secrets && npm run verify:no-prod-credentials-local
+
+  # The Android build is the deliverable, so it is built on every push rather
+  # than only when someone remembers to. It runs as a separate job because it
+  # needs the Android SDK and nothing in the parity job does.
+  #
+  # This proves the APK still ASSEMBLES. It does not prove it runs: GitHub's
+  # hosted runners have no KVM, so no emulator can boot, and an APK that builds
+  # is not an APK that works. Installing it on a real device remains the test.
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - run: npm ci
+
+      - name: Compile the hosts and stage the app assets
+        run: npm run build:web && npm run build:app-assets
+
+      # Unsigned: the release keystore is not in CI and must never be. This job
+      # answers "does it build", and signing is a separate concern handled on a
+      # machine that holds the key.
+      - name: Assemble the debug APK
+        working-directory: android
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Check what the APK actually contains
+        run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          AAPT=$(ls -d "$ANDROID_HOME"/build-tools/*/ | tail -1)aapt2
+
+          # targetSdk must stay at 36: from 31 August 2026 Play blocks anything
+          # lower, and a silent downgrade would not be noticed until submission.
+          "$AAPT" dump badging "$APK" | grep -q "targetSdkVersion:'36'" \
+            || { echo "::error::APK does not target API 36"; exit 1; }
+
+          # No INTERNET permission. This is the load-bearing claim behind the
+          # Data Safety declaration and the Minimum Functionality argument, so
+          # it is asserted rather than trusted.
+          if "$AAPT" dump permissions "$APK" | grep -q 'android.permission.INTERNET'; then
+            echo "::error::APK requests INTERNET — the offline claim is no longer true"
+            exit 1
+          fi
+
+          # No native libraries, so the 16 KB page-size requirement is satisfied
+          # by having nothing that could violate it.
+          if unzip -l "$APK" | grep -q '\.so$'; then
+            echo "::error::APK contains native libraries — check 16 KB page alignment"
+            exit 1
+          fi
+
+          echo "APK: targets 36, no INTERNET, no native libraries"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

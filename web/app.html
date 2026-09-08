@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>GLAAS · 4D Daily</title>
+<style>
+  /* The safe-area insets are published as custom properties so the layout
+     function in controls-layout.ts can read the same numbers CSS uses, rather
+     than a second guess at them. */
+  :root {
+    color-scheme: dark;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: #05050a; color: #e8e8f0;
+    font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    /* The canvas handles its own gestures; stop the browser stealing them. */
+    overscroll-behavior: none; touch-action: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+  #hud {
+    position: fixed; top: 0; left: 0; padding: 10px 12px;
+    padding-top: max(10px, var(--safe-top));
+    padding-left: max(12px, var(--safe-left));
+    background: linear-gradient(135deg, rgba(6,6,14,.82), rgba(6,6,14,.42));
+    border-bottom-right-radius: 10px;
+    backdrop-filter: blur(8px);
+    pointer-events: none;
+    max-width: min(70vw, 320px);
+  }
+  #hud h1 { margin: 0 0 6px; font-size: 11px; letter-spacing: .16em; color: #7bdfff; font-weight: 600; }
+  .row { display: flex; gap: 8px; white-space: nowrap; font-size: 12px; }
+  .k { color: #7a7a92; min-width: 62px; }
+  .v { color: #e8e8f0; }
+  #day { color: #9dff9d; }
+
+  /* Controls are positioned from JavaScript, by the same pure layout function
+     the headless verifier checks. Nothing here sets a position. */
+  .ctl {
+    position: fixed;
+    display: flex; align-items: center; justify-content: center;
+    font: inherit; font-size: 12px; line-height: 1.15; text-align: center;
+    color: #e8e8f0; background: rgba(26,26,42,.82);
+    border: 1px solid rgba(140,140,190,.34); border-radius: 14px;
+    backdrop-filter: blur(8px);
+    touch-action: none;
+  }
+  .ctl:active { background: rgba(64,64,102,.95); }
+  .ctl.w {
+    /* The w controls are the mechanic, so they read differently from the three
+       directions the player already understands. */
+    background: rgba(58,28,72,.86); border-color: rgba(220,140,255,.5); color: #f0c8ff;
+  }
+  .ctl small { display: block; opacity: .62; font-size: 9px; }
+
+  #stick {
+    position: fixed; border-radius: 20px;
+    border: 1px dashed rgba(140,140,190,.22);
+    touch-action: none;
+  }
+  #stick-nub {
+    position: absolute; left: 50%; top: 50%;
+    width: 54px; height: 54px; margin: -27px 0 0 -27px;
+    border-radius: 50%; background: rgba(123,223,255,.16);
+    border: 1px solid rgba(123,223,255,.5);
+    opacity: 0; transition: opacity .12s;
+    pointer-events: none;
+  }
+
+  #topright {
+    position: fixed; top: max(10px, var(--safe-top)); right: max(10px, var(--safe-right));
+    display: flex; gap: 8px;
+  }
+  #topright button {
+    font: inherit; font-size: 12px; color: #e8e8f0;
+    background: rgba(26,26,42,.82); border: 1px solid rgba(140,140,190,.34);
+    border-radius: 10px; min-height: 44px; padding: 0 12px;
+    backdrop-filter: blur(8px);
+  }
+
+  #hint {
+    position: fixed; left: 0; right: 0; top: 46%;
+    text-align: center; color: #6a6a86; font-size: 11px;
+    pointer-events: none; padding: 0 24px;
+  }
+  #hint b { color: #f0c8ff; }
+
+  #done {
+    display: none; position: fixed; inset: 0; z-index: 20;
+    background: rgba(5,5,10,.94); backdrop-filter: blur(10px);
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px; padding: 24px;
+    padding-top: max(24px, var(--safe-top));
+    padding-bottom: max(24px, var(--safe-bottom));
+    text-align: center;
+  }
+  #done h2 { margin: 0; font-size: 20px; color: #7bdfff; letter-spacing: .06em; }
+  #done .big { font-size: 34px; color: #e8e8f0; }
+  #done .sub { color: #7a7a92; font-size: 12px; }
+  #done-digest { color: #9dff9d; font-size: 13px; word-break: break-all; }
+  #done-verdict { color: #9dff9d; font-size: 12px; max-width: 30em; }
+  #done button {
+    font: inherit; color: #e8e8f0; background: rgba(30,30,48,.9);
+    border: 1px solid rgba(140,140,190,.4); border-radius: 10px;
+    min-height: 48px; min-width: 160px; padding: 0 18px; margin-top: 6px;
+  }
+  #done .note { color: #5f5f78; font-size: 11px; max-width: 28em; line-height: 1.5; }
+
+  #fatal {
+    display: none; position: fixed; inset: 0; z-index: 30;
+    background: #0b0b14; padding: 24px; overflow: auto;
+    padding-top: max(24px, var(--safe-top));
+  }
+  #fatal strong { color: #ff8f8f; font-size: 15px; display: block; margin-bottom: 10px; }
+  #fatal pre { white-space: pre-wrap; color: #b9b9cc; font-size: 12px; }
+</style>
+</head>
+<body>
+  <canvas id="view"></canvas>
+
+  <div id="hud">
+    <h1>GLAAS · 4D DAILY</h1>
+    <div class="row"><span class="k">day</span><span class="v" id="day">—</span></div>
+    <div class="row"><span class="k">seed</span><span class="v" id="seed">—</span></div>
+    <div class="row"><span class="k">found</span><span class="v" id="score">0/0</span></div>
+    <div class="row"><span class="k">time</span><span class="v" id="clock">0.0s</span></div>
+    <div class="row"><span class="k">your w</span><span class="v" id="playerw">0.00</span></div>
+    <div class="row"><span class="k">nearest</span><span class="v" id="nearest">—</span></div>
+    <div class="row"><span class="k">entities</span><span class="v" id="entities">0</span></div>
+    <div class="row"><span class="k">fps</span><span class="v" id="fps">—</span></div>
+    <div class="row"><span class="k">view</span><span class="v" id="mode">—</span></div>
+  </div>
+
+  <div id="topright">
+    <button id="btn-spin">spin</button>
+    <button id="btn-mode">view</button>
+    <button id="btn-finish">finish</button>
+  </div>
+
+  <div id="hint">
+    drag the left area to move · <b>ana/kata</b> travel through w<br>
+    a target level with you in space may still be far away in w
+  </div>
+
+  <div id="stick"><div id="stick-nub"></div></div>
+  <button class="ctl w" id="btn-ana">ana<small>+w</small></button>
+  <button class="ctl" id="btn-rise">up</button>
+  <button class="ctl w" id="btn-kata">kata<small>−w</small></button>
+  <button class="ctl" id="btn-fall">down</button>
+
+  <div id="done">
+    <h2 id="done-title">Run complete</h2>
+    <div class="big" id="done-score">—</div>
+    <div class="sub">in <span id="done-time">—</span></div>
+    <div class="sub">run digest</div>
+    <div id="done-digest">—</div>
+    <div id="done-verdict">—</div>
+    <button id="btn-copy">copy replay</button>
+    <p class="note">
+      Your run is a list of inputs, not a score we were told to believe. Anyone
+      with the replay can rebuild today's world from its seed and recompute the
+      result exactly. Today's puzzle stays computable forever — nothing here
+      expires, and missing a day costs you nothing.
+    </p>
+  </div>
+
+  <div id="fatal"></div>
+
+  <script type="module" src="./dist/web/app.js"></script>
+</body>
+</html>

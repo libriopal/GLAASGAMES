@@ -37,7 +37,11 @@
     "verify:game": "tsx engine/verify/verify-game.ts",
     "verify:replay": "tsx engine/verify/verify-replay.ts",
     "verify:daily": "tsx engine/verify/verify-daily.ts",
-    "verify:controls": "tsx engine/verify/verify-controls.ts"
+    "verify:controls": "tsx engine/verify/verify-controls.ts",
+    "build:app-assets": "node scripts/build-app-assets.mjs android/app/src/main/assets",
+    "build:apk": "npm run build:web && npm run build:app-assets && cd android && gradle --no-daemon :app:assembleRelease",
+    "build:aab": "npm run build:web && npm run build:app-assets && cd android && gradle --no-daemon :app:bundleRelease",
+    "build:apk-debug": "npm run build:web && npm run build:app-assets && cd android && gradle --no-daemon :app:assembleDebug"
   },
   "engines": {
     "node": ">=22.5.0"

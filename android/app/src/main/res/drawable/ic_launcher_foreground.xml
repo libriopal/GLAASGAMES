@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A tesseract: the outer cube, the inner cube, and the four edges joining them.
+     Drawn as a vector so there is no bitmap to ship at five densities. The safe
+     zone for an adaptive icon foreground is the centre 66dp of 108dp. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- outer cube -->
+    <path android:strokeColor="#7BDFFF" android:strokeWidth="2.2" android:fillColor="#00000000"
+        android:pathData="M30,34 L64,34 L64,68 L30,68 Z" />
+    <!-- inner cube -->
+    <path android:strokeColor="#F0C8FF" android:strokeWidth="2.2" android:fillColor="#00000000"
+        android:pathData="M44,48 L78,48 L78,82 L44,82 Z" />
+    <!-- the four connecting edges: the fourth dimension, drawn -->
+    <path android:strokeColor="#9DFF9D" android:strokeWidth="1.8" android:fillColor="#00000000"
+        android:pathData="M30,34 L44,48 M64,34 L78,48 M64,68 L78,82 M30,68 L44,82" />
+</vector>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pre-API-26 launcher icon. Devices on 26+ use the adaptive icon in
+     mipmap-anydpi-v26, which overrides this; minSdk is 24, so this covers the
+     two releases that predate adaptive icons. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/ic_launcher_background" />
+    <item android:drawable="@drawable/ic_launcher_foreground" />
+</layer-list>

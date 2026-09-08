@@ -14,6 +14,6 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["@webgpu/types"]
   },
-  "include": ["../engine/math", "../engine/sim", "../engine/host", "./main.ts"],
+  "include": ["../engine/math", "../engine/sim", "../engine/host", "./main.ts", "./app.ts", "./gl2-renderer.ts", "./controls-layout.ts", "./parity.ts"],
   "exclude": ["../engine/verify", "../engine/sim/config.ts", "../engine/gpu"]
 }

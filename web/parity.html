@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GLAAS · real-silicon parity</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; padding: 16px; background: #05050a; color: #cfcfe0;
+    font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    padding-top: max(16px, env(safe-area-inset-top));
+  }
+  h1 { font-size: 13px; letter-spacing: .14em; color: #7bdfff; margin: 0 0 4px; }
+  p  { color: #7a7a92; max-width: 42em; }
+  #out div { white-space: pre-wrap; word-break: break-word; }
+  .good { color: #9dff9d; }
+  .bad  { color: #ff9d9d; }
+</style>
+</head>
+<body>
+  <h1>REAL-SILICON PARITY</h1>
+  <p>
+    CI executes the simulation shader on a software Vulkan device, which proves
+    the shader is correct but says nothing about agreement on real GPUs. This
+    page runs the same shader on <em>this device's</em> GPU and compares it, tick
+    by tick, against the reference executor. Open it in Chrome — a WebView has no
+    WebGPU.
+  </p>
+  <div id="out"></div>
+  <script type="module" src="/web/dist/web/parity.js"></script>
+</body>
+</html>
