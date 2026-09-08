@@ -1,538 +1,411 @@
-# The Lens — blueprint for approval
+# The Lens — blueprint v2, rebuilt against the v1 corpus
 
 **Status: AWAITING HUMAN APPROVAL AT THE VERIFY GATE.**
-No design item is written and no code is changed. This is the output of the
-Research and Audit halves only, per the loop approved in `PLAN.md`.
+No design item is written and no code is changed. Research and audit halves only.
 
-Reference: `libriopal/glassbox_labs` @ `9cdcffd` (branch
-`claude/scite-mcp-deep-research-x8b8l2`; there is no `main`), read against
-`libriopal/GLAASGAMES` @ `84b5559`.
+Sources read for this revision:
 
----
-
-## 1. Three facts that change the shape of the task
-
-Before anything else, because each one contradicts a reasonable assumption in
-the brief, and building on the assumption would waste the work.
-
-### 1.1 There is no visual design in the origin repo
-
-I inventoried every file. Glassbox_Labs contains no renderer, no HTML, no CSS,
-no colour tokens, no layout, no component library — **no user-facing surface of
-any kind.** It is 60 TypeScript and Markdown files of governance protocol,
-genome/expression pipeline, telemetry, fitness, gates, a Delphi corpus and
-economy rules.
-
-So "maintain the sovereign origin repo's visual design" cannot mean matching a
-style that exists. It has to mean something better, and the repo does supply
-it: GLASSBOX is a **disclosure discipline**, not a palette. The name is the
-thesis — show the box. `LAW 3` voids any gate result whose provenance is not
-the real engine. The anti-fabrication rule makes model recall inadmissible.
-Nothing in the package may sign its own approval.
-
-**The visual design language is therefore derived, and it is this: the interface
-may compress, but it may never conceal, and every number it shows must be
-traceable to something that was actually computed.** Everything in §4 follows
-from that sentence, and §4.4 makes it machine-checkable rather than aspirational.
-
-### 1.2 The origin repo already decided the real-money question
-
-`game/economy/types.ts`:
-
-```ts
-export interface StakeRelease {
-  stakeId: string;
-  principal: number;
-  payout: number; // must equal principal — no bonus (Tier 1, R6Q2)
-}
-```
-
-and `game/economy/rules.ts:88`:
-
-```ts
-/** At release: principal returned at 100% — NO BONUS (Tier 1, R6Q2). The ~2% bonus was removed. */
-export function verifyNoStakeBonus(release: StakeRelease): boolean {
-  return release.payout === release.principal;
-}
-```
-
-A standing Tier 1 decision says a stake returns exactly what went in. **That is
-not a wager.** There is no prize, no expected gain, and nothing won — it is a
-refundable commitment bond, and its entire function is to make walking away
-cost something. I cannot sign or reverse a Tier 1 decision, so §7 builds on it
-rather than around it, and §7.3 states plainly what changes if you want
-otherwise.
-
-### 1.3 What was missing was never the evaluator — it was the engine
-
-This is the direct comparison you asked for.
-
-| | Glassbox_Labs | GLAASGAMES |
+| Repo | Rev | What it is |
 |---|---|---|
-| Genome, expression pipeline | ✅ | — |
-| Telemetry capture, fitness, gates, breeder | ✅ | — |
-| Delphi human-judgment corpus | ✅ | — |
-| Economy / anti-manipulation rules | ✅ | inherited |
-| Governance protocol, Tier gates | ✅ | inherited |
-| **A simulation that actually runs** | ❌ | ✅ |
-| **A renderer** | ❌ | ✅ (two) |
-| **Input, host loop, fixed timestep** | ❌ | ✅ |
-| **GPU execution, proven bit-identical** | ❌ | ✅ |
-| **Replay verification** | ❌ | ✅ |
-| **A shippable artifact** | ❌ | ✅ (APK/AAB) |
-
-Glassbox is a **foundry that breeds and grades game designs**. GLAASGAMES is a
-**deterministic engine that can run one**. They have never been connected, and
-the origin repo says so about itself, in `foundry/gates/kot-calibration.ts`:
-
-> the session and judgment-aggregate fixtures below stand in for a live
-> bot-vs-bot lab match … Real telemetry/corpus data replaces these fixtures once
-> W3-W5 have run against an actual deployed build
-
-Meanwhile `LAW 3` voids any gate result whose provenance is not the real engine.
-So the foundry is currently calibrating **the gate code** against fixtures,
-because no real engine exists to feed it. **GLAASGAMES is that engine.** The
-single highest-value change available in this whole system is not a new feature;
-it is the wire between them. §5 is that wire.
+| `libriopal/magentadice-cyancode` | `8db018e` | **v1.** The integration monorepo — 2,652 files |
+| `libriopal/FAR_NZY` (submodule `core/`) | cloned | Farkle Frenzy — the actual game, 350 files |
+| `libriopal/adabt-core` (submodule `dream/`) | cloned | AMIS/AGROS — the music engine, 115 files |
+| `libriopal/glassbox_labs` | `9cdcffd` | The governance/foundry package |
+| `libriopal/GLAASGAMES` | `f5a63d7` | The deterministic 4D engine |
 
 ---
 
-## 2. The central problem, stated exactly
+## 0. What v1 changed, stated as a scorecard
 
-The lens must show a 4D state on a 2D surface. An independent auditor, given the
-architecture and no code, put the objection in its strongest form:
+Blueprint v1 was written without this corpus. Four of its load-bearing claims
+were wrong, and one design decision it made was **forbidden** by a law it could
+not see. This is that accounting, because a revision that quietly absorbs its
+corrections is not showing its work.
 
-> The strongest argument is the mathematical impossibility of an injective
-> mapping from ℝ⁴ to ℝ². Dimensionality reduction necessitates information loss,
-> meaning distinct 4D states will inevitably map to identical 2D coordinates.
-> This misleads the player during **false proximity events**: when an entity and
-> a target share the same 2D projection but possess divergent w values, the
-> player will perceive an accessible target that is actually unreachable.
+| # | v1 claimed | v1 corpus shows | Cost had we built it |
+|---|---|---|---|
+| G1 | "There is no visual design in the origin repo — none." | `3libras/the_visual_layer.md`, 364 lines of binding visual law: three pillars (Biological / Industrial / Crystalline), VOIDSHARD rarity law, named scenes, motion rules. | We would have invented an identity that already existed and contradicted it. |
+| G2 | "The lens is a **flat 2D plan view**." | `3libras`: **"UI PHILOSOPHY — Rule: No flat UI. Everything must feel physically integrated into the world."** | The central design decision of v1 violates the sovereign law outright. |
+| G3 | "Stakes must be principal-return, or you need per-jurisdiction gambling licences." | `LEGAL.md` + `AMOE.md`: a **third path** — skill-based sweepstakes with an Alternate Method of Entry, three-element test, real case law. | We would have shipped a strictly weaker product and told you a real option didn't exist. |
+| G4 | "Music from game state needs to be built (§6.3)." | `adabt-core`: AMIS, a full deterministic emotional-music runtime with a constitution, 8 canonical states, and a multiplayer sync law. | Weeks reinventing a specified, governed system. |
+| G5 | "Monte Carlo forecasting needs to be built (§5.2)." | `FAR_NZY/packages/farkle-engine/src/monteCarlo.ts` and `rtpConfig.ts` — both **in the sacred core**; `sandbox-ui/` has RTP, coverage, gate-status and simulation-progress panels. | Duplicate of a locked, governed subsystem. |
 
-This is correct and it is not fixable by better art. Any *projection* collides.
-
-**The resolution is to stop trying to be state-complete and to be
-decision-complete instead.** The lens does not owe the player the state. It owes
-the player enough to choose correctly. Formally:
-
-> For any two world states A and B, if the optimal action in A differs from the
-> optimal action in B, the lens must render A and B distinguishably.
-
-That is a weaker requirement than injectivity — and unlike injectivity it is
-*achievable*, because the space of decision-relevant distinctions is far smaller
-than the state space. It is also **falsifiable and machine-checkable**, which is
-what makes it a design I am willing to put a gate on. §4.4.
+**And one thing v1 could not have found, which is now the most important item in
+this document: §3.** It is a live conflict between two subsystems that each look
+correct alone.
 
 ---
 
-## 3. What the research says
+## 1. What v1 actually is
 
-### 3.1 The channel budget is four, not seven
+Not a prototype. A governed production system with:
 
-Cowan's review across verbal and non-verbal, visual and auditory, single and
-dual task converges on a focus-of-attention capacity of about **four chunks**,
-not Miller's seven — and visual-array experiments isolating simple features like
-colour or orientation show a hard limit near four. The pre-attentive system runs
-roughly four to five largely independent channels over *separable* dimensions
-(colour, orientation, motion, position); *integral* dimensions compete for the
-same capacity. (Cowan 2001, *The magical number 4*; Journal of Cognition
-10.5334/joc.387 for the modern re-analysis.)
+- **A real game.** FAR_NZY / Farkle Frenzy — physics-based Match-3D dice game.
+  A sacred-core lock manifest (`.ff-core-lock`) names eleven files implementing
+  balance, scoring and fairness that may not be modified without the full suite
+  and explicit approval. Each carries a header enforcing that.
+- **Provably-fair RNG.** `csprng.ts` — SHA-256 / HMAC commit-reveal, server seed
+  and client seed. Casino-grade *unpredictability* fairness.
+- **Monte Carlo + RTP.** `monteCarlo.ts`, `rtpConfig.ts`, both sacred.
+- **A legal architecture.** Three independent grounds, each sufficient alone:
+  skill predominance (dominant-factor test), no illegal consideration (AMOE),
+  and an auditable prize draw. Cited to *Dept. of Legal Affairs v. Rogers*,
+  *Mississippi Gaming Comm'n v. Treasured Arts*, *Pre-Paid Solutions v. Little
+  Rock*, FTC 16 C.F.R. § 251. Carries a proper not-legal-advice disclaimer.
+- **An event-sourced spine.** `mesh/` — `IEventStore.v1`, `ReplayEvent-Snapshot.v1`,
+  hashing strategy, RNG lineage spec, event versioning, snapshot strategy.
+- **A music engine with a constitution.** AMIS: gameplay state → emotional
+  inference → symbolic runtime → procedural orchestration → DSP. Eight canonical
+  states: Dread, Suspense, Escalation, Catastrophic Release, Mourning, Recovery,
+  Silence, Ritualistic Build. DSP banned from the main thread. Tiered fidelity
+  Tier 0–4 to survive Android thermal throttling.
+- **A visual law.** `3libras/`.
+- **A simulation sandbox UI.** RTP breakdown, coverage, gate status, parameter
+  editor, AI advisor.
 
-**Design consequence:** the lens gets a budget of **four simultaneous channels**,
-and they must be separable ones. This is the hard constraint that decides §4.
-A fifth channel does not add information; it degrades the other four.
-
-### 3.2 Uncertainty must be framed as frequency, not probability
-
-This is the strongest evidence in the whole review, and it governs the entire
-forecasting surface. Frequency framing ("5 out of 100") is understood where
-probability framing ("5%") is not. Quantile dotplots and hypothetical outcome
-plots beat interval plots, density plots and violin plots on recall, on
-probability estimation and on real incentivised decisions. (Kay et al. 2016;
-Hullman et al. 2015; Fernandes et al. CHI 2018; Kale et al. 2018, 2020;
-summarised in Padilla, Kay & Hullman 2022, *Uncertainty Visualization*.
-Frequency formats trace to Gigerenzer & Hoffrage 1995.)
-
-That literature also names the failure mode I must design against:
-**deterministic construal error** — given the chance, people collapse an
-uncertain display into a single certain reading. A Monte Carlo forecast drawn as
-one smooth band will be read as a promise.
-
-**Design consequence:** the forecast is never a line and never a band. It is
-**countable outcomes** — discrete dots, each one a real simulated run. §5.2.
-
-### 3.3 Direct 4D perception is real but weak, variable, and a bad thing to require
-
-People can measurably improve at 4D tasks with practice — rotation, hypercube
-navigation, judging inherently 4D properties — and cross-sectional and
-projection training both help, with dimensional anchoring (Hinton's coloured
-cubes) aiding intuition. But a 2020 review notes the studies are small, mostly
-college samples, show wide inter-subject variability, and struggle to exclude
-strategies that solve the task *without* 4D representation at all.
-
-**This supports your premise and I am taking it as settled: the design must not
-require 4D perception.** Direct 4D remains available as an opt-in expert view,
-because the evidence says some people genuinely acquire it — but nothing that
-matters may depend on it.
-
-### 3.4 Shared music synchronises affect — it does not simply feel nicer
-
-Hyperscanning work on friend dyads found joint listening raised interpersonal
-neural synchrony and made continuous pleasure ratings more *similar* between
-partners; physiological and behavioural synchrony predicts group cohesion and
-performance. (Curzel et al., *Cortex* 2026, S0010945226000547; Nature *Sci Rep*
-10.1038/s41598-020-65670-1.)
-
-**The honest caveat, which I am keeping:** that study found joint listening did
-**not** increase pleasure in general. The effect is on *alignment*, not on
-enjoyment. So the music feature's claim is "you can feel what your partner is
-feeling", not "the music makes it better" — and §6.3 is scoped to the claim the
-evidence supports.
-
-### 3.5 Play policy on real money is restrictive and specific
-
-Real-money gambling, games and contests are prohibited on Google Play **except**
-for apps that are licensed and separately Google-approved: free to download, no
-Play Billing for the money flow, adult rating, hard age-gating, and geo-gating
-to exactly the jurisdictions the licence covers. Incorrect geo-gating is a named
-common violation. (Play Console policy 9877032 and 13381106.)
-
-**This is why §1.2 matters so much.** A principal-return commitment bond is not
-a contest with a prize and does not enter that policy. Adding a payout does, and
-it changes the product from "an app you can ship" to "a licensed operator in
-each jurisdiction you serve."
+**The four repos are one system nobody has assembled:** v1 has the game, the
+money, the law, the music and the look. Glassbox has the governance and the
+breeding foundry. GLAASGAMES has the thing neither had — *an engine whose every
+result is bit-reproducible and independently recomputable.*
 
 ---
 
-## 4. The lens
+## 2. The corrected lens
 
-### 4.1 What it is
+### 2.1 v1's law kills the flat map, and hands us something better
 
-A **2D plan view** — the xz plane, seen from above, the way a map is. Not a
-perspective camera, not an orbit. Flat, stable, and readable at a glance on a
-phone held in one hand.
+`3libras` forbids flat UI. It also names the scene that solves our problem:
 
-The other two dimensions of the world do not vanish. They become the two
-channels a plan view has spare.
+> **VAULT CROSS-SECTION** — Requirements: side-view infrastructure, elevators,
+> server traffic, reactor pulses, AI workers.
 
-### 4.2 The four channels
+A **cross-section** is a 2D lens that is diegetic — an object in the world, not
+a chart laid over it. And this is where the two halves of the system agree in a
+way neither could have reached alone:
 
-| Channel | Carries | Why this pairing |
+**A cross-section is a slice, and a slice does not collide.**
+
+The v1 blueprint's central problem was the auditor's objection that no injective
+map ℝ⁴→ℝ² exists, so a *projection* creates false proximity — two entities at
+the same screen point, one of them unreachable in w. A **slice** answers it
+differently and better: it does not squash w, it **excludes** on w. Nothing
+appears in the section unless it is actually in the section. False proximity
+cannot occur, because coincidence in the plane now *means* coincidence in w.
+
+The GLAASGAMES engine already implements this. `engine/math/rotor4.ts` exports
+`sliceTo3D` beside `projectTo3D`, and the renderer already has a slice mode with
+`sliceThickness`. **The 4D math and the visual law independently arrived at the
+same answer.** v1 called it a vault cross-section; the engine calls it slicing;
+they are the same operation.
+
+### 2.2 What the player sees
+
+A **cross-sectional vault view**: the world cut at the player's own w, rendered
+as diegetic infrastructure per the Industrial pillar — layered depth, scanlines,
+reactor pulses, ambient motion. Not a map. A window into a machine.
+
+The four-channel budget from the perception research still binds (Cowan: ~4
+chunks, separable dimensions), and the slice frees a channel by removing the
+need to encode w-distance for things you cannot reach:
+
+| Channel | Carries | Pillar |
 |---|---|---|
-| **Position (x, z)** | the two axes you steer in | Position is the strongest visual channel; it should carry the thing you act on most directly. |
-| **Ring** — a concentric halo whose radius grows with \|Δw\| | separation along w between you and that entity | Size is separable from colour and from position, and a ring reads as "distance to close" rather than as a property of the object. **This is the anti-false-proximity channel** and it exists specifically to answer §2. |
-| **Elevation shadow** — a soft offset shadow, displaced by Δy | height above or below you | Shadows are the one depth cue that survives a flat view without adding a third position axis, and people read them without instruction. |
-| **Value** — brightness, not hue | reachability *now*: can you close this gap before it closes on you | Brightness is pre-attentive and orderable. Hue is not orderable and is unusable for ~8% of men, so it never carries a magnitude here. |
+| **Position (x, y)** in the section | where it is, in the plane you are in | Industrial: infrastructure layout |
+| **Approach** — a bloom that intensifies as an entity nears the section from outside | something is about to enter your w | Biological: pulsing, breathing |
+| **Depth layer** — parallax offset | distance along the cut axis | Industrial: layered depth |
+| **Value** — brightness | reachable now | Crystalline: resonance |
 
-That is four. There is no fifth, and the design's chief discipline is refusing
-to add one. Kind (player, target, drifter) is carried by **shape**, which is a
-categorical channel and does not compete with the four magnitudes.
+Hue carries identity, rarity and the VOIDSHARD law — categorical, per v1's
+palette, never magnitude. This also fixes v1's colour-blind exclusion.
 
-### 4.3 What happens to hue
+The **Approach channel is the new mechanic** and it is what makes a slice
+playable rather than claustrophobic: you cannot see out of your section, but you
+can see something coming. That is the 4D structure delivering tension into a 2D
+surface without asking anyone to perceive 4D.
 
-The current WebGPU renderer encodes w as hue. That was the right first move —
-it made w visible at all — but it is wrong under this design for two reasons the
-research names: hue is not orderable, so it cannot express "how far", and it
-excludes red-green colour-blind players from the one mechanic the game is about.
+### 2.3 The oracle, corrected
 
-Hue is demoted to identity and team, where categorical is what is wanted.
+The v1 obligation (action-discriminability, with the horizon sweep the third
+audit forced) survives — but the slice changes what it measures. Under a
+projection it measured *collisions*. Under a slice it measures **occlusion**: a
+state whose optimal action depends on something outside the current section.
 
-### 4.4 The oracle: action-discriminability
-
-This is the check that makes §2's claim real rather than rhetorical, and it is
-the single most important new obligation in this blueprint.
-
-> **Obligation L1.** Sample N pairs of world states. For each pair, compute the
-> optimal action under the rules (the engine is deterministic, so this is
-> decidable by search over the action set for a bounded horizon). Where the
-> optimal actions differ, assert that the two rendered lens outputs differ by
-> more than a stated perceptual threshold, measured over the four channels.
+> **Obligation L1 (revised).** Sample state pairs; where the optimal action
+> differs under bounded search, assert the rendered sections differ perceptibly.
+> Report the **occlusion rate** — the fraction of decision-relevant differences
+> that live entirely outside the visible section — as a function of search
+> horizon H, swept a decade, and report the H at which it converges.
 >
-> **Negative control.** A deliberately lossy lens — one that drops the ring
-> channel, so w-separation becomes invisible — must FAIL this check. If it
-> passes, the check is measuring nothing.
+> **Negative controls.** (a) A section with the Approach channel removed must
+> show a materially higher occlusion rate. (b) A zero-thickness section must
+> fail outright.
 
-The reported metric is the **false-proximity rate**: the fraction of sampled
-pairs that demand different actions but render indistinguishably. The design
-target is zero; the honest expectation is a small non-zero number, and *that
-number belongs in the HUD's About screen*, because §1.1 says the interface may
-compress but never conceal, and a lens that hides its own error rate is
-concealing the most important thing about itself.
+The occlusion rate is the number that goes on screen, because `3libras` demands
+transparency and GLASSBOX means the interface may compress but never conceal.
+I know of no shipped game that publishes the fidelity of its own abstraction.
 
-**The horizon problem, and why L1 alone is not enough.** I put this obligation
-to the auditor and it found the hole:
+---
 
-> The verification is vulnerable to **horizon effects** caused by the bounded
-> search. The test passes if the map distinguishes states by the *locally*
-> optimal actions found within the search depth, even where those states require
-> different *globally* optimal actions the map fails to distinguish. This bites
-> when optimal strategy depends on consequences that manifest beyond the
-> lookahead.
+## 3. The conflict — read this before anything else
 
-That is right, and it would let a lens certify itself while hiding exactly the
-long-range information that makes a 4D world hard. "Optimal" is only ever
-optimal-within-H, and a single H silently defines away the question.
+This is the finding that justifies the whole re-run, and it was invisible
+without v1.
 
-So the horizon becomes a measured variable rather than a hidden assumption:
+**`design/OpportunityWeightController.md`** specifies the OWC: it reads board
+state, detects "whether the player is behind and needs a comeback opportunity",
+and returns `wildBoostPct` and `cascadeEnablerBoostPct` — up to +10 each on draw
+probabilities, plus `blockerBoostPct` up to +5 — triggered when
+`playerBanked < leaderBanked * 0.7`. Its stated motive is that dead boards
+"harm retention and skill perception".
 
-> **Obligation L1b.** Report the false-proximity rate as a function of search
-> horizon H, swept over at least a decade of H. The rate must not rise
-> materially between H and 2H; if it does, the lens is horizon-limited and L1's
-> result at H is not yet valid — the finding is that the check has not converged,
-> not that the lens has passed.
+**In fairness to its authors, the design says explicitly: "boost strategic
+comeback opportunities (not guaranteed rewards)."** That distinction is real and
+it matters — an opportunity a player must still convert is far closer to skill
+than a handed-out win, and it is the strongest defence the OWC has. The
+objection below is not that the OWC hands out victories. It is narrower, and it
+survives that distinction.
+
+**`LEGAL.md`** rests the platform's legality partly on **skill predominance**:
+"Farkle outcomes are determined primarily by player decisions, not chance",
+under the dominant-factor test.
+
+I put the combination to the independent auditor without telling it which
+answer I wanted:
+
+> The strongest objection is **deceptive trade practices**. The Opportunity
+> Weight Controller introduces algorithmic manipulation of chance that directly
+> invalidates the skill-predominance defense. By programmatically boosting
+> probabilities to engineer comeback opportunities, the operator substitutes
+> player skill with a hidden, non-skill-based mechanism designed to steer
+> outcomes, rendering the legal classification factually false. **This bites
+> when the adjustments are significant enough to prevent skill from being the
+> dominant factor under the applicable test.**
+
+Three independent lines converge on the same place:
+
+1. **Legal.** A hidden chance-adjuster erodes the exact ground `LEGAL.md`
+   stands on — and it is one of three grounds, so the platform survives on the
+   other two, but the strongest one weakens.
+2. **Empirical.** Dynamic difficulty adjustment is the design idea my earlier
+   research pass *falsified* — a pre-registered study found no effect of
+   challenge–skill balance on enjoyment (null result). The OWC's stated benefit
+   is the one the evidence does not support.
+3. **Governance, and this is the sharpest.** `3libras/the_audit.md` states the
+   primary governance law: *"Economic trust is infrastructure… all systems must
+   reinforce trust. Not short-term extraction."* GLASSBOX means show the box.
+   **An undisclosed probability adjustment is concealment by construction** —
+   it violates v1's own charter before any regulator is involved.
+
+### 3.1 What I recommend, and what would settle it
+
+Not "delete the OWC" — dead boards are a real problem and I have no evidence the
+authors were wrong about that. The objection is to it being **hidden and
+unbounded**, and both are fixable:
+
+- **Disclose it.** The boost is visible in the UI when active, and its magnitude
+  is written into the replay/event stream. A disclosed comeback assist is a
+  game mechanic. An undisclosed one is what the auditor described.
+- **Bound it, and prove the bound.** State a maximum, then measure that skill
+  still dominates with the OWC live.
+
+> **Obligation O1 — the skill-dominance oracle.** Run bot-vs-bot populations of
+> known, graded skill, OWC on and OWC off. Measure the rank correlation between
+> bot skill and outcome. Assert that with OWC active it stays above a stated
+> threshold, and that the *drop* from OWC-off to OWC-on is below a stated
+> maximum.
 >
-> **Negative control.** A lens that omits a feature whose consequence only
-> appears late — say, one that renders w-velocity not at all — must show a rate
-> that climbs with H. If its curve is flat, the sweep is not measuring horizon
-> sensitivity and L1b proves nothing.
+> **Negative control.** An OWC configured to a deliberately excessive boost must
+> drive the correlation below threshold. If it does not, the oracle is not
+> measuring skill dominance and O1 proves nothing.
 
-The published number is then the rate **and** the horizon it converged at, since
-a fidelity figure without its horizon is the same kind of claim as a digest
-without the run that produced it.
-
-I know of no shipped game that publishes this number. That is the proven-value
-argument for the whole approach: not that a 2D view of 4D is novel, but that its
-**fidelity is measured and disclosed** instead of asserted.
+This turns the platform's central legal claim from an assertion in a document
+into **a number produced by the engine on every build**. That is the highest-value
+thing in this blueprint, and it exists only because v1 supplied the conflict.
 
 ---
 
-## 5. The 4D core as the forecasting backend
+## 4. Two fairness models, and why the system needs both
 
-The 4D state is not decoration once the lens flattens it. It is what makes the
-forecast worth having.
+v1 and GLAASGAMES each call their RNG "provably fair" and mean different things.
 
-### 5.1 Why 4D earns its place
+| | v1 `csprng.ts` | GLAASGAMES |
+|---|---|---|
+| Mechanism | SHA-256/HMAC commit–reveal, server + client seed | Integer Q16.16, xorshift world-gen |
+| Proves | the operator **could not have known or steered** the outcome | anyone can **recompute** the outcome exactly |
+| Property | unpredictability | reproducibility |
+| Async? | yes (`crypto.subtle`) | no |
+| Float? | yes (`nextFloat`) | never |
 
-A 3D world's near-future is legible by eye; forecasting it adds nothing. A 4D
-world's is not — the w axis makes "what will be reachable in three seconds"
-genuinely hard, because reachability moves in a direction the player cannot see
-directly. **The forecast is therefore not a convenience layered on the game; it
-is the reason the fourth dimension is fun rather than merely confusing.** The
-skill the game teaches is reading a forecast of a space you cannot perceive.
+Neither is sufficient. Commit–reveal proves the house did not cheat but leaves
+the *result* unverifiable by a third party. Reproducibility lets anyone
+recompute a run but says nothing about whether the seed was chosen adversarially.
 
-### 5.2 Monte Carlo, drawn as countable outcomes
+**Together they compose, and the composition is clean** (this is my own
+reasoning, labelled as mine): commit–reveal supplies the seed; the integer
+kernel consumes it and produces a bit-reproducible run. The player verifies the
+seed was honest *and* recomputes the outcome from it. Neither repo can make that
+claim alone.
 
-Each tick the engine has spare frame budget, it advances **k cheap rollouts** of
-the current state under a small set of candidate player policies, using the same
-integer kernel — so every rollout is exactly reproducible and costs no floating
-point.
+The engineering constraint is one line: **the commit–reveal output must enter
+the simulation as integer bits, never as a float.** `nextFloat()` is
+float64-shaped and is the exact hazard the i32-wrapping contract already guards
+against in the kernel.
 
-The result is drawn as a **quantile dotplot**: 20 dots, each an actual rollout,
-positioned by outcome. Not a band, not a percentage. Per §3.2 this is the form
-that survives contact with a human, and it structurally resists deterministic
-construal because there is nothing continuous to mistake for a promise.
+> **Obligation R1.** The seed pipeline is integer end to end: reveal → bytes →
+> i32 → world-gen, with no float in the path. **Negative control:** a float
+> injected anywhere in the pipeline must fail the check.
 
-> **Obligation F1.** The forecast is reproducible: same state, same seed, same
-> dots. **Negative control:** perturbing the state by one Q16.16 unit in w must
-> move at least one dot.
+---
+
+## 5. Music — adopt, do not rebuild
+
+v1 §6.3 proposed building this. AMIS already exists, with a constitution.
+
+Its **Law of Deterministic Emergence** ("procedural orchestration MUST derive
+from synchronized seeds and bounded mutation") is the same discipline as the
+engine's digest. Its **Multiplayer Sync** law — *"Hybrid Symbolic Replication:
+authoritative seeds and states are replicated; orchestral decoration is local"* —
+is a more mature answer than v1's, because it replicates *meaning* rather than
+audio and therefore costs almost no bandwidth.
+
+The eight canonical states — Dread, Suspense, Escalation, Catastrophic Release,
+Mourning, Recovery, Silence, Ritualistic Build — are the shared emotional
+channel. The research supports precisely this and no more: joint listening
+raises interpersonal affective and neural synchrony (Curzel et al., *Cortex*
+2026), but that study found it did **not** raise pleasure in general. The claim
+is *alignment*, not enjoyment, and the blueprint keeps it that size.
+
+> **Obligation M1.** Same replay → bit-identical emotional state sequence.
+> **Negative control:** a one-tick change must change the sequence.
 >
-> **Obligation F2.** Calibration. Over a recorded session, outcomes must fall
-> inside the forecast's stated interval at the stated rate — if the dots say 15
-> of 20, roughly 75% of the time it should happen. A forecast that is confidently
-> wrong is worse than none, and this is the check that catches it.
-
-### 5.3 The wire to the foundry — the highest-value change in this document
-
-Per §1.3, the foundry grades designs it cannot run, using fixtures it openly
-labels as stand-ins, under a law that voids stand-in provenance. Closing that is
-worth more than any visual feature.
-
-`foundry/telemetry/capture.ts` already defines `SessionRecord`, `TurnRecord` and
-`captureAtMarginFlaggedStates`. The engine already produces verified replays.
-**The bridge is an adapter that turns a verified replay into a `SessionRecord`
-with real `GateProvenance` — `modelIdentity` = the actual engine, `commitSha` =
-the build that produced it, `isStandIn: false` earned rather than asserted.**
-
-Then, for the first time: breed a design → run it in the real engine → capture
-real telemetry → score it against the real gates → and the `isStandIn: false`
-in the provenance is *true*. That is the complete loop the origin repo was
-built for and has never once executed.
-
-> **Obligation B1.** A gate result carrying `isStandIn: false` must be traceable
-> to a replay that verifies. **Negative control:** a fabricated `SessionRecord`
-> not backed by a verifying replay must be rejected by the adapter, not merely
-> flagged.
+> **Obligation A1.** Every state has a visual counterpart. **Negative control:**
+> a planted audio-only cue must fail. (A mechanic delivered only through audio
+> excludes deaf players from the mechanic. AMIS's own tiered fidelity means some
+> players legitimately run with reduced audio.)
 
 ---
 
-## 6. The connected systems
+## 6. Stakes — v1 supplies the third path
 
-### 6.1 Skill mastery
+v1 said: principal-return, or per-jurisdiction gambling licences. `LEGAL.md`
+and `AMOE.md` document a third, and it is the standard structure for this:
 
-Skill here is forecast-reading, so mastery is measured as **the gap between the
-player's revealed choice and the rollout-optimal choice**, narrowing over time.
-This is computed from replays that already verify, so it needs no new trusted
-input. It also gives the Delphi corpus something real to rate: contested states
-where the player and the search disagree are exactly the states worth putting to
-human raters.
+**Skill-based sweepstakes with an Alternate Method of Entry.** Gambling requires
+consideration + chance + prize *simultaneously*; removing any one removes the
+activity from the definition in most US states. A genuine free entry route
+removes consideration. v1 implements it — email entry to `amoe@libriopal.com`,
+"NO PURCHASE NECESSARY", purchase does not improve odds — and reports the
+backend enforcement (KYC, age gate, Play Integrity, geofencing) as complete.
+The official rules already void Washington and restrict to US residents 18+,
+which is a fair signal that the drafting is considered rather than decorative —
+Washington is the state that makes this analysis hardest.
 
-### 6.2 Multiplayer, and the exploit that shapes it
+This does not eliminate the Play problem; Play's real-money policy still governs
+distribution and still wants licensing, geo-gating, adult rating and no Play
+Billing on the money flow. But it changes the question from *"is this legal at
+all"* to *"which jurisdictions and which store surfaces"*, which is a
+commercial question with known answers.
 
-The second audit named the strongest exploit against this design:
-
-> Information leakage (map hacking). The client computes the full simulation
-> state locally, so all "hidden" data is resident in client memory. To close it
-> you need server-side interest management, so the client's local simulation is
-> intentionally incomplete.
-
-This is correct and it forces a choice. Server-authoritative interest management
-would break everything that makes this project what it is — offline play, no
-INTERNET permission, deterministic local execution, the whole Data Safety
-position.
-
-**So the design takes the other branch, and it is the right one: the lens
-compresses for comprehension and never for concealment.** Nothing the lens omits
-is secret. Any player may open the expert 4D view (§3.3) and see everything;
-the lens is an ergonomic aid, not an information advantage. A "map hack" against
-this design reveals a button the game already ships.
-
-Competitive integrity then rests entirely on execution and forecast-reading
-under a shared clock — which is exactly where a game about reading a
-4D forecast wants its difficulty to live. Symmetric information is also, not
-coincidentally, what GLASSBOX means.
-
-- **Competitive:** same daily seed, same world, asynchronous, ranked by
-  verified replay. No live connection needed, so it works offline and ships.
-- **Cooperative:** two players, one world, complementary lenses — one sees the
-  w-ring channel at higher fidelity, the other the elevation channel. Neither
-  can solve it alone, and the coupling is *perceptual* rather than informational,
-  so it survives §6.2's rule.
-
-### 6.3 Music as a shared emotional channel
-
-Generated from game state, deterministically, from the same integer state that
-drives everything else — so two players in the same world hear the same music,
-and a replay reproduces its audio exactly.
-
-The claim is precisely §3.4's and no larger: **shared music aligns affect between
-people.** Mapping, kept to the four-channel discipline: tempo from time
-pressure, harmonic tension from forecast variance, register from w-position,
-and a consonance that resolves when partners' states converge. In co-op, hearing
-your partner's tension *is* the coordination channel — which is why this is a
-mechanic and not a soundtrack.
-
-> **Obligation M1.** Music is a pure function of game state: same replay, same
-> audio buffer, bit-identical. **Negative control:** a one-tick state change must
-> change the buffer.
-
-Accessibility: every musical cue is duplicated visually, because a mechanic
-delivered only through audio excludes deaf players from the mechanic.
-
-### 6.4 Stakes
-
-Per §1.2, a stake is a **commitment bond**: you post it before a ranked run and
-it returns at exactly 100% when the run completes, whatever the result. It buys
-nothing, wins nothing, and is not at risk from losing — it is at risk only from
-abandoning. It makes attention costly to withdraw, which is the only honest
-reason to have it.
-
-The existing machinery — `ageVerified21Plus`, `selfExcluded`, cooling-off,
-`verifyNoStakeBonus`, the dark-pattern ban — carries over unchanged and stays
-enforced by `verify:economy`.
+**Three caveats I am not softening.** (a) The AMOE must be *real* — genuinely
+free, genuinely equal odds, genuinely honoured; a decorative one is worse than
+none and is precisely the deceptive-practices exposure §3 describes. (b) The
+skill-predominance ground is the one §3 puts at risk, which is why O1 matters
+beyond engineering. (c) `LEGAL.md` says on its own face that it is not legal
+advice and that counsel should be engaged. I am not counsel, I am not clearing
+this, and nothing here changes that.
 
 ---
 
-## 7. Governance and legal — read this before approving
+## 7. The bridge, restated with v1 in it
 
-### 7.1 Where I stand
+v1's blueprint said the highest-value change was wiring GLAASGAMES's verified
+replays into Glassbox's foundry, because `LAW 3` voids stand-in provenance and
+no real engine existed to feed it. That still holds — and v1 makes it larger,
+because v1 has `mesh/IEventStore.v1` and `ReplayEvent-Snapshot.v1` already
+specified. **The event contract we needed to invent is written.**
 
-I have kept the design inside the standing Tier 1 decision (payout = principal).
-Under that decision this is not gambling: no prize, no expected gain, nothing
-won. It does not enter Play's real-money policy.
-
-### 7.2 What I have not done and cannot
-
-I cannot sign a Tier 1 gate, write `APPROVED FOR RESEARCH EXECUTION`, or clear
-any of this as legally compliant. I am not a lawyer and this is not legal
-advice.
-
-### 7.3 If you want actual prize payouts, say so now
-
-It is a different product, and the honest cost is:
-
-- Play permits it only for licensed, separately Google-approved apps: free to
-  download, no Play Billing for the money flow, adult content rating, hard
-  age-gating, and geo-gating to exactly the licensed jurisdictions. Incorrect
-  geo-gating is a named common violation.
-- A licence is needed **per jurisdiction**, and the skill-versus-chance test
-  that decides whether you need a gambling licence at all varies by
-  jurisdiction and is decided on the facts of the specific game.
-- It reverses a standing Tier 1 decision in your own repo, which is your call
-  to make and not mine.
-- It would require competent gaming-law counsel before a line of code.
-
-**My recommendation is to keep principal-return.** It preserves the ship path we
-just built, keeps the Data Safety declaration true, and — the part I think
-actually matters — a game whose stakes cannot pay out is one whose competitive
-integrity nobody has a financial motive to attack.
+> **Obligation B1.** A gate result carrying `isStandIn: false` traces to a
+> replay that verifies, expressed as `ReplayEvent` records against
+> `IEventStore.v1`. **Negative control:** a fabricated session with no verifying
+> replay must be rejected by the adapter, not merely flagged.
 
 ---
 
-## 8. The new verification phase
-
-Every obligation above, with the oracle that decides it. Each carries a negative
-control, per the rule that an oracle unseen to fail is decoration.
+## 8. The verification phase
 
 | Id | Obligation | Oracle | Negative control |
 |---|---|---|---|
-| L1 | The lens is action-discriminable | `verify-lens` | a ring-less lens must fail |
-| L1b | The discriminability result has converged in search horizon | `verify-lens` | a lens omitting a late-consequence feature must show a rate rising with H |
-| L2 | Four channels, no fifth | `verify-lens` | a planted fifth channel must fail |
-| L3 | No magnitude rides on hue | `verify-lens` | hue-encoded w must fail |
-| F1 | Forecast is reproducible | `verify-forecast` | 1-unit w change must move a dot |
-| F2 | Forecast is calibrated | `verify-forecast` | a deliberately biased forecast must fail |
-| B1 | Gate provenance is earned | `verify-bridge` | a fabricated session must be rejected |
-| M1 | Music is a pure function of state | `verify-music` | 1-tick change must change the buffer |
-| S1 | Stake pays principal, never more | `verify:economy` (exists) | a bonus must fail |
-| A1 | Every audio cue has a visual twin | `verify-a11y` | a planted audio-only cue must fail |
+| **O1** | **Skill stays the dominant factor with OWC live** | `verify-skill-dominance` | an excessive OWC must drop correlation below threshold |
+| L1 | Section is action-discriminable; occlusion rate converges in H | `verify-lens` | Approach-less section must show higher occlusion; zero-thickness must fail |
+| L2 | Four channels, no fifth | `verify-lens` | a planted fifth must fail |
+| L3 | No magnitude on hue | `verify-lens` | hue-encoded magnitude must fail |
+| L4 | No flat UI (`3libras` law) | `verify-visual-law` | a flat overlay must fail |
+| R1 | Seed pipeline integer end to end | `verify-seed` | an injected float must fail |
+| F1 | Forecast reproducible | `verify-forecast` | 1-unit change moves a dot |
+| F2 | Forecast calibrated | `verify-forecast` | a biased forecast must fail |
+| B1 | Gate provenance earned | `verify-bridge` | fabricated session rejected |
+| M1 | Music deterministic from state | `verify-music` | 1-tick change alters sequence |
+| A1 | Every audio cue has a visual twin | `verify-a11y` | audio-only cue must fail |
+| S1 | AMOE is real and equal-odds | `verify-amoe` | an odds-advantaged paid path must fail |
+| S2 | Stake pays principal, never more | `verify:economy` (exists) | a bonus must fail |
 
-Plus everything already green: determinism `0xfc60aadd`, GPU parity
-`0x1f3865c0`, replay, daily, controls, i32-wrapping contract, permission
-allowlist.
+Plus what is already green: determinism `0xfc60aadd`, GPU parity `0x1f3865c0`,
+replay, daily, controls, i32 wrapping, permission allowlist.
 
 ---
 
 ## 9. Sequence
 
-Ordered by irreversibility — cheapest-to-redo first, and each increment gated on
-its own oracles before the next begins.
+Ordered by irreversibility and by risk retired per unit of work.
 
-1. **The bridge** (§5.3). Highest value, no visual risk, and it makes the
-   origin repo's own loop executable for the first time.
-2. **The lens** (§4) with `verify-lens`. The false-proximity rate is a number we
-   do not yet have, and everything downstream depends on it.
-3. **The forecast** (§5.2) with calibration.
-4. **Skill mastery** (§6.1) — falls out of 1–3 nearly free.
-5. **Music** (§6.3).
-6. **Multiplayer** (§6.2) — async competitive first, co-op second.
-
-Stakes (§6.4) need no new work under §7.1.
+1. **O1, the skill-dominance oracle.** First, and not close. It is the only item
+   that retires a *legal* risk, it needs no visual work, and until it exists the
+   platform's central claim is undefended. §3.
+2. **B1, the bridge**, now against `IEventStore.v1`. Makes the foundry's own
+   loop executable for the first time.
+3. **R1, the seed composition.** Small, and it unblocks everything that mixes
+   the two fairness models.
+4. **L1–L4, the cross-section lens.** The occlusion rate is a number we do not
+   have.
+5. **F1–F2, forecast** as quantile dotplots — frequency framing, per the
+   research: never a band, always countable outcomes.
+6. **M1/A1, adopt AMIS.** Integrate; do not rebuild.
+7. **Multiplayer** — async competitive on the daily seed first, then co-op.
 
 ## 10. What I would cut
 
-Offered because a plan that recommends everything is not a plan.
+- **Direct 4D expert view.** The evidence for trained 4D perception is real but
+  weak and highly variable. Keep as opt-in; cut first if it costs anything.
+- **v1's co-op complementary-lens idea** — mine, from the last pass, with no
+  literature behind it. AMIS's Hybrid Symbolic Replication is the better
+  coupling and it is already specified. I am withdrawing my version.
+- **The OWC in its current hidden form.** Not the feature — the hiddenness.
 
-- **Direct 4D expert view** — keep, but it is the first thing to cut if it costs
-  anything; §3.3 says almost nobody will use it well.
-- **Co-op complementary lenses** (§6.2) is the most speculative idea here. It has
-  no supporting literature, only a clean argument. Treat it as an experiment
-  with a kill criterion, not a commitment.
-- **Music** is scoped to what §3.4 actually supports. If you want it to "make
-  the game feel better", that is not what the evidence says it does, and I would
-  rather build the alignment claim honestly than the pleasure claim loosely.
+## 11. One thing to fix regardless of this gate
+
+`README.md` in v1 says a BrightData API token was committed to git history and
+should be revoked and the history scrubbed. If that has not been done, it is
+independent of everything above and does not need a gate.
 
 ---
 
-## 11. The decision at this gate
+## 12. The decision at this gate
 
-1. **Approve** — §4 lens, §5 forecast and bridge, §6 systems, sequence in §9.
-2. **Approve with changes** — name what moves, what is cut.
-3. **Reject** — name which part is wrong and it goes back to Research.
+1. **Approve** — §2 cross-section lens, §3 OWC disclosure + O1, §4 seed
+   composition, §5 adopt AMIS, §6 AMOE path, sequence in §9.
+2. **Approve with changes** — name what moves or is cut.
+3. **Reject** — name what is wrong; it returns to Research.
 
-And one answer I need explicitly, because it changes the product rather than the
+Two answers I need explicitly, because they change the product rather than the
 plan:
 
-> **Do stakes stay principal-return (§6.4, recommended), or do you want real
-> prize payouts (§7.3)?** I have built the entire blueprint on the first. The
-> second is legitimate but it is a different company, and I would not start it
-> without counsel.
+> **A. The OWC.** Disclose and bound it (recommended, §3.1), remove it, or keep
+> it hidden? If hidden, I need you to record that decision as yours, because it
+> runs against your own governance law, the research, and the audit.
+>
+> **B. Stakes.** The AMOE sweepstakes path (§6, now evidenced), or the
+> principal-return bond? These are different products with different counsel
+> requirements. I have written §8's S1/S2 to cover either.
+
+I cannot sign a Tier 1 gate, write `APPROVED FOR RESEARCH EXECUTION`, or clear
+any of this as legally compliant.
