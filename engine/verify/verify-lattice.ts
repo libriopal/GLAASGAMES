@@ -18,12 +18,13 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { Board, CELL_COUNT, EMPTY, NO_LINK, OFFSET_FACE, OFFSET_LINK } from '../../lattice/board.js';
 import { checkReveal, commit, seedFromReveal } from '../../lattice/commit.js';
-import { generateLattice } from '../../lattice/lattice-gen.js';
+import { generateLattice, generateLattice as genLattice } from '../../lattice/lattice-gen.js';
 import { DEFAULT_ROUND, MAX_RESHUFFLE_ATTEMPTS, isStagnant, playRound, verifyRound } from '../../lattice/round.js';
 import { buildReveal, directionOf, reconstructLattice, scoreInference } from '../../lattice/reveal.js';
 import { linkObservationJoint, mutualInformation } from '../../lattice/information.js';
 import { cellCentre, tileTransform, type BoardLayout } from '../../lattice/tile-transform.js';
 import { fundingIsClean, payoutEqualsPrincipal, postBond, releaseBond } from '../../lattice/bond.js';
+import { FrameChain, SUBSYSTEMS, compareFrames, stampFrame } from '../../lattice/frame.js';
 
 const failures: string[] = [];
 const fail = (detail: string): void => void failures.push(detail);
@@ -295,6 +296,66 @@ const SEED = 0x3f1a7c05 | 0;
       `(different seed differs in ${differs}/${CELL_COUNT}), perfect inference 1.000 vs blind ` +
       `${blindScore.accuracy.toFixed(3)}, best constant guess ${constantGuessBest.toFixed(3)}, ` +
       `reported no-skill baseline ${perfectScore.chanceBaseline.toFixed(3)}`,
+  );
+}
+
+// ── F1x: two devices can prove they are showing the same board ─────────────
+// A shared-board game is only shared if both screens agree. The lockstep
+// literature is unanimous on the method — per-tick state checksums compared
+// every frame — and adds one thing this engine did not have: a PER-SUBSYSTEM
+// breakdown, so a divergence names the system that drifted rather than only the
+// tick it drifted on.
+{
+  // Two peers building the same board from the same seed.
+  const peerA = new Board();
+  const peerB = new Board();
+  genLattice(peerA, SEED);
+  genLattice(peerB, SEED);
+
+  const chainA = new FrameChain();
+  const chainB = new FrameChain();
+  for (let tick = 0; tick < 24; tick += 1) {
+    chainA.push(stampFrame(peerA, tick));
+    chainB.push(stampFrame(peerB, tick));
+  }
+
+  ok(chainA.firstDivergence(chainB) === null,
+    'F1x: two peers seeded identically disagreed — the stamp is not deterministic');
+  ok(chainA.lastAgreedTick(chainB) === 23,
+    `F1x: identical peers last agreed at tick ${chainA.lastAgreedTick(chainB)}, expected 23`);
+
+  // NEGATIVE CONTROL, and the point of the whole decomposition: perturb exactly
+  // ONE subsystem on one peer and require the report to NAME it. A stamp that
+  // only says "desync" would pass a weaker test than this and be worth far less.
+  const drifted = new Board();
+  genLattice(drifted, SEED);
+  drifted.set(17, OFFSET_FACE, (drifted.get(17, OFFSET_FACE) + 1) % 7);
+  const faceDrift = compareFrames(stampFrame(peerA, 0), stampFrame(drifted, 0));
+  ok(!faceDrift.agree, 'F1x NEGATIVE CONTROL FAILED: a changed face did not register as a divergence');
+  ok(faceDrift.firstDivergence === 'faces',
+    `F1x: a face change was reported as "${faceDrift.firstDivergence}" — the breakdown names the wrong subsystem`);
+  ok(faceDrift.diverged.length === 1,
+    `F1x: a single face change reported ${faceDrift.diverged.length} diverged subsystems — the columns are not independent`);
+
+  // The HIDDEN column must be covered too. Two clients disagreeing about the
+  // lattice are not playing the same game, and discovering that at reveal time
+  // would be a whole round too late.
+  const hiddenDrift = new Board();
+  genLattice(hiddenDrift, SEED);
+  hiddenDrift.set(9, OFFSET_LINK, (hiddenDrift.get(9, OFFSET_LINK) + 1) % CELL_COUNT);
+  const linkDrift = compareFrames(stampFrame(peerA, 0), stampFrame(hiddenDrift, 0));
+  ok(linkDrift.firstDivergence === 'links',
+    `F1x: a hidden-lattice change was reported as "${linkDrift.firstDivergence}" — the hidden half is not covered`);
+
+  // Comparing different ticks is a caller error, not a desync, and must throw
+  // rather than quietly report disagreement.
+  let threw = false;
+  try { compareFrames(stampFrame(peerA, 3), stampFrame(peerB, 4)); } catch { threw = true; }
+  ok(threw, 'F1x: comparing two different ticks reported a result instead of refusing');
+
+  console.log(
+    `  F1x frame sync: 24 ticks agree across two peers; a single ${SUBSYSTEMS.length}-way perturbation is ` +
+      'isolated to the exact subsystem, hidden column included',
   );
 }
 

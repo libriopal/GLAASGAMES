@@ -1,0 +1,201 @@
+// engine/verify/verify-theme.ts
+// The palette matches the corpus it claims to come from, and every pairing is
+// legible by a standard that works on dark backgrounds.
+//
+// T1  the digest is the one the theme cites, and is complete
+// T2  the accent hues match the measured chromatic weights, in measured order
+// T3  every text pairing clears APCA, which WCAG 2 would not have caught
+// T4  the recorded contradiction between the written spec and the images stands
+//
+// This is the oracle that stops the palette drifting into taste. A colour here
+// is either traceable to 4,613,440 measured pixels or it fails.
+
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import {
+  AMBER,
+  apcaLc,
+  CORPUS_DIGEST,
+  CORPUS_IMAGES,
+  CORPUS_PIXELS,
+  CYAN,
+  GROUND,
+  GROUND_EDGE,
+  GROUND_RAISED,
+  hex,
+  INK,
+  INK_DIM,
+  LC_BODY_TEXT,
+  LC_INVISIBLE,
+  LC_LARGE_UI,
+  MAGENTA,
+  type Rgb,
+} from '../../web/theme.js';
+
+const failures: string[] = [];
+const fail = (detail: string): void => void failures.push(detail);
+const ok = (condition: boolean, detail: string): void => {
+  if (!condition) fail(detail);
+};
+
+interface Digest {
+  images_read: number;
+  images_failed: number;
+  pixels_sampled: number;
+  hue_share_weighted_pct: number[];
+  saturation_share_pct: number[];
+  luminance_share_pct: number[];
+  top_chromatic: { hex: string; share_pct: number }[];
+}
+
+const digest = JSON.parse(
+  readFileSync(fileURLToPath(new URL(`../../${CORPUS_DIGEST}`, import.meta.url)), 'utf8'),
+) as Digest;
+
+/** Hue in degrees, 0-360, from an RGB triple. */
+function hueOf(c: Rgb): number {
+  const r = c.r / 255, g = c.g / 255, b = c.b / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const d = max - min;
+  if (d === 0) return 0;
+  let h: number;
+  if (max === r) h = ((g - b) / d) % 6;
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  h *= 60;
+  return h < 0 ? h + 360 : h;
+}
+
+/** Total weighted chromatic share across a band of 10-degree hue bins. */
+function bandWeight(fromDeg: number, toDeg: number): number {
+  let total = 0;
+  for (let bin = 0; bin < 36; bin += 1) {
+    const centre = bin * 10 + 5;
+    if (centre >= fromDeg && centre <= toDeg) total += digest.hue_share_weighted_pct[bin] ?? 0;
+  }
+  return total;
+}
+
+// ── T1: the digest is real and complete ────────────────────────────────────
+{
+  ok(digest.images_read === CORPUS_IMAGES,
+    `T1: theme claims ${CORPUS_IMAGES} images but the digest reports ${digest.images_read}`);
+  ok(digest.pixels_sampled === CORPUS_PIXELS,
+    `T1: theme claims ${CORPUS_PIXELS} pixels but the digest reports ${digest.pixels_sampled}`);
+  ok(digest.images_failed === 0,
+    `T1: ${digest.images_failed} images failed to read — the palette rests on an incomplete ingestion`);
+  ok(digest.hue_share_weighted_pct.length === 36,
+    `T1: the hue histogram has ${digest.hue_share_weighted_pct.length} bins, expected 36`);
+
+  const total = digest.saturation_share_pct.reduce((a, b) => a + b, 0);
+  ok(Math.abs(total - 100) < 0.5,
+    `T1: the saturation histogram sums to ${total.toFixed(2)}%, so it is not a distribution`);
+  console.log(`  T1 provenance: ${digest.images_read} images, ${digest.pixels_sampled.toLocaleString()} pixels, 0 failures`);
+}
+
+// ── T2: the accents are the measured hues, in the measured order ───────────
+{
+  const cyanBand = bandWeight(170, 219);
+  const amberBand = bandWeight(20, 59);
+  const magentaBand = bandWeight(280, 329);
+  const greenBand = bandWeight(90, 149);
+
+  ok(cyanBand > amberBand,
+    `T2: cyan (${cyanBand.toFixed(1)}%) is not the leading hue — amber measured ${amberBand.toFixed(1)}%`);
+  ok(amberBand > magentaBand,
+    `T2: amber (${amberBand.toFixed(1)}%) does not outrank magenta (${magentaBand.toFixed(1)}%)`);
+
+  // Each token must actually sit in the band it is drawn from.
+  const inBand = (c: string, lo: number, hi: number): boolean => {
+    const h = hueOf(hex(c));
+    return h >= lo && h <= hi;
+  };
+  ok(inBand(CYAN, 170, 219), `T2: CYAN sits at ${hueOf(hex(CYAN)).toFixed(0)} deg, outside the measured 170-219 band`);
+  ok(inBand(AMBER, 20, 59), `T2: AMBER sits at ${hueOf(hex(AMBER)).toFixed(0)} deg, outside the measured 20-59 band`);
+  ok(inBand(MAGENTA, 280, 329), `T2: MAGENTA sits at ${hueOf(hex(MAGENTA)).toFixed(0)} deg, outside the measured 280-329 band`);
+
+  // NEGATIVE CONTROL: the band predicate must reject a colour from elsewhere.
+  ok(!inBand('#00ff00', 170, 219), 'T2 NEGATIVE CONTROL FAILED: pure green passed as a cyan-band colour');
+
+  console.log(
+    `  T2 hues: cyan ${cyanBand.toFixed(1)}% > amber ${amberBand.toFixed(1)}% > magenta ${magentaBand.toFixed(1)}%` +
+      ` (green ${greenBand.toFixed(1)}%), tokens sit in their measured bands`,
+  );
+}
+
+// ── T3: APCA, because WCAG 2 would have passed unreadable pairings ─────────
+{
+  const pairs: readonly (readonly [string, string, string, number])[] = [
+    ['body text on ground', INK, GROUND, LC_BODY_TEXT],
+    ['body text on raised', INK, GROUND_RAISED, LC_BODY_TEXT],
+    ['dim text on ground', INK_DIM, GROUND, LC_LARGE_UI],
+    ['cyan accent on ground', CYAN, GROUND, LC_LARGE_UI],
+    ['amber accent on ground', AMBER, GROUND, LC_LARGE_UI],
+    ['magenta accent on ground', MAGENTA, GROUND, LC_LARGE_UI],
+    ['cyan on raised', CYAN, GROUND_RAISED, LC_LARGE_UI],
+  ];
+
+  for (const [name, fg, bg, floor] of pairs) {
+    const lc = Math.abs(apcaLc(hex(fg), hex(bg)));
+    ok(lc >= floor, `T3: ${name} scores |Lc| ${lc.toFixed(1)}, below the ${floor} floor — it will be hard to read on a dark screen`);
+  }
+
+  // NEGATIVE CONTROLS. The implementation must produce ~0 for a colour on
+  // itself, and must call a genuinely invisible pairing invisible — otherwise
+  // the floors above are being cleared by a broken function.
+  const selfLc = Math.abs(apcaLc(hex(CYAN), hex(CYAN)));
+  ok(selfLc < 1, `T3 NEGATIVE CONTROL FAILED: a colour against itself scored |Lc| ${selfLc.toFixed(1)}`);
+
+  const nearInvisible = Math.abs(apcaLc(hex(GROUND_EDGE), hex(GROUND_RAISED)));
+  ok(nearInvisible < LC_INVISIBLE,
+    `T3 NEGATIVE CONTROL FAILED: two adjacent ground tones scored |Lc| ${nearInvisible.toFixed(1)}, ` +
+      'which claims they are distinguishable as text');
+
+  // And the reason APCA is used at all: show a pairing WCAG 2 would pass.
+  const luminance = (c: Rgb): number => {
+    const f = (v: number): number => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b);
+  };
+  const wcagRatio = (a: Rgb, b: Rgb): number => {
+    const la = luminance(a), lb = luminance(b);
+    return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+  };
+  const dimOnGround = wcagRatio(hex(INK_DIM), hex(GROUND));
+  const dimLc = Math.abs(apcaLc(hex(INK_DIM), hex(GROUND)));
+  console.log(
+    `  T3 contrast: 7 pairings clear their APCA floors; self-contrast ${selfLc.toFixed(1)}, ` +
+      `adjacent grounds ${nearInvisible.toFixed(1)} (invisible, correctly)`,
+  );
+  console.log(
+    `             dim text scores WCAG ${dimOnGround.toFixed(2)}:1 and APCA |Lc| ${dimLc.toFixed(1)} — ` +
+      'the two standards are measuring different things, which is why APCA is the one enforced',
+  );
+}
+
+// ── T4: the contradiction between spec and images is recorded, not hidden ──
+{
+  const source = readFileSync(fileURLToPath(new URL('../../web/theme.ts', import.meta.url)), 'utf8');
+  const greenBand = bandWeight(90, 149);
+
+  ok(greenBand < 5,
+    `T4: green now measures ${greenBand.toFixed(1)}% of chromatic weight — if the corpus has changed, the ` +
+      'recorded contradiction needs revisiting rather than leaving a stale claim in the theme');
+  ok(/emerald green/i.test(source) && /contradiction/i.test(source),
+    'T4: the theme no longer records that the written visual spec calls for green while the images ' +
+      'contain almost none — a decision made against a document must stay visible in the file that made it');
+  console.log(
+    `  T4 disclosure: green is ${greenBand.toFixed(1)}% of chromatic weight against a spec that names it a ` +
+      'primary pillar; the theme records the disagreement and follows the images',
+  );
+}
+
+if (failures.length > 0) {
+  console.error(`verify-theme: FAIL — ${failures.length} violations`);
+  for (const detail of failures) console.error(`  ${detail}`);
+  process.exit(1);
+}
+
+console.log('verify-theme: PASS — palette traces to 4.6M measured pixels, every pairing clears APCA');
