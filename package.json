@@ -3,7 +3,7 @@
   "version": "6.0.0",
   "private": true,
   "type": "module",
-  "description": "GLAASGAMES — GPU-authoritative 4D game engine on the GLASSBOX genome-driven foundry",
+  "description": "GLAASGAMES \u2014 GPU-authoritative 4D game engine on the GLASSBOX genome-driven foundry",
   "scripts": {
     "verify:genome": "tsx families/genome/verify-genome.ts",
     "verify:expression": "tsx families/expression/verify-expression.ts",
@@ -53,7 +53,9 @@
     "verify:app": "npm run build:web && npm run build:app-assets && tsx engine/verify/verify-app.ts",
     "verify:app-only": "tsx engine/verify/verify-app.ts",
     "verify:gl2": "tsx engine/verify/verify-gl2.ts",
-    "verify:render-strict": "bash scripts/verify-render.sh"
+    "verify:render-strict": "bash scripts/verify-render.sh",
+    "verify:apk": "tsx engine/verify/verify-apk.ts",
+    "verify:apk-debug": "tsx engine/verify/verify-apk.ts --debug"
   },
   "engines": {
     "node": ">=22.5.0"

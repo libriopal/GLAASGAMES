@@ -140,6 +140,22 @@ const CURATED: readonly Curated[] = [
       '"pixels came back lit" check would miss if it did not also test an empty world',
   },
   {
+    // NOTE the subject is a STAGED ASSET, not a source file. verify-apk compares
+    // the built APK against the staged tree, so a source mutation would not move
+    // either side and the mutant would survive for a reason that says nothing
+    // about the oracle. Perturbing the staged tree is what actually exercises
+    // the comparison K2 performs.
+    // --debug, because the RELEASE variant cannot pass without a keystore this
+    // machine does not have, and an oracle that is already red proves nothing
+    // about a mutant. The comparison being exercised is identical in both.
+    oracle: 'engine/verify/verify-apk.ts --debug',
+    subject: 'android/app/src/main/assets/index.html',
+    find: '<title>GLAAS · Lattice</title>',
+    replace: '<title>GLAAS · Lattice (tampered)</title>',
+    why: 'the staged page no longer matches the one inside the APK, which is exactly the divergence that lets ' +
+      'a tester install a build that is not the code under review',
+  },
+  {
     oracle: 'engine/verify/verify-fixed.ts',
     subject: 'engine/math/fixed.ts',
     find: 'export function mulFixed',
@@ -150,8 +166,11 @@ const CURATED: readonly Curated[] = [
 
 /** Runs one oracle. Returns true when it PASSED (exit 0). */
 function runOracle(oracle: string): { readonly passed: boolean; readonly detail: string } {
+  // The entry may carry arguments (e.g. "verify-apk.ts --debug"), because some
+  // oracles check a variant. Split rather than requiring one file per variant.
+  const [script, ...args] = oracle.split(' ');
   try {
-    execFileSync('npx', ['tsx', oracle], {
+    execFileSync('npx', ['tsx', script!, ...args], {
       cwd: ROOT,
       stdio: 'pipe',
       timeout: 180_000,
