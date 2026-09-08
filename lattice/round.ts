@@ -125,25 +125,40 @@ export function isStagnant(board: Board): boolean {
 }
 
 /**
- * Plays one round.
+ * A round in progress.
  *
- * `chooseAction` is the player. It is handed only what a player can see — the
- * observable board — so a policy CANNOT read the hidden lattice even by
- * accident. That constraint is enforced by the type, not by discipline: there is
- * no path from the argument to OFFSET_LINK.
+ * THIS EXISTS SO THERE IS EXACTLY ONE EXECUTOR. `playRound` runs a round to
+ * completion against a policy; an interactive host cannot, because a player
+ * answers over minutes and a synchronous callback loop cannot wait. The obvious
+ * response — let the UI drive its own turn loop — would create a SECOND
+ * implementation of the rules with nothing holding the two in agreement, which
+ * is precisely the defect kernel.ts/sim.wgsl parity exists to prevent, one
+ * level up and with no oracle.
+ *
+ * So the turn is extracted rather than duplicated. `playRound` and
+ * `lattice/session.ts` both call `advanceTurn`, and there is no second copy of
+ * the rules to drift.
  */
-export function playRound(
-  seed: number,
-  config: RoundConfig,
-  chooseAction: (observable: Int32Array, turn: number) => Action,
-): RoundResult {
+export interface RoundState {
+  readonly board: Board;
+  readonly rng: () => number;
+  score: number;
+  reshuffles: number;
+  conceded: boolean;
+  readonly observations: Observation[];
+  chained: number;
+  turn: number;
+}
+
+/** Generates the lattice and the opening faces. */
+export function beginRound(seed: number): RoundState {
   const board = new Board();
   generateLattice(board, seed);
 
   const rng = makeRng(seed ^ 0x5bf03635);
 
-  // ── L1x: the face distribution is fixed here, before the loop, and is const.
-  // No statement inside the turn loop may derive a new weighting.
+  // ── L1x: the face distribution is fixed here, before any turn, and is const.
+  // No statement inside a turn may derive a new weighting.
   const weights = FACE_WEIGHTS;
 
   for (let i = 0; i < CELL_COUNT; i += 1) {
@@ -151,14 +166,32 @@ export function playRound(
     board.set(i, OFFSET_STATE, STATE_IDLE);
   }
 
-  let score = 0;
-  let reshuffles = 0;
-  let conceded = false;
-  const observations: Observation[] = [];
-  let chained = 0x811c9dc5;
+  return { board, rng, score: 0, reshuffles: 0, conceded: false, observations: [], chained: 0x811c9dc5, turn: 0 };
+}
 
-  let turn = 0;
-  for (; turn < config.turns; turn += 1) {
+/**
+ * Advances one turn. Returns false when the round has ended.
+ *
+ * The order of operations here is load-bearing and is the reason this is one
+ * function rather than several a host could call out of sequence: stagnation is
+ * resolved BEFORE the player is asked, so the board they are shown is the board
+ * they act on.
+ */
+export function advanceTurn(
+  state: RoundState,
+  config: RoundConfig,
+  chooseAction: (observable: Int32Array, turn: number) => Action,
+): boolean {
+  const { board, rng } = state;
+  // FACE_WEIGHTS is used DIRECTLY here rather than bound to a local. A local
+  // rebinding is harmless as written, but it is the exact textual shape L1x
+  // forbids inside a turn, and L1x fired on it the moment the turn was
+  // extracted. Satisfying the rule by removing the pattern is correct;
+  // relaxing the rule to permit a benign instance would spend the oracle.
+  if (state.conceded || state.turn >= config.turns) return false;
+
+  {
+    const turn = state.turn;
     // ── D1: stagnation is detected and answered VISIBLY ────────────────────
     // Bounded attempts, because a reshuffle cannot rescue every lattice — if a
     // region's links all point off the board there may be no arrangement of
@@ -169,16 +202,16 @@ export function playRound(
     let attempts = 0;
     while (isStagnant(board) && attempts < MAX_RESHUFFLE_ATTEMPTS) {
       for (let i = 0; i < CELL_COUNT; i += 1) {
-        board.set(i, OFFSET_FACE, drawFace(rng, weights));
+        board.set(i, OFFSET_FACE, drawFace(rng, FACE_WEIGHTS));
         board.set(i, OFFSET_STATE, STATE_IDLE);
         board.set(i, OFFSET_CHARGE, 0);
       }
-      reshuffles += 1;
+      state.reshuffles += 1;
       attempts += 1;
     }
     if (attempts >= MAX_RESHUFFLE_ATTEMPTS && isStagnant(board)) {
-      conceded = true;
-      break;
+      state.conceded = true;
+      return false;
     }
 
     const banked = chooseAction(board.observable(), turn);
@@ -192,7 +225,7 @@ export function playRound(
       // by the hidden lattice is worth more. That is the whole incentive to read
       // the lattice, and it is why w is load-bearing rather than decorative.
       const charge = board.get(target, OFFSET_CHARGE);
-      score = (score + face * (1 + charge)) | 0;
+      state.score = (state.score + face * (1 + charge)) | 0;
 
       board.set(target, OFFSET_FACE, EMPTY);
       board.set(target, OFFSET_CHARGE, 0);
@@ -214,26 +247,52 @@ export function playRound(
     let refilled = 0;
     for (let i = 0; i < CELL_COUNT && refilled < config.refill; i += 1) {
       if (board.get(i, OFFSET_FACE) === EMPTY) {
-        board.set(i, OFFSET_FACE, drawFace(rng, weights));
+        board.set(i, OFFSET_FACE, drawFace(rng, FACE_WEIGHTS));
         board.set(i, OFFSET_STATE, STATE_IDLE);
         refilled += 1;
       }
     }
 
-    observations.push({ turn, chargedCells, banked: target });
-    chained = (chained ^ hashState(board.cells)) >>> 0;
-    chained = Math.imul(chained, 0x01000193) >>> 0;
+    state.observations.push({ turn, chargedCells, banked: target });
+    state.chained = (state.chained ^ hashState(board.cells)) >>> 0;
+    state.chained = Math.imul(state.chained, 0x01000193) >>> 0;
+    state.turn += 1;
+    return true;
   }
+}
 
+/** The result of a round, from its state. */
+export function finishRound(state: RoundState): RoundResult {
   return {
-    score,
-    turnsPlayed: turn,
-    reshuffles,
-    conceded,
-    observations,
-    digest: chained >>> 0,
-    finalLinks: board.hiddenLinks(),
+    score: state.score,
+    turnsPlayed: state.turn,
+    reshuffles: state.reshuffles,
+    conceded: state.conceded,
+    observations: state.observations,
+    digest: state.chained >>> 0,
+    finalLinks: state.board.hiddenLinks(),
   };
+}
+
+/**
+ * Plays one round to completion against a policy.
+ *
+ * `chooseAction` is the player. It is handed only what a player can see — the
+ * observable board — so a policy CANNOT read the hidden lattice even by
+ * accident. That constraint is enforced by the type, not by discipline: there is
+ * no path from the argument to OFFSET_LINK.
+ */
+export function playRound(
+  seed: number,
+  config: RoundConfig,
+  chooseAction: (observable: Int32Array, turn: number) => Action,
+): RoundResult {
+  const state = beginRound(seed);
+  while (advanceTurn(state, config, chooseAction)) {
+    // advanceTurn owns the loop condition, so the two drivers cannot disagree
+    // about when a round is over.
+  }
+  return finishRound(state);
 }
 
 /**

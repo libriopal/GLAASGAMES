@@ -153,8 +153,14 @@ const RULES = computeRules().hash;
   const source = readFileSync(fileURLToPath(new URL('../../lattice/round.ts', import.meta.url)), 'utf8');
   const code = source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1');
 
-  const loopStart = code.indexOf('for (; turn < config.turns');
-  ok(loopStart > 0, 'L1x: could not locate the turn loop in round.ts, so the scan cannot be trusted');
+  // The anchor is `advanceTurn`, which IS the turn. It used to be the `for`
+  // loop inside playRound; when that loop was extracted so an interactive host
+  // and the policy driver could share one executor, this guard fired and
+  // refused to trust itself rather than silently scanning nothing. That is the
+  // guard working — the anchor is re-pointed here, and the check itself is
+  // unchanged.
+  const loopStart = code.indexOf('export function advanceTurn');
+  ok(loopStart > 0, 'L1x: could not locate advanceTurn in round.ts, so the scan cannot be trusted');
   const loopBody = loopStart > 0 ? code.slice(loopStart) : '';
 
   const banned: readonly (readonly [RegExp, string])[] = [

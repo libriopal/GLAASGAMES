@@ -108,6 +108,30 @@ const CURATED: readonly Curated[] = [
       'so the provenance chain is broken at its first link',
   },
   {
+    oracle: 'engine/verify/verify-session.ts',
+    subject: 'lattice/session.ts',
+    find: "if (this.#phase !== 'revealed') {",
+    replace: 'if (false) {',
+    why: 'removes the phase gate so a host can read the hidden lattice mid-round, which ends the inference ' +
+      'game and makes the mutual-information argument in P1 measure something the player can simply see',
+  },
+  {
+    oracle: 'engine/verify/verify-session.ts',
+    subject: 'lattice/round.ts',
+    find: 'state.turn += 1;',
+    replace: 'state.turn += 2;',
+    why: 'the interactive driver and playRound would still agree with THEMSELVES but the round would run half ' +
+      'its turns; catches a turn-accounting change that a single-driver test could not see',
+  },
+  {
+    oracle: 'engine/verify/verify-app.ts',
+    subject: 'web/lattice-app.ts',
+    find: 'const link = revealedLinks?.[index] ?? NO_LINK;',
+    replace: 'const link = session ? session.seed % 36 : NO_LINK;',
+    why: 'the page paints a link marker on every cell from the moment it is dealt — the exact leak A5 exists ' +
+      'to catch, and one no library-level oracle can see because it lives in the host',
+  },
+  {
     oracle: 'engine/verify/verify-fixed.ts',
     subject: 'engine/math/fixed.ts',
     find: 'export function mulFixed',

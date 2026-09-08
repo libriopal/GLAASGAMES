@@ -7,6 +7,7 @@
 // R4  the seed commitment now rejects a rules mismatch, and needs a third party to
 // R5  a mismatch names the file, not merely the fact
 // R6  the code/comment scanner survives adversarial source (found by verify-oracles)
+// R7  the hash pinned into the shipped bundle is not stale
 //
 // R3 is the one that matters. Every other check here can be satisfied by a
 // function that returns a constant string. This project's standing rule is that
@@ -17,6 +18,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { checkReveal, commit, type Commitment, type Reveal } from '../../lattice/commit.js';
+import { RULES_HASH } from '../../lattice/rules-manifest.js';
 import { codeSpans, computeRules, RULE_SOURCES, sameRules, semanticText, type RulesDigest } from '../../lattice/ruleset.js';
 
 const failures: string[] = [];
@@ -246,6 +248,20 @@ const baseline = computeRules();
     'R6: codeSpans did not report both a string span and a code span for a line that plainly has both');
 
   console.log(`  R6 scanner: ${cases.length} adversarial sources parse correctly, string whitespace preserved, comments still stripped`);
+}
+
+// ── R7: the bundle's pinned hash is the real one ───────────────────────────
+// The browser cannot run computeRules() — it reads the filesystem — so the app
+// publishes a hash generated at build time. A generated constant is an
+// assertion, and this project does not ship those: if the rules change and
+// nobody regenerates, the app would commit to a ruleset it is not running, and
+// every commitment it publishes would be wrong in a way no player could detect.
+{
+  ok(RULES_HASH === baseline.hash,
+    `R7: lattice/rules-manifest.ts pins ${RULES_HASH.slice(0, 16)}... but the sources now hash to ` +
+      `${baseline.hash.slice(0, 16)}... — run \`npm run gen:rules\`. Until then the shipped app commits to ` +
+      'rules it is not playing under.');
+  console.log(`  R7 bundle pin: rules-manifest.ts matches computeRules() at ${RULES_HASH.slice(0, 16)}...`);
 }
 
 if (failures.length > 0) {

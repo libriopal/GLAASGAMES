@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>GLAAS · Lattice</title>
+<style>
+  /* Colours are NOT written here. lattice-app.ts sets every custom property
+     from web/theme.ts at startup, so the palette this screen renders is the one
+     verify-theme holds to 4.6M measured pixels and to its APCA floors. A hex
+     literal in this file would be a colour no oracle governs. */
+  :root {
+    color-scheme: dark;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; min-height: 100%;
+    background: var(--ground); color: var(--ink);
+    font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #app {
+    max-width: 560px; margin: 0 auto;
+    padding: calc(12px + var(--safe-top)) 12px calc(16px + var(--safe-bottom));
+  }
+  h1 { font-size: 15px; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 2px; color: var(--cyan); }
+  .sub { color: var(--ink-dim); margin: 0 0 14px; font-size: 12px; }
+
+  #status {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    background: var(--ground-raised); border: 1px solid var(--ground-edge);
+    border-radius: 8px; padding: 10px; margin-bottom: 12px;
+  }
+  #status div { text-align: center; }
+  #status b { display: block; font-size: 20px; color: var(--amber); font-weight: 600; }
+  #status span { font-size: 11px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: .08em; }
+
+  #board { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  /* 48px is the floor verify-controls enforces for a touch target. The cells
+     are square and fluid, so on the narrowest phone they still clear it. */
+  .cell {
+    aspect-ratio: 1; min-height: 48px;
+    display: flex; align-items: center; justify-content: center;
+    font: inherit; font-size: 20px; font-weight: 600;
+    background: var(--die-body); color: var(--face-ink);
+    border: 1px solid var(--die-edge); border-radius: 8px;
+    cursor: pointer; transition: transform .08s ease;
+  }
+  .cell:active { transform: scale(.94); }
+  .cell[data-state="1"] { border-color: var(--charge); box-shadow: 0 0 0 2px var(--charge) inset; }
+  .cell[data-empty="1"] { background: transparent; border-style: dashed; color: var(--ink-dim); }
+  .cell[disabled] { cursor: default; }
+  .charge { font-size: 11px; color: var(--charge); margin-left: 4px; }
+  /* The link overlay only ever has content after the reveal. */
+  .cell .link { font-size: 10px; color: var(--link); margin-left: 3px; }
+
+  #actions { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+  button.primary {
+    flex: 1; min-height: 48px; padding: 0 16px;
+    background: var(--ground-raised); color: var(--cyan);
+    border: 1px solid var(--cyan); border-radius: 8px;
+    font: inherit; font-weight: 600; letter-spacing: .06em; cursor: pointer;
+  }
+  button.primary:disabled { color: var(--ink-dim); border-color: var(--ground-edge); cursor: default; }
+
+  #proof {
+    margin-top: 14px; padding: 10px; border-radius: 8px;
+    background: var(--ground-raised); border: 1px solid var(--ground-edge);
+    font-size: 11px; line-height: 1.6; word-break: break-all; color: var(--ink-dim);
+  }
+  #proof h2 { font-size: 11px; margin: 0 0 6px; color: var(--ink); letter-spacing: .08em; text-transform: uppercase; }
+  #proof .ok { color: var(--cyan); }
+  #proof .bad { color: var(--magenta); }
+  #proof code { color: var(--ink); }
+  a { color: var(--ink-dim); font-size: 11px; }
+</style>
+</head>
+<body>
+  <div id="app">
+    <h1>GLAAS · Lattice</h1>
+    <p class="sub">Bank a cell each turn. Charge moves along links you cannot see — until the reveal.</p>
+
+    <div id="status">
+      <div><b id="s-score">0</b><span>Score</span></div>
+      <div><b id="s-turn">0/0</b><span>Turn</span></div>
+      <div><b id="s-shuffle">0</b><span>Reshuffles</span></div>
+    </div>
+
+    <div id="board" role="grid" aria-label="Game board, 6 by 6"></div>
+
+    <div id="actions">
+      <button class="primary" id="btn-reveal" disabled>Reveal &amp; verify</button>
+      <button class="primary" id="btn-new">New round</button>
+    </div>
+
+    <div id="proof">
+      <h2>Proof</h2>
+      <div id="proof-body">The commitment is published before the first turn.</div>
+    </div>
+
+    <p><a href="engine.html">4D engine demo →</a></p>
+  </div>
+  <script type="module" src="dist/web/lattice-app.js"></script>
+</body>
+</html>
