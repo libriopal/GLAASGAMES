@@ -156,6 +156,14 @@ const CURATED: readonly Curated[] = [
       'a tester install a build that is not the code under review',
   },
   {
+    oracle: 'engine/verify/verify-coldstart.ts',
+    subject: 'web/lattice.html',
+    find: "if (!document.querySelector('#board .cell')) reveal('the board never appeared');",
+    replace: '/* watchdog removed */;',
+    why: 'a module that never executes fires no error event, so without the timeout backstop a failed load ' +
+      'shows an empty board and says nothing — the blank screen a reviewer files as "does not work"',
+  },
+  {
     oracle: 'engine/verify/verify-fixed.ts',
     subject: 'engine/math/fixed.ts',
     find: 'export function mulFixed',

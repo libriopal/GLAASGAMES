@@ -73,6 +73,19 @@
     font-size: 11px; line-height: 1.6; word-break: break-all; color: var(--ink-dim);
   }
   #proof h2 { font-size: 11px; margin: 0 0 6px; color: var(--ink); letter-spacing: .08em; text-transform: uppercase; }
+
+  /* The startup failure panel. Styled with literal colours, not tokens, on
+     purpose: the tokens are published by the very script that may have failed
+     to load, so a message depending on them would be invisible exactly when it
+     is needed. This is the one place in the file where a hex literal is
+     correct. */
+  .startup-error {
+    margin: 16px 0; padding: 14px; border-radius: 8px;
+    background: #1a1016; border: 1px solid #f4bdff; color: #e9eef4;
+    font-size: 13px; line-height: 1.6;
+  }
+  .startup-error h2 { margin: 0 0 6px; font-size: 13px; color: #f4bdff; }
+  .startup-error ul { margin: 8px 0 0; padding-left: 18px; color: #cbd0d8; }
   #proof .ok { color: var(--cyan); }
   #proof .bad { color: var(--magenta); }
   #proof code { color: var(--ink); }
@@ -90,6 +103,28 @@
       <div><b id="s-shuffle">0</b><span>Reshuffles</span></div>
     </div>
 
+    <noscript>
+      <div class="startup-error">
+        <h2>This game needs JavaScript</h2>
+        JavaScript is switched off in this browser or WebView, so the board cannot be dealt.
+        Enable it and reload.
+      </div>
+    </noscript>
+
+    <!-- Shown by the bootstrap script below if the game does not come up.
+         Present in the markup rather than created at runtime, because the code
+         that would create it is the code that may have failed. -->
+    <div id="startup-error" class="startup-error" hidden>
+      <h2>The game couldn't start</h2>
+      The board failed to load on this device. The app itself is offline and
+      needs no network, so this is usually the browser engine rather than a
+      connection.
+      <ul>
+        <li>Update <b>Android System WebView</b> and <b>Chrome</b> in the Play Store, then reopen.</li>
+        <li>If it still fails, this device's WebView may be too old to run the game.</li>
+      </ul>
+    </div>
+
     <div id="board" role="grid" aria-label="Game board, 6 by 6"></div>
 
     <div id="actions">
@@ -104,6 +139,38 @@
 
     <p><a href="engine.html">4D engine demo →</a></p>
   </div>
+  <!-- A CLASSIC script, not a module, and inline. A module would be subject to
+       exactly the loading failure it is here to report, and an external file
+       would be a second thing that can fail to arrive. This runs first, watches,
+       and speaks up if the board never appears. -->
+  <script>
+    (function () {
+      var panel = document.getElementById('startup-error');
+      var shown = false;
+      function reveal(why) {
+        if (shown || !panel) return;
+        shown = true;
+        panel.hidden = false;
+        // Recorded for a bug report. There is no network permission, so this
+        // goes nowhere on its own — it is here for a person reading the page.
+        panel.setAttribute('data-reason', String(why || 'unknown'));
+      }
+      window.addEventListener('error', function (e) {
+        // Only startup failures. Once the board exists the game is running and
+        // a later error is not a cold-start problem.
+        if (!document.querySelector('#board .cell')) reveal(e.message);
+      }, true);
+      window.addEventListener('unhandledrejection', function (e) {
+        if (!document.querySelector('#board .cell')) reveal(e.reason && e.reason.message);
+      });
+      // The backstop: a module that never executes fires no error at all.
+      // 2500ms is comfortably past the 281ms a 6x-throttled cold start takes,
+      // so this cannot fire on a slow-but-working device.
+      setTimeout(function () {
+        if (!document.querySelector('#board .cell')) reveal('the board never appeared');
+      }, 2500);
+    })();
+  </script>
   <script type="module" src="dist/web/lattice-app.js"></script>
 </body>
 </html>
