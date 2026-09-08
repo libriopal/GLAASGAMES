@@ -301,6 +301,31 @@ if (tier2) {
   console.log('  O4 generated: skipped — set MUTATION_TIER2=1 to run the search (minutes, reports only)');
 }
 
+// ── Restore DERIVED state, not just source ─────────────────────────────────
+//
+// FOUND BY verify-apk IMMEDIATELY AFTER THIS HARNESS RAN. `withMutation`
+// faithfully restores every source file it edits, and that is not enough:
+// several oracles REBUILD the web bundle and the staged APK assets as their
+// first act. A mutant that is live during such a rebuild gets compiled into
+// android/app/src/main/assets and stays there after the source is put back.
+//
+// The tree then looks clean to git while the staged assets carry the mutation,
+// and an APK built at that moment would ship it. verify-apk caught exactly
+// that: index.html in the staged tree read "/* watchdog removed */" while
+// web/lattice.html was intact.
+//
+// So the derived artifacts are regenerated here, unconditionally, as the last
+// act of the run.
+{
+  try {
+    execFileSync('npm', ['run', 'build:web'], { cwd: ROOT, stdio: 'pipe' });
+    execFileSync('npm', ['run', 'build:app-assets'], { cwd: ROOT, stdio: 'pipe' });
+    console.log('  restored: web bundle and staged app assets rebuilt from the restored sources');
+  } catch {
+    fail('the derived artifacts could not be rebuilt after mutation, so the staged tree may still carry a mutant');
+  }
+}
+
 if (failures.length > 0) {
   console.error(`verify-oracles: FAIL — ${failures.length} violations`);
   for (const detail of failures) console.error(`  ${detail}`);
