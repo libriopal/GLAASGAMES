@@ -183,3 +183,35 @@ export class WorldState {
     }
   }
 }
+
+/**
+ * Writes the player's position into its entity record.
+ *
+ * The player is simulated by the host, not by the kernel — the kernel only reads
+ * its position, as a uniform, to decide collection. But the record still has to
+ * be updated every tick, for two reasons: the renderer draws from the world
+ * buffer and would otherwise leave the player frozen at spawn, and the
+ * determinism digest hashes that buffer, so without this the digest does not
+ * bind the player's trajectory at all.
+ *
+ * That second reason is not hypothetical. The replay verifier's negative
+ * controls found exactly this: with the player's position absent from the
+ * buffer, a replay could be re-piloted along a completely different path and
+ * still hash identically, so long as it collected the same targets. One helper,
+ * used by every executor, is what keeps the host and the verifier honest about
+ * the same bits.
+ */
+export function writePlayerPosition(
+  world: WorldState,
+  slot: number,
+  player: { readonly x: number; readonly y: number; readonly z: number; readonly w: number },
+): void {
+  if (slot < 0 || slot >= world.capacity) {
+    throw new Error(`writePlayerPosition: slot ${slot} out of range`);
+  }
+  const base = slot * ENTITY_STRIDE;
+  world.buffer[base + OFFSET_POS_X] = player.x | 0;
+  world.buffer[base + OFFSET_POS_Y] = player.y | 0;
+  world.buffer[base + OFFSET_POS_Z] = player.z | 0;
+  world.buffer[base + OFFSET_POS_W] = player.w | 0;
+}
