@@ -127,9 +127,13 @@ jobs:
       # Unsigned: the release keystore is not in CI and must never be. This job
       # answers "does it build", and signing is a separate concern handled on a
       # machine that holds the key.
+      # ./gradlew, not the runner's gradle. The runner ships Gradle 9.7, and
+      # AGP 8.13 relies on an internal API removed in 9.6 — so the system gradle
+      # builds fine locally on 8.14 and fails here. The committed wrapper pins
+      # one version for every machine, which is what a wrapper is for.
       - name: Assemble the debug APK
         working-directory: android
-        run: gradle --no-daemon :app:assembleDebug
+        run: ./gradlew --no-daemon :app:assembleDebug
 
       - name: Check what the APK actually contains
         run: |

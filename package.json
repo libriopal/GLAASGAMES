@@ -39,9 +39,9 @@
     "verify:daily": "tsx engine/verify/verify-daily.ts",
     "verify:controls": "tsx engine/verify/verify-controls.ts",
     "build:app-assets": "node scripts/build-app-assets.mjs android/app/src/main/assets",
-    "build:apk": "npm run build:web && npm run build:app-assets && cd android && gradle --no-daemon :app:assembleRelease",
-    "build:aab": "npm run build:web && npm run build:app-assets && cd android && gradle --no-daemon :app:bundleRelease",
-    "build:apk-debug": "npm run build:web && npm run build:app-assets && cd android && gradle --no-daemon :app:assembleDebug"
+    "build:apk": "npm run build:web && npm run build:app-assets && cd android && ./gradlew --no-daemon :app:assembleRelease",
+    "build:aab": "npm run build:web && npm run build:app-assets && cd android && ./gradlew --no-daemon :app:bundleRelease",
+    "build:apk-debug": "npm run build:web && npm run build:app-assets && cd android && ./gradlew --no-daemon :app:assembleDebug"
   },
   "engines": {
     "node": ">=22.5.0"

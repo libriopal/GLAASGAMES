@@ -27,3 +27,9 @@ android/app/src/main/assets/
 build/app-assets/
 *.jks
 *.keystore
+
+# The Gradle wrapper JAR is committed deliberately: it is what pins the Gradle
+# version for CI and for anyone cloning. AGP 8.13 uses an internal API removed
+# in Gradle 9.6, and GitHub's runners ship 9.7 — without this the build works
+# locally and fails in CI, which is exactly what happened.
+!android/gradle/wrapper/gradle-wrapper.jar
