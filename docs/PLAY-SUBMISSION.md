@@ -89,17 +89,30 @@ loss-framing (`game/economy/rules.ts`), and `verify-daily.ts` fails the build if
 the daily module grows any of them. The rating answer is enforced by a test, not
 remembered by a person.
 
-## 7. Store listing assets you still need
+## 7. Store listing assets
 
-The build produces the binary; these are the human parts.
+**Done, in `docs/store/`** — regenerate any time with `npm run build:store-assets`,
+which renders them through Chromium so they are reproducible rather than
+hand-made once and lost:
 
-- App icon, 512×512 PNG (the in-app adaptive icon is a vector; the store needs a
-  raster one)
-- Feature graphic, 1024×500
-- At least 2 phone screenshots — 4 to 8 reads better. `app-shot.png` in the
-  scratchpad shows what a capture looks like.
-- Short description (80 chars) and full description (4000)
-- A privacy policy URL (see §5)
+- `store-icon-512.png` — 512×512, the same tesseract mark as the launcher icon
+- `store-feature-1024x500.png` — 1024×500 feature graphic
+- `screenshot-01-portrait.png` — 412×915 capture of the game running
+
+**Still yours to write:**
+
+- More screenshots. One is the minimum Play accepts for a phone listing; 4–8
+  reads far better. Capture them on your device once you have it installed —
+  a real screenshot beats a headless one.
+- Short description (80 characters) and full description (4000).
+- A privacy policy URL (see §5 — `docs/privacy-policy.md` is ready to publish).
+
+A first draft of the short description, to argue with rather than adopt:
+
+> A new four-dimensional world every day. Every run is verifiable. No ads.
+
+The three claims in it are all things the build actually enforces, which is
+the only reason to make them.
 
 ## 8. Build commands
 
