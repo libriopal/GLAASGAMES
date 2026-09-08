@@ -100,6 +100,14 @@ const CURATED: readonly Curated[] = [
       'programs printing different text hash identically — also a promoted TIER 2 survivor',
   },
   {
+    oracle: 'engine/verify/verify-theme.ts',
+    subject: 'design/corpus-manifest.json',
+    find: '"images": 1129,',
+    replace: '"images": 1128,',
+    why: 'the corpus pin stops covering the same number of images the palette claims to be derived from, ' +
+      'so the provenance chain is broken at its first link',
+  },
+  {
     oracle: 'engine/verify/verify-fixed.ts',
     subject: 'engine/math/fixed.ts',
     find: 'export function mulFixed',

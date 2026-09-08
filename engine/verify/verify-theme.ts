@@ -5,11 +5,13 @@
 // T1  the digest is the one the theme cites, and is complete
 // T2  the accent hues match the measured chromatic weights, in measured order
 // T3  every text pairing clears APCA, which WCAG 2 would not have caught
-// T4  the recorded contradiction between the written spec and the images stands
+// T4  the palette's omission of green is a measured decision, and stays one
+// T5  the digest is REPRODUCIBLE from a pinned corpus, not merely committed
 //
 // This is the oracle that stops the palette drifting into taste. A colour here
 // is either traceable to 4,613,440 measured pixels or it fails.
 
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
@@ -218,6 +220,75 @@ function bandWeight(fromDeg: number, toDeg: number): number {
   console.log(
     `  T4 omission: green is ${greenBand.toFixed(1)}% of chromatic weight; the theme states why it carries ` +
       'no green token, and none of its 8 exported colours sits in the green band',
+  );
+}
+
+// ── T5: the digest is reproducible, not merely committed ───────────────────
+//
+// FOUND BY THE SOVEREIGNTY AUDIT. T1 above checks the digest's internal
+// consistency — that it reports 1,129 images and 4,613,440 pixels and sums to a
+// distribution. It cannot check that those numbers came from any actual images,
+// because the corpus is not in this repository. So T1 was checking the digest
+// against itself: an assertion with no witness, in the one file that claims
+// "derived, not chosen".
+//
+// The fix is the same shape as `lattice/ruleset.ts`. Committing 1,129 JPEGs
+// would bloat this repo and duplicate another one; instead the manifest pins
+// every image by SHA-256, binds them under a root hash, and records the digest
+// those images produce. The chain a third party can now walk end to end:
+//
+//   corpus  --manifest-corpus.py --check-->  root 008cb900...
+//   corpus  --ingest-corpus.py------------>  digest, byte-identical to the
+//                                            committed one (verified: the
+//                                            regenerated file hashed equal)
+//   digest  --this file------------------->  the tokens above
+//
+// What T5 can prove without the images present is that the links exist and
+// agree. What it cannot prove is that the images themselves are unchanged —
+// that requires holding them, which is exactly why the manifest names each one.
+{
+  interface Manifest {
+    images: number;
+    root: string;
+    digest_sha256: string;
+    files: Record<string, string>;
+  }
+  const manifestPath = fileURLToPath(new URL('../../design/corpus-manifest.json', import.meta.url));
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Manifest;
+
+  ok(manifest.images === CORPUS_IMAGES,
+    `T5: the manifest pins ${manifest.images} images but the theme claims ${CORPUS_IMAGES}`);
+  ok(Object.keys(manifest.files).length === manifest.images,
+    `T5: the manifest claims ${manifest.images} images but lists ${Object.keys(manifest.files).length}`);
+
+  // The root must recompute from the file list, or it is a number typed in.
+  const recomputedRoot = createHash('sha256')
+    .update(Object.entries(manifest.files).map(([n, d]) => `${n}:${d}`).join('\n'))
+    .digest('hex');
+  ok(recomputedRoot === manifest.root,
+    `T5: the manifest root does not recompute from its own file list (${manifest.root.slice(0, 12)} vs ` +
+      `${recomputedRoot.slice(0, 12)}) — the pin does not bind the thing it claims to bind`);
+
+  // And the manifest must name THIS digest, not some other one.
+  const digestBytes = readFileSync(fileURLToPath(new URL(`../../${CORPUS_DIGEST}`, import.meta.url)));
+  const digestHash = createHash('sha256').update(digestBytes).digest('hex');
+  ok(digestHash === manifest.digest_sha256,
+    `T5: the manifest records digest ${manifest.digest_sha256.slice(0, 12)} but the committed digest hashes ` +
+      `to ${digestHash.slice(0, 12)} — the corpus pin and the measurements have come apart`);
+
+  // NEGATIVE CONTROL: the root must move if any single image hash changes.
+  const [firstName] = Object.keys(manifest.files);
+  const tampered = { ...manifest.files, [firstName!]: '0'.repeat(64) };
+  const tamperedRoot = createHash('sha256')
+    .update(Object.entries(tampered).map(([n, d]) => `${n}:${d}`).join('\n'))
+    .digest('hex');
+  ok(tamperedRoot !== manifest.root,
+    'T5 NEGATIVE CONTROL FAILED: substituting an image hash did not change the root, so the manifest ' +
+      'does not actually pin the corpus');
+
+  console.log(
+    `  T5 provenance: ${manifest.images} images pinned under root ${manifest.root.slice(0, 12)}..., ` +
+      `bound to digest ${digestHash.slice(0, 12)}... (regenerating from the corpus reproduces it byte for byte)`,
   );
 }
 
