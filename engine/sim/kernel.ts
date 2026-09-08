@@ -271,7 +271,11 @@ export function tick(world: WorldState, config: SimConfig, player: PlayerPositio
  */
 function integerSqrtFixed(value: number): number {
   if (value <= 0) return 0;
-  const radicand = value * 65536;
+  // i32-exempt: deliberately wider than 32 bits. value is Q16.16, so this
+  // product reaches 2^47 and MUST NOT wrap — that is exactly why the WGSL port
+  // implements this loop over a hi/lo u32 pair instead of a single i32. The two
+  // are proven equal by execution parity, not by both wrapping the same way.
+  const radicand = value * 65536;   // i32-exempt: see above
   let remainder = radicand;
   let root = 0;
   let bit = 2 ** 48;
@@ -281,7 +285,7 @@ function integerSqrtFixed(value: number): number {
   while (bit >= 1) {
     if (remainder >= root + bit) {
       remainder -= root + bit;
-      root = root / 2 + bit;
+      root = root / 2 + bit;   // i32-exempt: same wide radicand as above
     } else {
       root = root / 2;
     }

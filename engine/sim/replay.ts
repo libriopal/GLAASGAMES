@@ -13,8 +13,21 @@
 //
 // WHAT IS RECORDED: the seed, the drifter count, and one Input per tick. Not the
 // positions. Recording positions would let a forged replay assert an outcome;
-// recording only inputs means the outcome is derived, and a forgery has to
-// actually play the game.
+// recording only inputs means the outcome is derived rather than claimed.
+//
+// WHAT THIS PROVES, AND WHAT IT DOES NOT. It proves a score is ACHIEVABLE UNDER
+// THE RULES — no fabricated number, no tampered client, no trusted server
+// asserting a result nobody can check. It does NOT prove a human achieved it.
+// The same determinism that makes a run recomputable makes it solvable offline:
+// anyone can search input sequences against a known seed and submit the best one
+// found. An independent auditor named exactly this as the strongest remaining
+// attack, and it is correct — the property is inherent to the design, not a gap
+// in it.
+//
+// So a leaderboard built on this must say "verified", never "human". Those are
+// different claims and only the first one is supported here. Establishing the
+// second needs something outside the replay — input timing distributions, or an
+// attested client — and neither is built, so neither is claimed.
 //
 // THE INPUT STREAM IS RUN-LENGTH ENCODED because a human holding a direction
 // emits the same Input for dozens of consecutive ticks. A 60-second run at

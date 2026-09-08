@@ -145,11 +145,25 @@ jobs:
           "$AAPT" dump badging "$APK" | grep -q "targetSdkVersion:'36'" \
             || { echo "::error::APK does not target API 36"; exit 1; }
 
-          # No INTERNET permission. This is the load-bearing claim behind the
-          # Data Safety declaration and the Minimum Functionality argument, so
-          # it is asserted rather than trusted.
-          if "$AAPT" dump permissions "$APK" | grep -q 'android.permission.INTERNET'; then
-            echo "::error::APK requests INTERNET — the offline claim is no longer true"
+          # NO platform permissions at all — an allowlist, not a denylist.
+          #
+          # This is the load-bearing claim behind the Data Safety declaration and
+          # the Minimum Functionality argument, so it is asserted on the BUILT
+          # ARTIFACT rather than read off the source manifest. That distinction
+          # is the whole point: Gradle's manifest merger folds in permissions
+          # declared by any dependency's own manifest, so a source manifest with
+          # no <uses-permission> can still produce an APK that requests several.
+          # Adding one analytics or crash-reporting library is enough.
+          #
+          # Denying INTERNET alone would miss that. Anything under the
+          # android.permission namespace fails the build, and adding one has to
+          # be a deliberate edit here. (The AndroidX self-permission for dynamic
+          # receivers is app-scoped, not android.permission.*, so it does not
+          # match — verified against a real build.)
+          FOUND=$("$AAPT" dump permissions "$APK" | grep -o "android\.permission\.[A-Z_]*" | sort -u || true)
+          if [ -n "$FOUND" ]; then
+            echo "::error::APK requests platform permissions, so it is no longer offline-by-construction:"
+            echo "$FOUND"
             exit 1
           fi
 

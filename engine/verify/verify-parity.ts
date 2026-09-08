@@ -18,6 +18,8 @@
 // via --require-gpu, so CI on GPU runners can insist while a laptop or a
 // container need not.
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { readSimShaderSource, acquireGpu } from '../gpu/device.js';
 import { loadSimConfig } from '../sim/config.js';
 import { TickHashChain, formatHash } from '../sim/hash.js';
@@ -141,10 +143,96 @@ if (floatUse !== null) {
   );
 }
 
+// The other half of the same prohibition, and the one that is easy to forget.
+//
+// WGSL's i32 wraps at 32 bits. TypeScript's `+` and `*` do not — they compute in
+// float64 and stay exact to 2^53. So an intermediate that overflows i32 gives a
+// WRAPPED answer on the GPU and an EXACT one on the CPU, and the two executors
+// silently disagree. Every arithmetic result in the kernel must therefore be
+// forced back to i32, by `| 0`, by a shift, or by a fixed-point helper that
+// already does it.
+//
+// This is not hypothetical. Exactly this class of bug shipped once here: the
+// collection rule summed four squared per-axis deltas, the sum overflowed i32,
+// `| 0` wrapped it negative, and a negative total read as "inside the radius" —
+// so the farthest targets in the world collected themselves. An independent
+// auditor, given only the architecture and no code, named this as the single
+// most likely remaining divergence between the two hosts. It was clean when
+// checked; this makes it stay clean.
+const KERNEL_SOURCE = readFileSync(
+  fileURLToPath(new URL('../sim/kernel.ts', import.meta.url)),
+  'utf8',
+);
+
+/** Assignments whose right-hand side does arithmetic without forcing i32. */
+function unwrappedAssignments(source: string): string[] {
+  // Block comments go; line comments are KEPT, because the i32-exempt marker
+  // lives in one and stripping it would erase the declaration being read.
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+  const offenders: string[] = [];
+  for (const raw of code.split('\n')) {
+    const line = raw.trim();
+
+    // A line may declare itself exempt, but it has to say so in the source next
+    // to the code, where a reviewer sees it — not in this file, where the list
+    // of exceptions would drift away from the reasons for them.
+    if (line.includes('i32-exempt')) continue;
+    // Only assignments, and only ones whose value involves + - * on the right.
+    const match = /^(?:let |const )?[\w.[\]+ ]+ = (.+);$/.exec(line);
+    if (match === null) continue;
+    // Subscripts are addresses, not arithmetic. Judge the expression with them
+    // blanked out, or every `buffer[base + OFFSET_KIND]` read looks like a sum.
+    const rhs = match[1]!;
+    const outer = rhs.replace(/\[[^\]]*\]/g, '[]');
+    if (!/[^=!<>+\-*/]\s[+\-*]\s/.test(` ${outer}`)) continue;
+
+    // Safe forms: an explicit i32 coercion, a shift (which coerces), or a
+    // fixed-point helper whose own contract is to return i32.
+    if (/\|\s*0\s*$/.test(rhs)) continue;
+    if (/>>>?|<</.test(rhs)) continue;
+    if (/^(mulFixed|divFixed|sqrtFixed|toFixed)\(/.test(rhs)) continue;
+    // Address arithmetic is exempt, and it is recognised by what it is BUILT
+    // FROM rather than by what it is called: an expression composed only of a
+    // slot, a stride, field offsets and literals computes an index into an
+    // Int32Array. Such a value cannot approach 2^31 at any capacity this pool
+    // supports, and it is not simulation state, so wrapping it is meaningless.
+    // Anything mentioning a position, a velocity or a config value is not an
+    // address and is not exempt.
+    const identifiers = outer.replace(/\[\]/g, ' ').match(/[A-Za-z_$][\w$]*/g) ?? [];
+    const addressOnly = identifiers.length > 0 && identifiers.every((name) =>
+      /^(base|slot|index|i|ENTITY_STRIDE|OFFSET_[A-Z_]+)$/.test(name));
+    if (addressOnly) continue;
+
+    offenders.push(line);
+  }
+  return offenders;
+}
+
+const unwrapped = unwrappedAssignments(KERNEL_SOURCE);
+if (unwrapped.length > 0) {
+  fail(
+    `contract: ${unwrapped.length} arithmetic assignment(s) in kernel.ts are not forced to i32, ` +
+      'so they compute exactly on the CPU and wrap on the GPU: ' +
+      unwrapped.slice(0, 3).join(' | '),
+  );
+}
+
+// The check must be able to fire, or it is decoration. A planted unwrapped
+// assignment has to be caught by the same predicate the real scan uses.
+const planted = unwrappedAssignments('let velX = buffer[vx]! + gravityX * dtFixed;');
+if (planted.length !== 1) {
+  fail(
+    'contract: the i32-wrapping scan did not detect a planted unwrapped assignment, ' +
+      'so it proves nothing about the real kernel',
+  );
+}
+
 if (failures.length === 0) {
   console.log(
     `  contract: ${CONTRACT.length} layout constants, ${EXPECTED_PARAM_FIELDS.length} uniform fields, ` +
-      `workgroup size ${config.workgroupSize}, zero float types — CPU and GPU agree`,
+      `workgroup size ${config.workgroupSize}, zero float types, every kernel assignment ` +
+      'forced to i32 — CPU and GPU agree',
   );
 }
 

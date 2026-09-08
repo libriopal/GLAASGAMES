@@ -8,7 +8,14 @@ The critic therefore runs on a DIFFERENT model, on a DIFFERENT vendor's
 inference stack, and is given the artifact WITHOUT the reasoning that produced
 it — it sees the claim, not the chain of thought that made the claim feel true.
 
+    ./audit.py --ask "one specific question"     <- the reliable form
     ./audit.py <prompt-file> [--system <file>] [--max-tokens N]
+
+USE --ask. Three of four multi-part prompts sent to this model degenerated into
+repetition and burned their whole budget without answering; every single
+question was answered. Structured multi-part audits are supported but are a
+known failure mode, and an empty completion is reported loudly rather than
+being mistaken for a clean bill of health.
 
 Credentials come from $HOME/.env and are never printed. Transcripts are written
 to ./audits/ so every finding in the plan is traceable to a recorded exchange.
@@ -43,6 +50,37 @@ step depends on which and why the stated order breaks it.
 """
 
 
+def degenerate(reasoning: str, window: int = 40, threshold: int = 8) -> bool:
+    """True when the reasoning trace is looping rather than progressing.
+
+    MEASURED, not guessed. `@cf/google/gemma-4-26b-a4b-it` is a reasoning model
+    and on multi-part structured prompts it falls into repetition: the audit of
+    the shipped increments spent its full 14,000-token budget emitting the same
+    sentence over and over and never answered. The tell is a single line
+    recurring many times in the tail of the trace, so that is what this looks
+    for — the last `window` non-trivial lines, and whether any one of them
+    appears at least `threshold` times.
+
+    This matters because the failure is silent and expensive. Without it, a
+    caller sees an empty completion, assumes the budget was too small, raises it,
+    and pays twice for the same non-answer.
+    """
+    lines = [line.strip() for line in reasoning.splitlines() if len(line.strip()) > 20]
+    if len(lines) < threshold:
+        return False
+    tail = lines[-window:]
+    return max((tail.count(line) for line in set(tail)), default=0) >= threshold
+
+
+ASK_SYSTEM = """You are an independent technical auditor reviewing someone \
+else's work. Answer the single question you are given, in under 150 words.
+
+Do not restate the question. Do not list options. Give your best single answer \
+and the concrete condition under which it bites. If you do not know, write \
+"unknown" — a guess dressed as a finding is worse than no finding.
+"""
+
+
 def load_env() -> dict[str, str]:
     env: dict[str, str] = {}
     for line in (pathlib.Path.home() / ".env").read_text().splitlines():
@@ -59,11 +97,24 @@ def main() -> int:
         print(__doc__)
         return 2
 
-    prompt = pathlib.Path(args[0]).read_text()
-    system = DEFAULT_SYSTEM
-    max_tokens = 4096
-    if "--system" in args:
-        system = pathlib.Path(args[args.index("--system") + 1]).read_text()
+    # --ask takes the question inline and enforces the single-question form.
+    # Three of four multi-part audits degenerated; every single-question one
+    # answered. So the reliable shape is the default one worth making easy.
+    if args[0] == "--ask":
+        prompt = " ".join(a for a in args[1:] if not a.startswith("--"))
+        if not prompt.strip():
+            print("--ask needs a question", file=sys.stderr)
+            return 2
+        system = ASK_SYSTEM
+        max_tokens = 7000
+        name = "ask"
+    else:
+        prompt = pathlib.Path(args[0]).read_text()
+        system = DEFAULT_SYSTEM
+        max_tokens = 4096
+        name = pathlib.Path(args[0]).stem
+        if "--system" in args:
+            system = pathlib.Path(args[args.index("--system") + 1]).read_text()
     if "--max-tokens" in args:
         max_tokens = int(args[args.index("--max-tokens") + 1])
 
@@ -112,16 +163,22 @@ def main() -> int:
     if not text.strip():
         reason = choice.get("finish_reason")
         thinking = message.get("reasoning_content") or ""
-        print(
-            f"EMPTY AUDIT: finish_reason={reason}, "
-            f"{len(thinking)} chars of reasoning but no answer. "
-            f"Raise --max-tokens.",
-            file=sys.stderr,
+        looped = degenerate(thinking)
+        diagnosis = (
+            "the model looped — it repeated itself until the budget ran out. "
+            "Raising --max-tokens will not help; ask ONE question instead "
+            "(see --ask)."
+            if looped else
+            f"{len(thinking)} chars of reasoning but no answer. Raise --max-tokens."
         )
-        text = f"[NO ANSWER — finish_reason={reason}]\n\nTruncated reasoning:\n{thinking[-4000:]}"
+        print(f"EMPTY AUDIT: finish_reason={reason}, {diagnosis}", file=sys.stderr)
+        text = (
+            f"[NO ANSWER — finish_reason={reason}"
+            f"{', DEGENERATE LOOP' if looped else ''}]\n\n"
+            f"Truncated reasoning:\n{thinking[-2000:]}"
+        )
 
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    name = pathlib.Path(args[0]).stem
     (AUDITS / f"{stamp}-{name}.md").write_text(
         f"<!-- model: {model}  usage: {json.dumps(usage)} -->\n\n"
         f"## Prompt\n\n{prompt}\n\n## Auditor response\n\n{text}\n"

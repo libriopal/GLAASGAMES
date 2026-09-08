@@ -72,22 +72,40 @@ const ok = (condition: boolean, detail: string): void => {
 // A weak mixer would give neighbouring days neighbouring seeds, and the world
 // generator would then produce recognisably similar worlds day to day.
 {
+  /** Bits two seeds agree on. 32 means identical; ~16 means independent. */
+  const sharedBits = (a: number, b: number): number => {
+    let agree = 0;
+    for (let bit = 0; bit < 32; bit += 1) {
+      if (((a >>> bit) & 1) === ((b >>> bit) & 1)) agree += 1;
+    }
+    return agree;
+  };
+
+  // The counter itself must be right before any bound built on it means
+  // anything. An identity "mixer" — a seed compared with itself — has to read
+  // 32, and a bitwise complement has to read 0.
+  ok(sharedBits(0x1234abcd, 0x1234abcd) === 32,
+    `the bit-agreement counter reports ${sharedBits(0x1234abcd, 0x1234abcd)} for a seed against itself`);
+  ok(sharedBits(0x1234abcd, ~0x1234abcd) === 0,
+    `the bit-agreement counter reports ${sharedBits(0x1234abcd, ~0x1234abcd)} for a seed against its complement`);
+
   let worstShared = 0;
   const cursor = new Date(Date.UTC(2026, 0, 1));
   for (let i = 0; i < 400; i += 1) {
     const a = seedForDay(utcDayOf(cursor));
     cursor.setUTCDate(cursor.getUTCDate() + 1);
-    const b = seedForDay(utcDayOf(cursor));
-    // Count agreeing bits; 32 would mean identical, ~16 is what independence
-    // looks like.
-    let agree = 0;
-    for (let bit = 0; bit < 32; bit += 1) {
-      if (((a >>> bit) & 1) === ((b >>> bit) & 1)) agree += 1;
-    }
-    worstShared = Math.max(worstShared, agree);
+    worstShared = Math.max(worstShared, sharedBits(a, seedForDay(utcDayOf(cursor))));
   }
-  ok(worstShared <= 26,
+  // The bound is 28, not the 26 actually measured, and the margin is deliberate.
+  // For independent seeds each bit agrees with probability 1/2, so agreements
+  // per pair are Binomial(32, 1/2) — mean 16 — and the WORST of 400 such pairs
+  // lands around 25-26 simply by chance. Asserting the measured maximum would
+  // make this fail on ordinary variation while catching nothing; a broken mixer
+  // does not show 27, it shows 31 or 32. The test exists to catch that, not to
+  // police noise.
+  ok(worstShared <= 28,
     `consecutive days share up to ${worstShared} of 32 seed bits — the mixer is not avalanching`);
+
   console.log(`  avalanche: consecutive days share at most ${worstShared} of 32 seed bits`);
 }
 
