@@ -58,6 +58,20 @@
   /* The link overlay only ever has content after the reveal. */
   .cell .link { font-size: 10px; color: var(--link); margin-left: 3px; }
 
+  /* THE NARROW-PHONE CASE, found by verify-devices at 320px.
+     Six 48px cells plus five 6px gaps is 318px, and with 12px of padding either
+     side the board was 10px wider than a 320x568 screen — a horizontal scroll
+     on the smallest phone still sold.
+     The 48px floor is NOT the thing to give up: it is the touch target
+     verify-controls enforces, and shrinking it to fit trades an accessibility
+     guarantee for a layout convenience. The gutters go instead. At 6px padding
+     and 4px gaps the board is exactly 320px, which fits. */
+  @media (max-width: 360px) {
+    #app { padding-left: 6px; padding-right: 6px; }
+    #board { gap: 4px; }
+    #status { gap: 4px; padding: 8px; }
+  }
+
   #actions { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
   button.primary {
     flex: 1; min-height: 48px; padding: 0 16px;

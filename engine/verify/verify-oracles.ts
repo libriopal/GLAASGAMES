@@ -164,6 +164,14 @@ const CURATED: readonly Curated[] = [
       'shows an empty board and says nothing — the blank screen a reviewer files as "does not work"',
   },
   {
+    oracle: 'engine/verify/verify-devices.ts',
+    subject: 'web/lattice.html',
+    find: '    #app { padding-left: 6px; padding-right: 6px; }',
+    replace: '    #app { padding-left: 20px; padding-right: 20px; }',
+    why: 'restores a horizontal overflow on a 320px screen — the board becomes wider than the smallest phone ' +
+      'still sold, which is the defect D1 was written after finding',
+  },
+  {
     oracle: 'engine/verify/verify-fixed.ts',
     subject: 'engine/math/fixed.ts',
     find: 'export function mulFixed',
