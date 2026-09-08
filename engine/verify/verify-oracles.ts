@@ -132,6 +132,14 @@ const CURATED: readonly Curated[] = [
       'to catch, and one no library-level oracle can see because it lives in the host',
   },
   {
+    oracle: 'engine/verify/verify-gl2.ts',
+    subject: 'web/gl2-renderer.ts',
+    find: 'draw(world: Int32Array, capacity: number, camera: Gl2Camera, width: number, height: number): number {',
+    replace: 'draw(world: Int32Array, capacity: number, camera: Gl2Camera, width: number, height: number): number {\n    if (true) { const g = this.gl; g.viewport(0, 0, width, height); g.clearColor(0, 0, 0, 1); g.clear(g.COLOR_BUFFER_BIT); return 0; }',
+    why: 'the renderer clears the frame and draws nothing — the most likely real regression, and the one a ' +
+      '"pixels came back lit" check would miss if it did not also test an empty world',
+  },
+  {
     oracle: 'engine/verify/verify-fixed.ts',
     subject: 'engine/math/fixed.ts',
     find: 'export function mulFixed',

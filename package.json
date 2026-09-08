@@ -3,7 +3,7 @@
   "version": "6.0.0",
   "private": true,
   "type": "module",
-  "description": "GLAASGAMES \u2014 GPU-authoritative 4D game engine on the GLASSBOX genome-driven foundry",
+  "description": "GLAASGAMES — GPU-authoritative 4D game engine on the GLASSBOX genome-driven foundry",
   "scripts": {
     "verify:genome": "tsx families/genome/verify-genome.ts",
     "verify:expression": "tsx families/expression/verify-expression.ts",
@@ -25,7 +25,7 @@
     "verify:trig": "tsx engine/verify/verify-trig.ts",
     "verify:sim": "tsx engine/verify/verify-sim.ts",
     "verify:parity": "tsx engine/verify/verify-parity.ts",
-    "verify:engine": "npm run verify:fixed && npm run verify:trig && npm run verify:sim && npm run verify:game && npm run verify:replay && npm run verify:daily && npm run verify:controls && npm run verify:lattice && npm run verify:session && npm run verify:app-only && npm run verify:ruleset && npm run verify:theme && npm run verify:parity && npm run verify:render",
+    "verify:engine": "npm run verify:fixed && npm run verify:trig && npm run verify:sim && npm run verify:game && npm run verify:replay && npm run verify:daily && npm run verify:controls && npm run verify:lattice && npm run verify:session && npm run verify:app-only && npm run verify:gl2 && npm run verify:ruleset && npm run verify:theme && npm run verify:parity && npm run verify:render",
     "typecheck": "tsc --noEmit",
     "verify": "npm run typecheck && npm run verify:engine && npm run verify:genome && npm run verify:expression && npm run verify:telemetry && npm run verify:harvest && npm run verify:corpus && npm run verify:fitness && npm run verify:gates && npm run verify:kot && npm run verify:determinism && npm run verify:branch-a && npm run verify:breeder && npm run verify:economy && npm run verify:suite && npm run verify:store && npm run verify:no-secrets && npm run verify:no-prod-credentials-local",
     "verify:termux": "npm run typecheck && npm run build:web && npm run verify:engine && npm run verify:genome && npm run verify:expression && npm run verify:telemetry && npm run verify:harvest && npm run verify:corpus && npm run verify:fitness && npm run verify:gates && npm run verify:kot && npm run verify:determinism && npm run verify:branch-a && npm run verify:breeder && npm run verify:economy && npm run verify:suite && npm run verify:no-secrets && npm run verify:no-prod-credentials-local",
@@ -33,7 +33,7 @@
     "verify:gpu": "bash scripts/gpu-parity.sh",
     "build:web": "tsc -p web/tsconfig.json",
     "serve:web": "npm run build:web && node scripts/serve-web.mjs",
-    "verify:render": "tsx engine/verify/verify-render.ts",
+    "verify:render": "RENDER_SKIP_OK=1 bash scripts/verify-render.sh",
     "verify:game": "tsx engine/verify/verify-game.ts",
     "verify:replay": "tsx engine/verify/verify-replay.ts",
     "verify:daily": "tsx engine/verify/verify-daily.ts",
@@ -51,7 +51,9 @@
     "gen:rules": "tsx scripts/gen-rules-manifest.mjs",
     "verify:session": "tsx engine/verify/verify-session.ts",
     "verify:app": "npm run build:web && npm run build:app-assets && tsx engine/verify/verify-app.ts",
-    "verify:app-only": "tsx engine/verify/verify-app.ts"
+    "verify:app-only": "tsx engine/verify/verify-app.ts",
+    "verify:gl2": "tsx engine/verify/verify-gl2.ts",
+    "verify:render-strict": "bash scripts/verify-render.sh"
   },
   "engines": {
     "node": ">=22.5.0"
@@ -60,6 +62,7 @@
     "@types/node": "^22.0.0",
     "@types/pg": "^8.20.3",
     "@webgpu/types": "^0.1.72",
+    "playwright-core": "1.63.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
   },

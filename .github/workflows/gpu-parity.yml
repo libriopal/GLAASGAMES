@@ -61,7 +61,14 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Engine suite (CPU)
+      # verify-app and verify-gl2 drive a real browser: one plays a round by
+      # clicking the staged APK page, the other executes the WebGL2 renderer that
+      # actually ships. Both need a Chromium, and both FAIL rather than skip when
+      # one is missing, so it is installed here rather than left to chance.
+      - name: Install Chromium for the browser oracles
+        run: npx --yes playwright@1.63.0 install --with-deps chromium
+
+      - name: Engine suite (CPU + browser)
         run: npm run verify:engine
 
       - name: Browser host builds

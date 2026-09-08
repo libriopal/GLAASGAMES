@@ -95,7 +95,15 @@ const origin = `http://127.0.0.1:${port}`;
 // Resolved rather than hard-coded: the pre-installed browser is versioned
 // (chromium-1194), so a fixed path goes stale on the next image and the failure
 // reads as "the app is broken" rather than "the harness moved".
-function findChromium(): string {
+/**
+ * Where Chromium is.
+ *
+ * Playwright resolves its own download first; the versioned tree under
+ * /opt/pw-browsers is the fallback for this container, which ships a browser
+ * rather than downloading one. Returning undefined lets Playwright decide,
+ * which is what a CI runner with `playwright install` needs.
+ */
+function findChromium(): string | undefined {
   const roots = readdirSync('/opt/pw-browsers').filter((d) => d.startsWith('chromium'));
   for (const root of roots.sort().reverse()) {
     for (const exe of ['chrome-linux/chrome', 'chrome-linux/headless_shell']) {
@@ -103,7 +111,7 @@ function findChromium(): string {
       if (existsSync(candidate)) return candidate;
     }
   }
-  throw new Error('verify-app: no pre-installed Chromium found under /opt/pw-browsers');
+  return undefined;
 }
 
 const browser = await chromium.launch({ executablePath: findChromium() });
