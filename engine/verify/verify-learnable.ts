@@ -84,16 +84,42 @@ function rng(seed: number): () => number {
 
 type Policy = (observable: Int32Array, turn: number, memory: Memory) => number;
 
+// The board's geometry, mirrored from lattice-gen. The learner is allowed to
+// know the SHAPE of the world (a 6x6 grid split into four 3x3 regions, links
+// pointing at 4-neighbours) because a player can see that much by looking. It
+// is not allowed to know any actual link.
+const BOARD_W = 6, REGION = 3, REGIONS_PER_ROW = BOARD_W / REGION;
+const DX = [0, 1, 0, -1] as const;
+const DY = [-1, 0, 1, 0] as const;
+const colOf = (i: number): number => i % BOARD_W;
+const rowOf = (i: number): number => (i / BOARD_W) | 0;
+const regionOf = (i: number): number =>
+  ((rowOf(i) / REGION) | 0) * REGIONS_PER_ROW + ((colOf(i) / REGION) | 0);
+const REGION_COUNT = 4;
+
 /** What a policy is allowed to remember between turns. Observables only. */
 interface Memory {
-  /** counts[from][to] — times charge appeared at `to` after banking `from`. */
-  readonly counts: Int32Array;
+  /**
+   * votes[region * 4 + direction] — times charge appeared one step in
+   * `direction` after banking a cell in `region`.
+   *
+   * REGIONAL, NOT PER-CELL, AND THAT IS THE WHOLE POINT. A 12-turn round yields
+   * at most 12 observations; estimating 36 independent links from 12 samples is
+   * hopeless, and a learner that tried it was measuring its own weakness rather
+   * than the game. lattice-gen's own comment says why the regional form is the
+   * right model: three links in four follow their region's prevailing flow,
+   * "precisely what makes the lattice inferable from a handful of observations
+   * instead of requiring all 36 to be seen individually". Four regions times
+   * four directions is sixteen parameters with a strong prior, which a round
+   * genuinely can estimate.
+   */
+  readonly votes: Int32Array;
   lastBanked: number;
   lastCharges: Int32Array;
 }
 
 const newMemory = (): Memory => ({
-  counts: new Int32Array(CELL_COUNT * CELL_COUNT),
+  votes: new Int32Array(REGION_COUNT * 4),
   lastBanked: -1,
   lastCharges: new Int32Array(CELL_COUNT),
 });
@@ -136,33 +162,54 @@ const chargeAware: Policy = (observable) => {
  * is false.
  */
 const learner: Policy = (observable, _turn, memory) => {
-  // Attribute last turn's charge gains to last turn's bank.
-  if (memory.lastBanked >= 0) {
+  // Attribute last turn's charge gains to a DIRECTION in the banked cell's
+  // region. Only unit steps count: a charge that appeared somewhere unreachable
+  // in one step was not caused by this bank.
+  const from = memory.lastBanked;
+  if (from >= 0) {
     for (let i = 0; i < CELL_COUNT; i += 1) {
-      if (chargeOf(observable, i) > (memory.lastCharges[i] ?? 0)) {
-        const k = memory.lastBanked * CELL_COUNT + i;
-        memory.counts[k] = (memory.counts[k] ?? 0) + 1;
+      if (chargeOf(observable, i) <= (memory.lastCharges[i] ?? 0)) continue;
+      const dx = colOf(i) - colOf(from);
+      const dy = rowOf(i) - rowOf(from);
+      for (let d = 0; d < 4; d += 1) {
+        if (dx === DX[d] && dy === DY[d]) {
+          const k = regionOf(from) * 4 + d;
+          memory.votes[k] = (memory.votes[k] ?? 0) + 1;
+        }
       }
     }
   }
+
+  /** The region's best-guess prevailing flow, or -1 while it has seen nothing. */
+  const flowOf = (region: number): number => {
+    let best = -1, seen = 0;
+    for (let d = 0; d < 4; d += 1) {
+      const n = memory.votes[region * 4 + d]!;
+      if (n > seen) { seen = n; best = d; }
+    }
+    return best;
+  };
 
   let best = 0, bestValue = -Infinity;
   for (let i = 0; i < CELL_COUNT; i += 1) {
     const face = faceOf(observable, i);
     if (face === 0) continue;
-    const immediate = face * (1 + chargeOf(observable, i));
+    const charge = chargeOf(observable, i);
 
-    // Expected value of the cell this one probably feeds, from memory alone.
-    let target = -1, seen = 0;
-    for (let j = 0; j < CELL_COUNT; j += 1) {
-      const n = memory.counts[i * CELL_COUNT + j]!;
-      if (n > seen) { seen = n; target = j; }
+    // The scoring rule pays the face of the cell this one FEEDS, scaled by the
+    // charge sitting on it. The learner predicts that target from its regional
+    // model and values THAT — the inference the game is meant to reward. With
+    // no prediction yet it falls back to the cell's own face, matching the
+    // rule's dead-link floor.
+    const d = flowOf(regionOf(i));
+    let target = -1;
+    if (d >= 0) {
+      const tc = colOf(i) + DX[d]!;
+      const tr = rowOf(i) + DY[d]!;
+      if (tc >= 0 && tc < BOARD_W && tr >= 0 && tr < BOARD_W) target = tr * BOARD_W + tc;
     }
-    const downstream = target >= 0 && faceOf(observable, target) !== 0
-      ? faceOf(observable, target) * 0.8
-      : 0;
-
-    const value = immediate + downstream;
+    const targetFace = target >= 0 ? faceOf(observable, target) : 0;
+    const value = targetFace > 0 ? targetFace * (1 + charge) : face;
     if (value > bestValue) { bestValue = value; best = i; }
   }
 
@@ -240,17 +287,21 @@ const chargeVsBlind = compare(chargeAware, blind, false);
 }
 
 // ── E2: does modelling the hidden lattice beat merely reacting to it? ──────
+// The margin is stated BEFORE the measurement, so this cannot be settled by
+// looking at the number and declaring it sufficient.
+const E2_MARGIN_PCT = 5;
 const learnerVsCharge = compare(learner, chargeAware, false);
+const learnerLift = (learnerVsCharge.a.mean / learnerVsCharge.b.mean) - 1;
 {
-  const lift = ((learnerVsCharge.a.mean / learnerVsCharge.b.mean) - 1) * 100;
-  // Deliberately NOT asserted as a hard pass. A learner that ties with the
-  // naive reader is a real and reportable finding about the game's depth, not
-  // a build failure — and failing the build on it would pressure someone to
-  // tune the learner until it wins, which measures the tuning, not the game.
+  ok(learnerLift * 100 >= E2_MARGIN_PCT,
+    `E2: a learner that models the hidden lattice beats the naive charge-reader by only ` +
+      `${(learnerLift * 100).toFixed(1)}%, under the ${E2_MARGIN_PCT}% margin set in advance. Modelling the ` +
+      'thing the game is about must be worth more than reacting to what is already on screen, or the ' +
+      'inference premise is decorative.');
   console.log(
     `  E2 depth: modelling learner ${learnerVsCharge.a.mean.toFixed(1)} vs charge-reader ` +
-      `${learnerVsCharge.b.mean.toFixed(1)} (${lift >= 0 ? '+' : ''}${lift.toFixed(1)}%), ` +
-      `winning ${learnerVsCharge.a.wins}/${ROUNDS} — ${lift > 3 ? 'the chain is worth playing for' : 'REPORTED, NOT ENFORCED: the extra modelling buys little, so the depth beyond "bank the biggest number" is thin'}`,
+      `${learnerVsCharge.b.mean.toFixed(1)} (+${(learnerLift * 100).toFixed(1)}%, margin ${E2_MARGIN_PCT}%), ` +
+      `winning ${learnerVsCharge.a.wins}/${ROUNDS}`,
   );
 }
 
@@ -263,25 +314,36 @@ const learnerVsCharge = compare(learner, chargeAware, false);
   console.log(`  E3 consistency: charge-aware wins ${won}/${ROUNDS} paired boards (${((won / ROUNDS) * 100).toFixed(0)}%)`);
 }
 
-// ── E4: NEGATIVE CONTROL — scramble the links, the advantage must shrink ───
+// ── E4: NEGATIVE CONTROL — the LEARNER's edge must depend on real structure ─
+//
+// THE FIRST VERSION OF THIS CONTROL ASKED THE WRONG QUESTION. It compared
+// charge-aware against blind on a scrambled lattice, which measures "greedy
+// beats random" — true under almost any scoring rule, and it stayed true when
+// the lattice was noise. The thing that must depend on structure is not whether
+// evidence pays at all; it is whether MODELLING THE STRUCTURE pays. So the
+// control now scrambles the lattice and re-measures the LEARNER's edge.
+//
+// A real lattice is locally biased: three links in four follow the prevailing
+// regional flow. That is learnable. A uniformly scrambled lattice is not
+// learnable by construction, so a learner's advantage over the naive reader
+// must collapse. If it does not, the learner is not learning the structure.
 {
-  const severed = compare(chargeAware, blind, true);
-  const liveLift = (chargeVsBlind.a.mean / chargeVsBlind.b.mean) - 1;
-  const deadLift = (severed.a.mean / severed.b.mean) - 1;
+  const scrambled = compare(learner, chargeAware, true);
+  const scrambledLift = (scrambled.a.mean / scrambled.b.mean) - 1;
 
-  ok(Number.isFinite(deadLift),
+  ok(Number.isFinite(scrambledLift),
     'E4 SETUP FAILED: the scrambled control produced no scores, so it measured nothing');
-  ok(deadLift < liveLift,
-    `E4 NEGATIVE CONTROL FAILED: with the lattice scrambled into noise the charge-aware advantage was still ` +
-      `${(deadLift * 100).toFixed(1)}%, against ${(liveLift * 100).toFixed(1)}% on a real lattice. The ` +
-      'advantage does not come from the hidden STRUCTURE — E1 would be measuring "greedy beats random", which ' +
-      'is true of almost any scoring rule and says nothing about this game.');
+  ok(scrambledLift < learnerLift,
+    `E4 NEGATIVE CONTROL FAILED: the learner's edge over the naive reader was ` +
+      `${(scrambledLift * 100).toFixed(1)}% on a SCRAMBLED lattice against ${(learnerLift * 100).toFixed(1)}% ` +
+      'on a real one. An edge that survives the structure being destroyed was never coming from the ' +
+      'structure, so E2 is measuring something other than inference.');
   console.log(
-    `  E4 negative control: real lattice ${(liveLift * 100).toFixed(1)}%, scrambled lattice ` +
-      `${(deadLift * 100).toFixed(1)}% — ` +
-      (deadLift < liveLift
-        ? 'the edge comes from the structure, not the scoring rule'
-        : 'THE EDGE SURVIVES SCRAMBLING, so it is the scoring rule and not the hidden structure'),
+    `  E4 negative control: learner edge ${(learnerLift * 100).toFixed(1)}% on a real lattice vs ` +
+      `${(scrambledLift * 100).toFixed(1)}% scrambled — ` +
+      (scrambledLift < learnerLift
+        ? 'the edge comes from the structure being learnable'
+        : 'THE EDGE SURVIVES SCRAMBLING, so it is not inference'),
   );
 }
 

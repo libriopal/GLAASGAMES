@@ -221,11 +221,29 @@ export function advanceTurn(
     const chargedCells: number[] = [];
 
     if (face !== EMPTY) {
-      // Score is face value times one plus charge — so a cell that has been fed
-      // by the hidden lattice is worth more. That is the whole incentive to read
-      // the lattice, and it is why w is load-bearing rather than decorative.
+      // ── YOU ARE PAID FOR WHAT YOU FEED, NOT FOR WHAT YOU HOLD ──────────
+      //
+      // The rule used to be `face * (1 + charge)` on the banked cell, and
+      // `verify-learnable` proved that rule made the hidden lattice worthless.
+      // Scrambling every link into uniform noise did not reduce a greedy
+      // player's advantage — it slightly INCREASED it (83.4% vs 79.8%) —
+      // because charge lands somewhere regardless of where links point, so
+      // "bank the biggest number" was the whole game.
+      //
+      // Now the payout is the face of the cell the banked cell FEEDS, scaled by
+      // the charge that had accumulated on the cell you banked. To score you
+      // must know where a cell points, and the only way to know is to watch
+      // where charge appeared on earlier turns. That is the inference loop the
+      // game claims to be about, and it is now the one the scoring rewards.
+      //
+      // A dead link still pays the cell's own face, so a board with no live
+      // links is playable but poor — the floor, not a punishment.
       const charge = board.get(target, OFFSET_CHARGE);
-      state.score = (state.score + face * (1 + charge)) | 0;
+      const link = board.get(target, OFFSET_LINK);
+      const feedsLive = link !== NO_LINK && board.get(link, OFFSET_FACE) !== EMPTY;
+      state.score = feedsLive
+        ? (state.score + board.get(link, OFFSET_FACE) * (1 + charge)) | 0
+        : (state.score + face) | 0;
 
       board.set(target, OFFSET_FACE, EMPTY);
       board.set(target, OFFSET_CHARGE, 0);
@@ -234,8 +252,7 @@ export function advanceTurn(
       // Discharge along the hidden link: the banked cell feeds the one it links
       // to. This is the ONLY way charge moves, so every charge the player sees
       // appear is evidence about the link that produced it.
-      const link = board.get(target, OFFSET_LINK);
-      if (link !== NO_LINK && board.get(link, OFFSET_FACE) !== EMPTY) {
+      if (feedsLive) {
         const next = Math.min(board.get(link, OFFSET_CHARGE) + 1, CHARGE_MAX);
         board.set(link, OFFSET_CHARGE, next);
         board.set(link, OFFSET_STATE, STATE_CHARGED);

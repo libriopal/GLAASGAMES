@@ -180,6 +180,14 @@ const CURATED: readonly Curated[] = [
       'the exact copy regression P3 exists to stop',
   },
   {
+    oracle: 'engine/verify/verify-learnable.ts',
+    subject: 'lattice/round.ts',
+    find: '      state.score = feedsLive',
+    replace: '      state.score = false',
+    why: 'reverts the payout to the cell you HOLD rather than the cell you FEED — the exact rule that made ' +
+      'the hidden lattice worthless, which verify-learnable was built to detect',
+  },
+  {
     oracle: 'engine/verify/verify-fixed.ts',
     subject: 'engine/math/fixed.ts',
     find: 'export function mulFixed',
