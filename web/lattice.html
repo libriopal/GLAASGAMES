@@ -51,6 +51,12 @@
     cursor: pointer; transition: transform .08s ease;
   }
   .cell:active { transform: scale(.94); }
+  /* Item 5. A visible focus ring, because a keyboard or switch user otherwise
+     has no idea where they are. :focus-visible rather than :focus so a mouse or
+     touch tap does not leave a ring behind. */
+  .cell:focus-visible, button:focus-visible, a:focus-visible {
+    outline: 3px solid var(--cyan); outline-offset: 2px;
+  }
   .cell[data-state="1"] { border-color: var(--charge); box-shadow: 0 0 0 2px var(--charge) inset; }
   .cell[data-empty="1"] { background: transparent; border-style: dashed; color: var(--ink-dim); }
   .cell[disabled] { cursor: default; }
@@ -104,12 +110,60 @@
   #proof .bad { color: var(--magenta); }
   #proof code { color: var(--ink); }
   a { color: var(--ink-dim); font-size: 11px; }
+
+  /* Item 5. Vestibular safety. The 4D rotation and the cell press are the only
+     motion here; both are removed rather than merely slowed, because a reduced
+     amount of a motion that triggers nausea is still that motion. */
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+    .cell:active { transform: none; }
+  }
+
+  /* Item 4. How to play. */
+  #howto {
+    margin: 0 0 12px; padding: 12px; border-radius: 8px;
+    background: var(--ground-raised); border: 1px solid var(--ground-edge);
+    font-size: 12px; line-height: 1.6; color: var(--ink-dim);
+  }
+  #howto h2 { margin: 0 0 6px; font-size: 12px; color: var(--ink); letter-spacing: .08em; text-transform: uppercase; }
+  #howto ol { margin: 6px 0 8px; padding-left: 18px; }
+  #howto b { color: var(--amber); }
+  #howto button {
+    min-height: 44px; width: 100%; margin-top: 4px;
+    background: transparent; color: var(--cyan);
+    border: 1px solid var(--ground-edge); border-radius: 6px;
+    font: inherit; font-size: 12px; cursor: pointer;
+  }
+  /* A visually hidden live region: announced by a screen reader, invisible to
+     everyone else. Not display:none, which screen readers skip entirely. */
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; margin: -1px;
+    padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
 </style>
 </head>
 <body>
   <div id="app">
     <h1>GLAAS · Lattice</h1>
     <p class="sub">Take a cell each turn. Energy flows along hidden links — until you show the answer.</p>
+
+    <!-- Item 4. The rules, in the app, in plain words. Shown until dismissed;
+         the dismissal is remembered, so it costs a returning player nothing. -->
+    <div id="howto">
+      <h2>How to play</h2>
+      Each cell feeds one <b>hidden</b> neighbour. You score the face of the cell
+      you <b>feed</b> — not the one you take.
+      <ol>
+        <li>Tap a cell to take it.</li>
+        <li>Watch which cell lights up: that is where its energy went.</li>
+        <li>Cells in the same area tend to flow the same way. Use that.</li>
+      </ol>
+      <button type="button" id="btn-howto">Got it</button>
+    </div>
+
+    <!-- Item 5. Score and turn changes are announced. Without this a screen
+         reader user taps a cell and is told nothing at all. -->
+    <p class="sr-only" id="live" role="status" aria-live="polite"></p>
 
     <div id="status">
       <div><b id="s-score">0</b><span>Score</span></div>

@@ -51,6 +51,30 @@ export interface SessionView {
   readonly observable: Int32Array;
 }
 
+/**
+ * A round in progress, small enough to store.
+ *
+ * It carries the SEEDS, not the board. Storing the board would let a resumed
+ * round diverge from a replayed one, and there would be no way to tell which
+ * was right; storing the inputs means the resume runs the same executor over
+ * the same actions and cannot disagree.
+ *
+ * NOTE ON THE SERVER SEED. In this offline build the device generates it, so
+ * writing it to storage exposes nothing that was not already on the device —
+ * the "operator" here IS the phone. When rounds are issued remotely, only the
+ * COMMITMENT should be stored and the seed should arrive at reveal; this shape
+ * already separates the two, so that change is a substitution rather than a
+ * redesign.
+ */
+export interface SavedSession {
+  readonly version: 1;
+  readonly serverSeed: string;
+  readonly clientSeed: string;
+  readonly rulesHash: string;
+  readonly config: RoundConfig;
+  readonly actions: readonly Action[];
+}
+
 /** Everything a player needs to check the round independently, after it ends. */
 export interface VerificationBundle {
   readonly commitment: Commitment;
@@ -96,6 +120,43 @@ export class Session {
 
   get phase(): Phase {
     return this.#phase;
+  }
+
+  /** The round so far, for storage. */
+  save(): SavedSession {
+    return {
+      version: 1,
+      serverSeed: this.serverSeed,
+      clientSeed: this.commitment.clientSeed,
+      rulesHash: this.commitment.rulesHash,
+      config: this.config,
+      actions: [...this.#actions],
+    };
+  }
+
+  /**
+   * Rebuilds a round from storage by REPLAYING it, not by restoring a board.
+   *
+   * The saved actions go back through `bank`, which goes through `advanceTurn`
+   * — the same executor `playRound` and `verifyRound` use. A resumed round is
+   * therefore identical to one that was never interrupted, and there is no
+   * second code path that could disagree about what a turn does.
+   *
+   * `localRulesHash` is checked against the saved one: a round saved under
+   * different rules must not silently continue under these. Resuming it would
+   * produce a bundle whose commitment names rules the replay did not use.
+   */
+  static async restore(saved: SavedSession, localRulesHash: string): Promise<Session | null> {
+    if (saved.version !== 1) return null;
+    if (saved.rulesHash !== localRulesHash) return null;
+
+    const session = await Session.open(saved.serverSeed, saved.clientSeed, saved.rulesHash, saved.config);
+    session.start();
+    for (const action of saved.actions) {
+      if (session.phase !== 'playing') break;
+      session.bank(action);
+    }
+    return session;
   }
 
   /** Deals the opening board. */

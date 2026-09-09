@@ -20,7 +20,7 @@
 import { BOARD_W, CELL_COUNT, EMPTY, NO_LINK, STATE_CHARGED } from '../lattice/board.js';
 import { DEFAULT_ROUND } from '../lattice/round.js';
 import { computeRulesFromManifest } from '../lattice/rules-manifest.js';
-import { Session, type SessionView } from '../lattice/session.js';
+import { Session, type SavedSession, type SessionView } from '../lattice/session.js';
 import {
   AMBER,
   CHARGE_GLOW,
@@ -73,6 +73,29 @@ const btnNew = el<HTMLButtonElement>('btn-new');
 const cells: HTMLButtonElement[] = [];
 let session: Session | null = null;
 let revealedLinks: Int32Array | null = null;
+
+// ── Item 3: persistence ────────────────────────────────────────────────────
+// Every storage access is wrapped: a private window, cleared site data, or a
+// WebView with storage disabled all throw here, and a game that cannot save
+// must still be a game that can be played.
+const SAVE_KEY = 'glaas.lattice.round.v1';
+
+function saveRound(): void {
+  try {
+    if (session && session.phase === 'playing') {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(session.save()));
+    } else {
+      localStorage.removeItem(SAVE_KEY);
+    }
+  } catch { /* storage unavailable; the round simply will not survive a close */ }
+}
+
+function loadSaved(): SavedSession | null {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    return raw ? (JSON.parse(raw) as SavedSession) : null;
+  } catch { return null; }
+}
 
 function buildBoard(): void {
   board.replaceChildren();
@@ -130,18 +153,30 @@ function renderCell(index: number, view: SessionView): void {
   }
 }
 
+let lastAnnouncedTurn = -1;
+
 function render(view: SessionView): void {
   el('s-score').textContent = String(view.score);
   el('s-turn').textContent = `${view.turn}/${view.turnsTotal}`;
   el('s-shuffle').textContent = String(view.reshuffles);
   for (let i = 0; i < CELL_COUNT; i += 1) renderCell(i, view);
   btnReveal.disabled = view.phase !== 'ended';
+
+  // Item 5. Announced only when the turn actually advances: a live region that
+  // re-fires on every render talks over itself and gets switched off.
+  if (view.turn !== lastAnnouncedTurn) {
+    lastAnnouncedTurn = view.turn;
+    el('live').textContent = view.phase === 'ended'
+      ? `Round over. Final score ${view.score}.`
+      : `Turn ${view.turn} of ${view.turnsTotal}. Score ${view.score}.`;
+  }
 }
 
 function onBank(index: number): void {
   if (!session || session.phase !== 'playing') return;
   const view = session.bank(index);
   render(view);
+  saveRound();
   if (view.phase === 'ended') {
     proofBody.textContent = 'Round over. Show the answer to check the hidden layout against the lock made before you played.';
   }
@@ -167,9 +202,11 @@ function freshSeeds(): { readonly server: string; readonly client: string } {
 
 async function newRound(): Promise<void> {
   revealedLinks = null;
+  lastAnnouncedTurn = -1;
   const seeds = freshSeeds();
   const rules = computeRulesFromManifest();
   session = await Session.open(seeds.server, seeds.client, rules, DEFAULT_ROUND);
+  saveRound();
   proofBody.innerHTML =
     `Layout locked <span class="ok">before</span> turn 1.<br>` +
     `lock <code>${session.commitment.hash.slice(0, 32)}…</code><br>` +
@@ -215,8 +252,47 @@ async function onReveal(): Promise<void> {
   render(session.view());
 }
 
+/**
+ * Resumes an interrupted round, or deals a new one.
+ *
+ * A resume REPLAYS the saved actions through the same executor rather than
+ * restoring a board, so a resumed round is indistinguishable from one that was
+ * never interrupted. A save under different rules is discarded rather than
+ * continued: its commitment names a ruleset this build is not playing.
+ */
+async function boot(): Promise<void> {
+  const saved = loadSaved();
+  if (saved) {
+    const restored = await Session.restore(saved, computeRulesFromManifest());
+    if (restored && restored.phase === 'playing') {
+      session = restored;
+      revealedLinks = null;
+      lastAnnouncedTurn = -1;
+      proofBody.innerHTML =
+        `Round resumed at turn ${restored.view().turn}. Layout locked ` +
+        `<span class="ok">before</span> turn 1.<br>lock <code>${restored.commitment.hash.slice(0, 32)}…</code>`;
+      render(restored.view());
+      return;
+    }
+  }
+  await newRound();
+}
+
+// Item 4. The dismissal is remembered so a returning player is not taught twice.
+const HOWTO_KEY = 'glaas.lattice.howto.v1';
+const howto = el('howto');
+const btnHowto = el<HTMLButtonElement>('btn-howto');
+try { if (localStorage.getItem(HOWTO_KEY) === 'done') howto.hidden = true; } catch { /* keep it shown */ }
+btnHowto.addEventListener('click', () => {
+  howto.hidden = true;
+  try { localStorage.setItem(HOWTO_KEY, 'done'); } catch { /* nothing to remember with */ }
+});
+
 applyTheme();
 buildBoard();
 btnNew.addEventListener('click', () => void newRound());
 btnReveal.addEventListener('click', () => void onReveal());
-void newRound();
+// Android kills a backgrounded WebView without warning, so the save happens on
+// the way out as well as after every turn.
+globalThis.addEventListener('pagehide', saveRound);
+void boot();

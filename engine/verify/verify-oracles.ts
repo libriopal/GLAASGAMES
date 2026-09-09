@@ -188,6 +188,21 @@ const CURATED: readonly Curated[] = [
       'the hidden lattice worthless, which verify-learnable was built to detect',
   },
   {
+    oracle: 'engine/verify/verify-resume.ts',
+    subject: 'lattice/session.ts',
+    find: "if (saved.rulesHash !== localRulesHash) return null;",
+    replace: '// rules guard removed',
+    why: 'a round saved under different rules would resume under these, so its commitment names a ruleset the ' +
+      'replay did not use and every proof it produced afterwards would be wrong',
+  },
+  {
+    oracle: 'engine/verify/verify-resume.ts',
+    subject: 'web/lattice-app.ts',
+    find: "      localStorage.setItem(SAVE_KEY, JSON.stringify(session.save()));",
+    replace: '      void 0;',
+    why: 'nothing is persisted, so a player who closes the app mid-round loses it — the defect item 3 exists to fix',
+  },
+  {
     oracle: 'engine/verify/verify-fixed.ts',
     subject: 'engine/math/fixed.ts',
     find: 'export function mulFixed',
