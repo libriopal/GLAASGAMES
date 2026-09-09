@@ -281,6 +281,37 @@ const CURATED: readonly Curated[] = [
       'a single token swap restores',
   },
   {
+    oracle: 'engine/verify/verify-lattice-gl.ts',
+    subject: 'web/lattice-app.ts',
+    find: '    revealed: revealedLinks !== null,\n    links: revealedLinks,',
+    // NOT `reconstructLattice(...)` — it is not imported in that file, so the
+    // mutant would fail to COMPILE and be "caught" by tsc rather than by the
+    // oracle. A mutant has to be caught by an assertion or it proves nothing.
+    replace: '    revealed: true,\n    links: revealedLinks ?? new Int32Array(CELL_COUNT).fill(7),',
+    why: 'the renderer is handed a link map every frame instead of only after the reveal, so link threads are ' +
+      'uploaded to the GPU from turn one for cells the player never banked — a leak verify-app A5 cannot see, ' +
+      'because a canvas is not the DOM',
+  },
+  {
+    oracle: 'engine/verify/verify-lattice-gl.ts',
+    subject: 'web/lattice.html',
+    find: '    background: color-mix(in srgb, var(--die-body) 88%, transparent);',
+    replace: '    background: color-mix(in srgb, var(--die-body) 55%, transparent);',
+    why: 'the tiles go so translucent that the glow behind them lifts the digits below the APCA floor this project ' +
+      'enforces — the exact regression G3 caught on its first honest run, and one verify-theme cannot see because ' +
+      'it compares tokens rather than rendered pixels',
+  },
+  {
+    oracle: 'engine/verify/verify-lattice-gl.ts',
+    subject: 'web/ratelimit.ts',
+    find: '  const maxStep = LUMA_RATE_LIMIT * Math.max(0, dtSec);\n  return current + Math.max(-maxStep, Math.min(maxStep, wanted - current));',
+    replace: '  void dtSec;\n  return wanted;',
+    why: 'removes the brightness rate limiter, so the field can snap between dark and lit at frame rate — a ' +
+      'photosensitive-epilepsy hazard and a WCAG 2.3.1 failure. NOTE the mutant is EQUIVALENT end to end, because ' +
+      'under ordinary play the target brightness never oscillates and a limiter on a steady signal is invisible; ' +
+      'G4b is what catches it, by driving the guard with the 12.5Hz hazard it exists to bound',
+  },
+  {
     oracle: 'engine/verify/verify-fixed.ts',
     subject: 'engine/math/fixed.ts',
     find: 'export function mulFixed',

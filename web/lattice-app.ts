@@ -24,6 +24,7 @@ import { computeRulesFromManifest } from '../lattice/rules-manifest.js';
 import { Session, type SavedSession, type SessionView } from '../lattice/session.js';
 import { Telemetry, type TurnRecord } from '../lattice/telemetry.js';
 import { Feedback } from './feedback.js';
+import { LatticeGl } from './lattice-gl.js';
 import {
   AMBER,
   CHARGE_GLOW,
@@ -78,6 +79,45 @@ let session: Session | null = null;
 let revealedLinks: Int32Array | null = null;
 const telemetry = new Telemetry();
 const feedback = new Feedback();
+
+// ── THE GLOW LAYER ─────────────────────────────────────────────────────────
+// A WebGL2 canvas behind the board, driven by the same observable projection
+// the DOM cells are drawn from. It is OPTIONAL by construction: `create`
+// returns null on a device without WebGL2 and every call below is guarded, so
+// the game on such a phone is the game it was yesterday rather than a blank
+// screen. verify-lattice-gl G6 plants that device and plays a full round on it.
+const glCanvas = el<HTMLCanvasElement>('board-gl');
+const glow = LatticeGl.create(glCanvas);
+let frameHandle = 0;
+
+/**
+ * The frame handed to the renderer.
+ *
+ * `links` is null until the round is revealed, and that is the whole leak
+ * argument: the host cannot supply the lattice before `session.links()` will
+ * return it, and the renderer draws only what it is handed. The links are never
+ * uploaded to the GPU before the reveal — see the note at the top of
+ * lattice-gl.ts for the design this replaced and why.
+ */
+function glFrame(): { observable: Int32Array; witnessed: ReadonlyMap<number, number>; revealed: boolean; links: Int32Array | null } {
+  const view = session?.view();
+  return {
+    observable: view?.observable ?? new Int32Array(CELL_COUNT * 3),
+    witnessed: observed,
+    revealed: revealedLinks !== null,
+    links: revealedLinks,
+  };
+}
+
+function glTick(nowMs: number): void {
+  frameHandle = requestAnimationFrame(glTick);
+  if (!glow) return;
+  const rect = board.getBoundingClientRect();
+  if (rect.width < 2) return;
+  glCanvas.style.width = `${Math.round(rect.width)}px`;
+  glCanvas.style.height = `${Math.round(rect.height)}px`;
+  glow.render(glFrame(), nowMs, rect.width, rect.height);
+}
 
 // ── Item 3: persistence ────────────────────────────────────────────────────
 // Every storage access is wrapped: a private window, cleared site data, or a
@@ -277,6 +317,7 @@ function onBank(index: number): void {
   // await. Feedback is what happens AFTER the truth is on screen.
   // `verify-feedback` B2 measures this gap and fails the build if it grows.
   render(view);
+  glow?.emit(index, session.lastCharged, performance.now());
   feedback.commit();
   if (view.phase === 'ended') feedback.finish();
 
@@ -312,6 +353,7 @@ async function newRound(): Promise<void> {
   session = await Session.open(seeds.server, seeds.client, rules, DEFAULT_ROUND);
   telemetry.begin(performance.now());
   observed.clear();
+  glow?.setSeed(session.seed);
   saveRound();
   proofBody.innerHTML =
     `Layout locked <span class="ok">before</span> turn 1.<br>` +
@@ -385,6 +427,7 @@ async function boot(): Promise<void> {
       // half as a whole session.
       telemetry.adopt(loadLog(), performance.now());
       rebuildTrail(telemetry.turns);
+      glow?.setSeed(restored.seed);
       proofBody.innerHTML =
         `Round resumed at turn ${restored.view().turn}. Layout locked ` +
         `<span class="ok">before</span> turn 1.<br>lock <code>${restored.commitment.hash.slice(0, 32)}…</code>`;
@@ -426,4 +469,8 @@ btnReveal.addEventListener('click', () => void onReveal());
 // Android kills a backgrounded WebView without warning, so the save happens on
 // the way out as well as after every turn.
 globalThis.addEventListener('pagehide', saveRound);
+// The loop starts once and runs for the life of the page. It draws whatever the
+// session currently is, so it needs no wiring to the turn logic at all.
+if (glow) frameHandle = requestAnimationFrame(glTick);
+void frameHandle;
 void boot();
