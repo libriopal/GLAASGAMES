@@ -195,11 +195,71 @@ importing the machinery and discarding the safety.
 
 ## The plan, staged, with what blocks what
 
-### Stage 0 — the gene pool (no game changes)
-`corpus/alleles.ts` + `verify-alleles`: parse the 311 grammars, emit 1026 loci
-and 581 alleles as a pinned artifact with a digest, exactly as
-`design/corpus-digest.json` pins the pixels. **Negative control: a corrupted
-prompt must move the digest.**
+### Stage 0 — the gene pool (no game changes) — **DONE**
+`corpus/alleles.ts` + `verify-alleles`: parse the grammars, emit the loci and
+alleles as a pinned artifact with a digest, exactly as `design/corpus-digest.json`
+pins the pixels. **Negative control: a corrupted prompt must move the digest.**
+
+**What executing it changed about the plan.** Three things, and all three came
+from running a check rather than from reading the corpus again:
+
+| Planned | Measured | Why the difference |
+|---|---|---|
+| 311 grammar prompts | **316** | The 311 count required a `\|` inside the braces, so it missed five prompts whose only locus is an arity-one `{...}`. Those five carry nothing else, which is exactly why they were invisible. A locus of arity one is still a locus; `verify-alleles` A1 asserts `316 − 5 = 311` so the two counts stay reconciled instead of merely differing. |
+| 1026 loci / 581 alleles | **1031 / 584** | The same five. Two of the five strings repeat, so five loci add three distinct alleles. |
+| the trim is harmless | **7 loci were being silently mangled** | See below. |
+
+**The round trip is what earned its place.** The plan specified one negative
+control — a corrupted prompt must move the digest — and that control passes.
+It would also have passed on a broken pool. The check that actually found
+something was A3, which rebuilds each prompt from its decomposed parts and
+compares against the source: it failed on `mp9d4ebqw7edep`, because the parser
+trimmed each alternative and seven prompts pad their pipes
+(`{void black abyss | skeletal gold arches | ...}`). The pool was lossy, the
+digest over it was perfectly stable, and no count, hash or reading of the corpus
+would ever have said so. `Locus` now carries both views — `alleles` (trimmed,
+what a genome expresses) and `raw` (what the corpus wrote, what `expand`
+replays) — and the digest binds both.
+
+**Two more checks exist because the mutation harness refused to accept the
+oracle as written.** Six curated mutants of `corpus/alleles.ts`, each with a
+stated behavioural consequence; all six are caught. But two of them — reading
+arity-one braces as literal text, and dropping the trim — were caught *only* by
+A6, the check that re-reads the corpus, so on any machine without the corpus
+mounted they walked through a green run. A8 closes it: the artifact stores each
+prompt's source beside its decomposition, so the parser is re-run offline
+against a reference it did not just produce. Re-running the harness with the
+corpus hidden then still caught 6/6.
+
+**The auditor rejected the oracle once, and A9 is what it cost.** Asked whether
+the round trip is a genuine witness, it named a hole the file did not cover:
+*"the reliance on the same parser for both artifact creation and verification,
+which fails to detect systematic parser errors that are consistent across the
+corpus and the pinned artifact."* True — A6 and A8 both call `parsePrompt`, so a
+systematically wrong parser agrees with itself everywhere. A9 is a second
+implementation by a different algorithm (regex scan, not index walk), run over
+the artifact and over all 1116 corpus prompts including the 800 called prose.
+
+It was then tested the way the auditor described: the parser mutated to never
+split on `|`, the artifact **regenerated** with it, and the pinned constants
+**rewritten** to match — the whole system self-consistent around a pool of 1031
+arity-one loci. A9 objected on 1026 of them. A1 and A3 objected too, and the
+source says so; A9's claim is corroboration, not sole custody. Approved on the
+second round.
+
+**The one hole that stays open, named rather than closed.** The auditor's
+remaining objection is common-mode failure from a shared *specification*: both
+implementations agree on what a locus IS, so if that definition is wrong they
+are wrong together. It is not a bug and no oracle can settle it, because it is a
+judgment about the corpus. Its concrete instance: the five arity-one bodies are
+`10k/25k/50k/100k`, `70/30`, `gold ones/steel blues/rainbow wilds` — the author
+using `/` where the grammar uses `|`. Reading `/` as a second separator would add
+loci and would be a guess, so they are recorded faithfully as arity one. **If
+Stage 2 finds the expression pipeline wants those as real choice points, that is
+a specification change and it moves the digest.**
+
+Artifact: `design/allele-pool.json`, digest `a9854416740d…`. Regenerate with
+`npm run gen:alleles`; verify with `npm run verify:alleles` (in `verify:engine`).
 
 ### Stage 1 — the token assets (the digits go)
 Replace all 6 digit faces plus wild/bomb/locked/frozen with an atlas built from
