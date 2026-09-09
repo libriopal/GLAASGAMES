@@ -307,10 +307,59 @@ centre-lit and edge-darkened, consistently, and no prompt in it says so. That is
 what the token ground is painted with. It costs 2.1 APCA (94.6 flat, 92.5 lit,
 against a 75 floor).
 
-### Stage 2 — expression from the pool
+### Stage 2 — expression from the pool — **DONE**
 Wire `ExpressionLoci` to the allele pool so a genome selects tokens, palette
-band and filigree style. **Gate: expression must be a pure function of the
-genome — same genome, same screen, provable by digest.**
+band and filigree style. ~~**Gate: expression must be a pure function of the
+genome — same genome, same screen, provable by digest.**~~
+
+**THE GATE THIS PLAN WROTE FOR STAGE 2 IS VACUOUS, AND THAT IS THE STAGE'S MAIN
+FINDING.** A constant function is pure. An expression pipeline that never reads
+the genome satisfies "same genome, same screen, provable by digest" perfectly.
+`corpus/genome.ts` ships `constantExpression` — pure, genome-blind — and X3
+*requires it to pass the planned gate*, which is the only way to show the gate
+needed replacing rather than asserting it.
+
+It was not hypothetical. `families/expression/pipeline.ts` was ported with its
+own `verify-expression`, which proves determinism against hand-written fixtures
+(`'sentinel'`, `'ember'`, `'quarry'`) — **none of which is in the corpus**. That
+check has been green since it landed while establishing nothing about the corpus.
+
+The replacement is SENSITIVITY, and getting it right took a retraction:
+
+| Round | What happened |
+|---|---|
+| 1 | Required 80% of loci to be able to move the screen. Measured **56.6%** |
+| 2 | Invented a pigeonhole "ceiling" (584 alleles ⇒ ≥447 loci must be inert), normalised against it, reported a comfortable 99.5% |
+| 3 | **The auditor: "The pigeonhole argument is incorrect and your metric is a false positive… if the phenotype is a set there are 2^584 possible states… your 99.5% result is illusory — you are normalizing against an artificially low floor."** Correct. The bound was deleted, not defended |
+| 4 | Measured the real mechanism instead: set-collision predicts 704 inert; the ordered phenotype leaves 445; **ordering demonstrably carries 259 loci a set would discard** |
+| 5 | The auditor's last point: a drift tolerance of ±5 is a heuristic. Removed — the sweep is a deterministic hash chain with no noise, so 581 is pinned **exactly**, and the question the tolerance was covering ("is 581 one lucky seed?") is measured directly: **573–601 across 8 genomes** |
+
+Final state: X1 purity, X2 sensitivity (581/1026 exactly, mechanism checked),
+X2a seed spread, X2b whole-genome (100 genomes → 100 distinct screens, blind
+control → 1), X3 the vacuity demonstration, X4 encoding, X5 provenance, X6
+colour reach, X7 controls.
+
+**Two of my own checks were vacuous controls, and the mutation harness found
+both.** M4 folds the index by `abs(raw) % (n + 1)`: it always returns a *valid*
+allele, so a validity check stays green. What it breaks is the property Stage 5
+depends on — **incrementing an index must change the allele**, or point mutation
+silently does nothing. The first step-sweep walked only indices in `[0, n)` and
+M4 survived that too, because it collides only at `base = n` — and a mutation
+operator increments without wrapping, so that is exactly the region it visits.
+6/6 curated mutants caught once the sweep covered `[-n-2, 3n+3]`.
+
+**Measured facts the plan did not have.** 842 of 1031 loci are **arity 2**
+(81.7%) — the genome over this pool is very nearly a 1031-bit string, which is
+what makes crossover and point mutation well-defined in Stage 5 rather than
+things to invent. And only **171 of 584 alleles (29.3%)** name a colour, so the
+corpus cannot drive a palette on its own; X6 pins that reach so widening the
+word list to flatter the palette moves a number somebody has to defend.
+
+**445 loci cannot change the screen.** Under selection they are silent
+passengers — breeding on expression alone would let 43% of the genome drift with
+no pressure. That is a measurement in support of a decision the auditor already
+forced for a different reason: **expression is sampled and constrained, never
+bred.**
 
 ### Stage 3 — structural loci from the game
 `FACE_WEIGHTS`, turns, charge depth, region size become `StructuralLoci` with
