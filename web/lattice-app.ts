@@ -40,6 +40,8 @@ import {
   LINK_FIELD,
   MAGENTA,
 } from './theme.js';
+import { type TokenKind, type TokenState, tokenDefs, tokenSvg } from './tokens.js';
+import TEXTURE from '../design/token-texture.json' with { type: 'json' };
 
 const el = <T extends HTMLElement>(id: string): T => {
   const found = document.getElementById(id);
@@ -198,6 +200,13 @@ function loadLog(): readonly TurnRecord[] {
 }
 
 function buildBoard(): void {
+  // ── THE CORPUS'S OWN LIGHT, EMITTED ONCE ────────────────────────────────
+  // Every token's ground references one pattern, so the 8x8 tile mined from
+  // 1129 corpus images is in the document a single time rather than 36 times.
+  // The tile is a measurement, not a gradient: see web/tokens.ts.
+  if (!document.getElementById('glaas-grain')) {
+    document.body.insertAdjacentHTML('afterbegin', tokenDefs(TEXTURE.tile, DIE_BODY, TEXTURE.grid));
+  }
   board.replaceChildren();
   cells.length = 0;
   for (let i = 0; i < CELL_COUNT; i += 1) {
@@ -227,6 +236,23 @@ function buildBoard(): void {
   }
 }
 
+/**
+ * The paint every token is drawn in, taken from the theme and never invented
+ * here. `DIE_BODY` is the ground the pips sit on, and it is what P4 measures
+ * the ink against once the GL wash has composited underneath it.
+ */
+const TOKEN_PAINT = {
+  ink: FACE_INK,
+  ground: DIE_BODY,
+  edge: DIE_EDGE,
+  accent: CHARGE_GLOW,
+} as const;
+
+/** The board's numeric cell state, as the token module's three states. */
+function tokenState(state: number): TokenState {
+  return state === STATE_CHARGED ? 'charged' : 'idle';
+}
+
 /** Renders one cell from the observable projection alone. */
 function renderCell(index: number, view: SessionView): void {
   const cell = cells[index]!;
@@ -248,13 +274,25 @@ function renderCell(index: number, view: SessionView): void {
     cell.append('·');
     cell.setAttribute('aria-label', `Row ${row} column ${column}, empty`);
   } else {
-    cell.append(String(face));
-    if (charge > 0) {
-      const badge = document.createElement('span');
-      badge.className = 'charge';
-      badge.textContent = `+${charge}`;
-      cell.append(badge);
-    }
+    // ── THE DIGIT BECOMES A DIE, AND THE NUMBER SURVIVES THE CHANGE ────────
+    //
+    // The face is drawn as pips, not written as a numeral. `web/tokens.ts` has
+    // the argument: the score is `face x (1 + charge)`, so this is a magnitude
+    // the player does arithmetic on, and six pretty emblems would have replaced
+    // a quantity with a name.
+    //
+    // The aria-label below is UNCHANGED and still reads "face 5". Turning a
+    // digit into a picture is a visual decision; taking the number out of the
+    // accessibility tree would be a regression, and verify-surface would be
+    // right to fail it.
+    // The charge is drawn BY the token, on its top edge, not written over it.
+    // A `+1` span used to sit here and on a 6 it covered the middle two pips —
+    // the game's own HUD hiding the number the player multiplies. See
+    // FACE_REGION in web/tokens.ts.
+    cell.insertAdjacentHTML(
+      'beforeend',
+      tokenSvg(face as TokenKind, tokenState(state), TOKEN_PAINT, true, '', charge),
+    );
     if (link !== NO_LINK) {
       const badge = document.createElement('span');
       badge.className = 'link';

@@ -112,6 +112,15 @@
     content: ''; position: absolute; inset: 0; border-radius: inherit;
     box-shadow: inset 0 1px 0 var(--die-edge); pointer-events: none;
   }
+  /* ── THE TOKEN ────────────────────────────────────────────────────────────
+     The face is an SVG die, not a numeral. web/tokens.ts carries the argument:
+     the score is face x (1 + charge), so the face is a magnitude the player
+     multiplies, and six emblems would have replaced a quantity with a name.
+     It fills the cell, so the pip geometry scales with the tile and the P1
+     separation check has one number to reason about at every density. */
+  .cell > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  /* The charge and link badges sit ON the token, so they stay above it. */
+  .cell .charge, .cell .link { position: relative; z-index: 1; }
   .cell:active { transform: scale(.94); }
   /* Item 5. A visible focus ring, because a keyboard or switch user otherwise
      has no idea where they are. :focus-visible rather than :focus so a mouse or

@@ -261,12 +261,51 @@ a specification change and it moves the digest.**
 Artifact: `design/allele-pool.json`, digest `a9854416740d…`. Regenerate with
 `npm run gen:alleles`; verify with `npm run verify:alleles` (in `verify:engine`).
 
-### Stage 1 — the token assets (the digits go)
-Replace all 6 digit faces plus wild/bomb/locked/frozen with an atlas built from
-corpus-named tokens. Every token has 3 states (idle / charged / spent).
-**Gate: `verify-theme` APCA and `verify-lattice-gl` G3 must still pass — a token
-is a background a glyph may sit on.** Figma holds the master components; Canva
-generates candidate art; the atlas is a single PNG in the APK.
+### Stage 1 — the token assets (the digits go) — **DONE**
+Replace all 6 digit faces plus wild/bomb/locked/frozen with corpus-named tokens.
+Every token has 3 states (idle / charged / spent). **Gate: `verify-theme` APCA
+and `verify-lattice-gl` G3 must still pass.**
+
+`design/tokens.md` carries the EINCOL pass. Three things the plan did not say:
+
+**The faces are PIPS, and that is a playability constraint rather than a style.**
+`lattice/round.ts` pays `face(fed cell) x (1 + charge)` — the face is a number
+the player multiplies. Six distinguishable emblems would give the board an
+identity system where the game needs a magnitude one, and **no oracle in this
+repo could have seen it happen**: every policy in `verify-learnable` reads
+`observable[i * 3]` as an integer and never looks at a pixel.
+
+**The atlas PNG was dropped, deliberately.** An atlas is how you keep a GPU
+cheap, and the GL layer here draws light, not faces — the faces live in DOM
+cells, where an atlas buys nothing and costs sub-pixel sampling on artwork whose
+whole job is to stay countable at 48px. SVG instead.
+
+**Figma could not hold the masters.** The account is a **View seat**, so the MCP
+can read files and not create them. The geometry lives in `web/tokens.ts`
+instead, which is better for the gate anyway — pip positions are arithmetic
+there and `verify-tokens` P3 can check them.
+
+`verify-tokens` P1-P9, and **five of the nine came from outside the plan**:
+
+| Check | Where it came from |
+|---|---|
+| P1 separation, P3 canonical layout | auditor rejection 1: component counting measures topological discreteness, not magnitude perception |
+| P4 contrast on rendered pixels | auditor rejection 2: geometrically discrete is not perceptually salient |
+| P8 face/state separation | **a screenshot.** The `+1` charge badge sat across the middle pips of a 6 — the HUD covering the number the player multiplies. Charge is now ticks the token owns, outside `FACE_REGION` |
+| P7b the renderer paints the vignette | **the mutation harness.** M7 discarded the vignette's sign and passed P7, because P7 reads the pinned tile and the tile had not changed |
+| P9 picture == label | **the auditor again.** P2 counts pips in isolation, P5 checks labels exist, and nothing joined them: a wiring bug drawing face 3 on a cell the model calls 5 would leave both green while telling a sighted player and a screen-reader user different numbers about the same cell |
+
+Eight curated mutants, all caught, including one that breaks the WIRING rather
+than the token module — the only way to exercise P9.
+
+**The corpus was mined for a third time, and it had a third thing to say.** Its
+pixels gave the palette and its prompts gave the grammar; `scripts/mine-token-texture.py`
+downsamples all 1129 images to 8x8, subtracts each image's own mean so exposure
+cancels, and averages. The result is not noise: a clean **vignette**, corners at
+about -18, an upper-centre lobe at +17, 39 of 255 peak to peak. The corpus is
+centre-lit and edge-darkened, consistently, and no prompt in it says so. That is
+what the token ground is painted with. It costs 2.1 APCA (94.6 flat, 92.5 lit,
+against a 75 floor).
 
 ### Stage 2 — expression from the pool
 Wire `ExpressionLoci` to the allele pool so a genome selects tokens, palette
