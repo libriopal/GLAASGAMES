@@ -58,7 +58,8 @@
     "verify:apk-debug": "tsx engine/verify/verify-apk.ts --debug",
     "verify:coldstart": "tsx engine/verify/verify-coldstart.ts",
     "verify:devices": "tsx engine/verify/verify-devices.ts",
-    "verify:listing": "tsx engine/verify/verify-listing.ts"
+    "verify:listing": "tsx engine/verify/verify-listing.ts",
+    "verify:learnable": "tsx engine/verify/verify-learnable.ts"
   },
   "engines": {
     "node": ">=22.5.0"
