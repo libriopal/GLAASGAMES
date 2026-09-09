@@ -241,6 +241,12 @@ export function advanceTurn(
       const charge = board.get(target, OFFSET_CHARGE);
       const link = board.get(target, OFFSET_LINK);
       const feedsLive = link !== NO_LINK && board.get(link, OFFSET_FACE) !== EMPTY;
+      // PAYING FOR THE SECOND HOP TOO WAS TRIED AND MEASURED WORSE. Charge
+      // travels two steps, so it was natural to pay for both cells it passes
+      // through — but the second hop is not predictable from one region's flow,
+      // so paying for it added noise the model cannot reduce and inference
+      // value FELL from 4.2% to 2.1%. The payout stays on the hop a player can
+      // actually infer.
       state.score = feedsLive
         ? (state.score + board.get(link, OFFSET_FACE) * (1 + charge)) | 0
         : (state.score + face) | 0;
@@ -257,6 +263,27 @@ export function advanceTurn(
         board.set(link, OFFSET_CHARGE, next);
         board.set(link, OFFSET_STATE, STATE_CHARGED);
         chargedCells.push(link);
+
+        // ── THE CHARGE TRAVELS TWO STEPS, NOT ONE ────────────────────────
+        //
+        // With a single hop only one cell gained charge per turn, so the
+        // highest-charge cell almost always dominated the choice and knowing
+        // where cells point rarely changed the pick. verify-learnable measured
+        // the consequence: modelling the lattice was worth a near-constant ~2.4
+        // points a round at 12, 16 and 20 turns — real, but under the 5% design
+        // target however long the round ran.
+        //
+        // A second hop puts two live candidates on the board each turn and
+        // makes the CHAIN, rather than one link, the thing worth knowing. It
+        // also gives the observer two data points per bank instead of one, so
+        // the lattice becomes inferable faster.
+        const second = board.get(link, OFFSET_LINK);
+        if (second !== NO_LINK && second !== target && board.get(second, OFFSET_FACE) !== EMPTY) {
+          const onward = Math.min(board.get(second, OFFSET_CHARGE) + 1, CHARGE_MAX);
+          board.set(second, OFFSET_CHARGE, onward);
+          board.set(second, OFFSET_STATE, STATE_CHARGED);
+          chargedCells.push(second);
+        }
       }
     }
 

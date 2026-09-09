@@ -203,6 +203,41 @@ const CURATED: readonly Curated[] = [
     why: 'nothing is persisted, so a player who closes the app mid-round loses it — the defect item 3 exists to fix',
   },
   {
+    oracle: 'engine/verify/verify-playlog.ts',
+    subject: 'web/lattice-app.ts',
+    find: "      localStorage.setItem(LOG_KEY, JSON.stringify(telemetry.turns));",
+    replace: '      void 0;',
+    why: 'the playtest log is never written, so a WebView kill loses the session — and a kill is exactly when the ' +
+      'tester had something worth reporting',
+  },
+  {
+    oracle: 'engine/verify/verify-playlog.ts',
+    subject: 'web/lattice-app.ts',
+    find: "  telemetry.record(before.turn, index, session.lastCharged, before.observable, performance.now());",
+    replace: '  telemetry.record(before.turn, index, session.lastCharged, view.observable, performance.now());',
+    why: 'the board is snapshotted AFTER the turn resolves, so every record shows a position the player never chose ' +
+      'from — the banked cell is already empty in the record that says it was banked, and a learner replayed against ' +
+      'the log would be judging choices against a board that did not exist when they were made',
+  },
+  {
+    oracle: 'engine/verify/verify-playlog.ts',
+    subject: 'lattice/telemetry.ts',
+    find: "    this.#turns.push(...turns);",
+    replace: '    void turns;',
+    why: 'a resumed round silently starts its log again from empty, so the turns played before the crash are gone ' +
+      'while the round still counts them — L4 catches the disagreement',
+  },
+  {
+    oracle: 'engine/verify/verify-playlog.ts',
+    subject: 'android/app/src/main/java/games/glaas/fourd/MainActivity.kt',
+    find: '        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)',
+    replace: '        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)\n' +
+      '        webView.addJavascriptInterface(Object(), "host")',
+    why: 'installs the native bridge the independent auditor identified: a call across it is not a web API, not a ' +
+      'network request and needs no permission, so every instrument L5 installs would report silence while the ' +
+      'playtest log left the device through Kotlin',
+  },
+  {
     oracle: 'engine/verify/verify-fixed.ts',
     subject: 'engine/math/fixed.ts',
     find: 'export function mulFixed',

@@ -17,6 +17,7 @@
 // K3  the rules hash INSIDE the APK equals computeRules() on the source
 // K4  no WebGPU entry point survived into the bundle
 // K5  a tampered asset is detected                          (NEGATIVE CONTROL)
+// K6  no native JavaScript bridge — the channel no web-API check can see
 //
 // K3 IS THE ONE THAT MATTERS FOR A PLAYER. The app publishes a rules hash in
 // every commitment it makes. If the APK ships a stale one, every commitment it
@@ -203,6 +204,49 @@ const apkAssets = listing.filter((n) => n.startsWith('assets/') && !n.startsWith
       'K5 NEGATIVE CONTROL FAILED: a plainly wrong rules hash compared equal to the computed one');
     console.log('  K5 negative control: a one-byte change to an asset and a false rules hash are both detected');
   }
+}
+
+// ── K6: NO NATIVE BRIDGE ───────────────────────────────────────────────────
+//
+// FOUND BY THE INDEPENDENT AUDITOR, and it was right. verify-playlog proves the
+// page attempts no transmission by instrumenting fetch, XHR, sendBeacon,
+// WebSocket, EventSource and the img/script src setters — and it runs the
+// bundle in Chromium, not in a WebView. `WebView.addJavascriptInterface`
+// injects a native object straight into the JavaScript context, so a call on it
+// is not a web API, not a network request, and needs no permission. Every one
+// of those checks would report silence while the log walked out through Kotlin.
+//
+// The scan is on the DEX, which is the built artifact rather than the source —
+// a bridge added by a library would never appear in MainActivity.kt.
+// verify-playlog L7 makes the same check against the Kotlin source, so a bridge
+// has to defeat two instruments looking at two different things.
+//
+// `setJavaScriptEnabled` is the CONTROL. It is a WebView method this app
+// demonstrably calls, so finding it proves the scanner can read method names
+// out of this dex at all. Without it, "addJavascriptInterface is absent" is
+// equally consistent with a scan that reads nothing.
+{
+  const dex = listing.filter((n) => /^classes\d*\.dex$/.test(n));
+  ok(dex.length > 0, 'K6: the APK contains no classes.dex, so its code could not be inspected at all');
+  let bridges = 0;
+  let controlSeen = 0;
+  for (const entry of dex) {
+    const bytes = execFileSync('unzip', ['-p', APK, entry], { maxBuffer: 128 * 1024 * 1024 });
+    const text = bytes.toString('latin1');
+    if (text.includes('addJavascriptInterface')) bridges += 1;
+    if (text.includes('setJavaScriptEnabled')) controlSeen += 1;
+  }
+  ok(bridges === 0,
+    'K6: the APK references addJavascriptInterface — a native bridge carries data out of the page without a ' +
+      'network request or a permission, and every no-transmission check in this repo watches web APIs it would ' +
+      'never touch');
+  ok(controlSeen > 0,
+    'K6 NEGATIVE CONTROL FAILED: setJavaScriptEnabled, which this app certainly calls, was not found in the dex ' +
+      'either — the scanner is not reading method names, so its silence about addJavascriptInterface means nothing');
+  console.log(
+    `  K6 bridge: ${dex.length} dex file(s), 0 addJavascriptInterface references (control: setJavaScriptEnabled ` +
+      `found in ${controlSeen})`,
+  );
 }
 
 if (failures.length > 0) {

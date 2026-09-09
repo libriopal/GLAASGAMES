@@ -314,6 +314,14 @@ const learner: Policy = (observable, _turn, memory) => {
     // same as it. That was most of the -26% on scrambled boards: not brittle
     // inference, just a bad default.
     const EXPECTED_FACE = 3.5;
+    // ONE HOP PREDICTED, THE SECOND TAKEN AS AVERAGE. The payout now covers
+    // both cells the charge passes through. Predicting BOTH hops was measured
+    // and was worse than predicting neither (-5.2%): a two-step chain compounds
+    // the model's error, so a wrong first step guarantees a wrong second. The
+    // first hop is what the evidence supports; the cell beyond it is an unknown
+    // six-sided face worth 3.5 on average — the same value the model-off
+    // baseline assigns to both.
+    const EXPECTED_FACE_AHEAD = 3.5;
     const targetFace = target >= 0 ? faceOf(observable, target) : 0;
     const value = targetFace > 0
       ? targetFace * (1 + charge)

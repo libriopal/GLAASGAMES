@@ -186,6 +186,12 @@ export class Session {
     };
   }
 
+  /** Cells whose charge rose on the most recent turn — the visible evidence. */
+  get lastCharged(): readonly number[] {
+    const obs = this.#state?.observations;
+    return obs && obs.length > 0 ? obs[obs.length - 1]!.chargedCells : [];
+  }
+
   /** Banks one cell. Returns the view after the turn resolves. */
   bank(cell: Action): SessionView {
     if (this.#phase !== 'playing') throw new Error(`Session.bank: cannot bank in phase "${this.#phase}"`);

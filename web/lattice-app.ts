@@ -21,6 +21,7 @@ import { BOARD_W, CELL_COUNT, EMPTY, NO_LINK, STATE_CHARGED } from '../lattice/b
 import { DEFAULT_ROUND } from '../lattice/round.js';
 import { computeRulesFromManifest } from '../lattice/rules-manifest.js';
 import { Session, type SavedSession, type SessionView } from '../lattice/session.js';
+import { Telemetry, type TurnRecord } from '../lattice/telemetry.js';
 import {
   AMBER,
   CHARGE_GLOW,
@@ -73,19 +74,28 @@ const btnNew = el<HTMLButtonElement>('btn-new');
 const cells: HTMLButtonElement[] = [];
 let session: Session | null = null;
 let revealedLinks: Int32Array | null = null;
+const telemetry = new Telemetry();
 
 // ── Item 3: persistence ────────────────────────────────────────────────────
 // Every storage access is wrapped: a private window, cleared site data, or a
 // WebView with storage disabled all throw here, and a game that cannot save
 // must still be a game that can be played.
 const SAVE_KEY = 'glaas.lattice.round.v1';
+// The playtest log is stored SEPARATELY from the round and written after every
+// turn, because an Android WebView is killed without `pagehide` and a log
+// flushed only on the way out is lost exactly when the tester hit something
+// worth reporting. It is a second key rather than a field on the save so that a
+// log which fails to parse cannot cost the player their round.
+const LOG_KEY = 'glaas.lattice.log.v1';
 
 function saveRound(): void {
   try {
     if (session && session.phase === 'playing') {
       localStorage.setItem(SAVE_KEY, JSON.stringify(session.save()));
+      localStorage.setItem(LOG_KEY, JSON.stringify(telemetry.turns));
     } else {
       localStorage.removeItem(SAVE_KEY);
+      localStorage.removeItem(LOG_KEY);
     }
   } catch { /* storage unavailable; the round simply will not survive a close */ }
 }
@@ -95,6 +105,14 @@ function loadSaved(): SavedSession | null {
     const raw = localStorage.getItem(SAVE_KEY);
     return raw ? (JSON.parse(raw) as SavedSession) : null;
   } catch { return null; }
+}
+
+function loadLog(): readonly TurnRecord[] {
+  try {
+    const raw = localStorage.getItem(LOG_KEY);
+    const parsed = raw ? (JSON.parse(raw) as TurnRecord[]) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
 }
 
 function buildBoard(): void {
@@ -174,7 +192,11 @@ function render(view: SessionView): void {
 
 function onBank(index: number): void {
   if (!session || session.phase !== 'playing') return;
+  const before = session.view();
   const view = session.bank(index);
+  // Recorded BEFORE the turn is applied for the board, after it for the
+  // consequence: what the player could see when they chose, and what happened.
+  telemetry.record(before.turn, index, session.lastCharged, before.observable, performance.now());
   render(view);
   saveRound();
   if (view.phase === 'ended') {
@@ -206,6 +228,7 @@ async function newRound(): Promise<void> {
   const seeds = freshSeeds();
   const rules = computeRulesFromManifest();
   session = await Session.open(seeds.server, seeds.client, rules, DEFAULT_ROUND);
+  telemetry.begin(performance.now());
   saveRound();
   proofBody.innerHTML =
     `Layout locked <span class="ok">before</span> turn 1.<br>` +
@@ -241,6 +264,12 @@ async function onReveal(): Promise<void> {
   const mark = (good: boolean, text: string): string =>
     `<span class="${good ? 'ok' : 'bad'}">${good ? '✓' : '✗'}</span> ${text}`;
 
+  // The playtest log, offered for export and sent nowhere. There is no network
+  // permission, so the only way this leaves the device is the tester choosing
+  // to share the text.
+  (globalThis as { __session?: unknown }).__session =
+    telemetry.build(bundle.seed, bundle.score, session.result?.conceded ?? false);
+
   proofBody.innerHTML = [
     mark(holds, 'the hidden layout matches the one locked in before turn 1 — it was not changed while you played'),
     mark(check.ok, `replaying your ${bundle.actions.length} moves gives the same score, ${check.score}`),
@@ -268,6 +297,10 @@ async function boot(): Promise<void> {
       session = restored;
       revealedLinks = null;
       lastAnnouncedTurn = -1;
+      // The log is picked up where the kill left it, not restarted. A resumed
+      // round that logged from turn 1 again would report the player's second
+      // half as a whole session.
+      telemetry.adopt(loadLog(), performance.now());
       proofBody.innerHTML =
         `Round resumed at turn ${restored.view().turn}. Layout locked ` +
         `<span class="ok">before</span> turn 1.<br>lock <code>${restored.commitment.hash.slice(0, 32)}…</code>`;
