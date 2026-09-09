@@ -257,6 +257,30 @@ const CURATED: readonly Curated[] = [
       'it — B4 plays a whole round on hardware that refuses both audio and vibration',
   },
   {
+    oracle: 'engine/verify/verify-surface.ts',
+    subject: 'web/lattice-app.ts',
+    find: '      if (directionOf(rec.banked, target) !== 4) observed.set(rec.banked, target);',
+    replace: '      observed.set(rec.banked, target);',
+    why: 'the trail starts claiming the SECOND hop as the banked cell\'s own target — a direction the player was ' +
+      'never shown that cell take — so the mark teaches a link the reveal will then contradict',
+  },
+  {
+    oracle: 'engine/verify/verify-surface.ts',
+    subject: 'web/lattice.html',
+    find: '    <details id="proof">',
+    replace: '    <details id="proof" open>',
+    why: 'the proof panel unfolds on load and pushes the buttons back below the fold, which is the layout defect ' +
+      'this pass exists to fix and the one a stylesheet change can silently reintroduce',
+  },
+  {
+    oracle: 'engine/verify/verify-surface.ts',
+    subject: 'web/lattice.html',
+    find: '    font: 14px/1.45 var(--font-ui);',
+    replace: '    font: 14px/1.45 var(--font-mono);',
+    why: 'the whole interface reverts to a monospaced face — the exact state this pass measured and left, and one ' +
+      'a single token swap restores',
+  },
+  {
     oracle: 'engine/verify/verify-fixed.ts',
     subject: 'engine/math/fixed.ts',
     find: 'export function mulFixed',

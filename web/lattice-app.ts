@@ -19,6 +19,7 @@
 
 import { BOARD_W, CELL_COUNT, CHARGE_MAX, EMPTY, NO_LINK, STATE_CHARGED } from '../lattice/board.js';
 import { DEFAULT_ROUND } from '../lattice/round.js';
+import { directionOf } from '../lattice/reveal.js';
 import { computeRulesFromManifest } from '../lattice/rules-manifest.js';
 import { Session, type SavedSession, type SessionView } from '../lattice/session.js';
 import { Telemetry, type TurnRecord } from '../lattice/telemetry.js';
@@ -109,6 +110,45 @@ function loadSaved(): SavedSession | null {
   } catch { return null; }
 }
 
+// ── THE OBSERVATION TRAIL ──────────────────────────────────────────────────
+//
+// THE FINDING THIS CLOSES. The board shows the player the CURRENT state and
+// never their own history, so the association between a cell they banked and
+// the cell that lit up in response — the only thing that discloses the lattice
+// — had to be held in their head across twelve turns. The regional learner in
+// verify-learnable is scored with perfect recall of exactly that association.
+// The human was given none, which is a plausible reason for a measurable edge
+// to go unfelt.
+//
+// WHAT IT MAY CONTAIN, AND WHY THAT IS NOT A LEAK. Only pairs the player caused
+// and watched: source cell banked by them, target cell whose charge rose in the
+// same turn, on screen at the time. It is a record of what has already been
+// displayed, not a window onto what has not. It is built from `Telemetry`'s
+// per-turn records — banked index and charged cells — and NEVER from
+// `session.links()`, which is the only thing in the app that knows the lattice
+// and which throws before the reveal anyway.
+//
+// REJECTED ALTERNATIVE: drawing the arrow the reveal draws (`→n`). It would
+// have been fewer lines and it is the wrong shape twice over — it collides with
+// the marker verify-app A5 searches for, and text is what this screen already
+// had too much of. The bar is drawn on the edge the charge left by, so the
+// direction is seen rather than read.
+const observed = new Map<number, number>();
+
+/** Rebuilds the trail from the play log. Pure: same log, same trail. */
+function rebuildTrail(turns: readonly TurnRecord[]): void {
+  observed.clear();
+  for (const rec of turns) {
+    for (const target of rec.charged) {
+      // Only an ADJACENT charge can be attributed to this bank. The charge
+      // travels two steps, so the second hop lit a cell this bank did not feed
+      // directly; recording it as the banked cell's target would be the trail
+      // claiming an observation the player was never shown.
+      if (directionOf(rec.banked, target) !== 4) observed.set(rec.banked, target);
+    }
+  }
+}
+
 function loadLog(): readonly TurnRecord[] {
   try {
     const raw = localStorage.getItem(LOG_KEY);
@@ -184,6 +224,23 @@ function renderCell(index: number, view: SessionView): void {
     const charged = state === STATE_CHARGED ? ', charged' : '';
     cell.setAttribute('aria-label', `Row ${row} column ${column}, face ${face}, charge ${charge}${charged}`);
   }
+
+  // The trail is drawn on every cell the player has banked, empty or not: the
+  // cell refills but its link does not change for the round, so the mark is
+  // still true about the cell that is there now.
+  const seen = observed.get(index);
+  if (seen !== undefined) {
+    const dir = directionOf(index, seen);
+    if (dir !== 4) {
+      const bar = document.createElement('span');
+      bar.className = 'trail';
+      bar.dataset['dir'] = String(dir);
+      cell.append(bar);
+      const side = ['top', 'right', 'bottom', 'left'][dir];
+      const label = cell.getAttribute('aria-label') ?? '';
+      cell.setAttribute('aria-label', `${label}, you saw this feed the cell to the ${side}`);
+    }
+  }
 }
 
 let lastAnnouncedTurn = -1;
@@ -212,6 +269,7 @@ function onBank(index: number): void {
   // Recorded BEFORE the turn is applied for the board, after it for the
   // consequence: what the player could see when they chose, and what happened.
   telemetry.record(before.turn, index, session.lastCharged, before.observable, performance.now());
+  rebuildTrail(telemetry.turns);
 
   // ── THE SCREEN FIRST. ALWAYS. ─────────────────────────────────────────────
   // The outcome is already decided by the line above, so nothing may come
@@ -253,6 +311,7 @@ async function newRound(): Promise<void> {
   const rules = computeRulesFromManifest();
   session = await Session.open(seeds.server, seeds.client, rules, DEFAULT_ROUND);
   telemetry.begin(performance.now());
+  observed.clear();
   saveRound();
   proofBody.innerHTML =
     `Layout locked <span class="ok">before</span> turn 1.<br>` +
@@ -325,6 +384,7 @@ async function boot(): Promise<void> {
       // round that logged from turn 1 again would report the player's second
       // half as a whole session.
       telemetry.adopt(loadLog(), performance.now());
+      rebuildTrail(telemetry.turns);
       proofBody.innerHTML =
         `Round resumed at turn ${restored.view().turn}. Layout locked ` +
         `<span class="ok">before</span> turn 1.<br>lock <code>${restored.commitment.hash.slice(0, 32)}…</code>`;

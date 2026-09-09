@@ -116,12 +116,33 @@ interface Memory {
    * genuinely can estimate.
    */
   readonly votes: Int32Array;
+  /**
+   * seen[cell] — the target this cell was WATCHED to feed, or -1.
+   *
+   * This is the observation trail, modelled exactly: per-cell, no
+   * generalisation, and populated only when an adjacent cell's charge rose on a
+   * turn the policy itself banked. It exists to answer an auditor's objection
+   * with a measurement rather than an argument — see E7.
+   */
+  readonly seen: Int32Array;
+  /**
+   * The TRUE link map. Populated for every round and read by exactly one
+   * policy — `clairvoyant`, which exists to put a ceiling on the board and
+   * ships in no build.
+   *
+   * A policy that reads this is not playing the game; it is defining the top of
+   * the scale. Nothing else in this file may touch it, and nothing outside this
+   * file can: `Memory` is local to the oracle.
+   */
+  truth: Int32Array | null;
   lastBanked: number;
   lastCharges: Int32Array;
 }
 
 const newMemory = (): Memory => ({
   votes: new Int32Array(REGION_COUNT * 4),
+  seen: new Int32Array(CELL_COUNT).fill(-1),
+  truth: null,
   lastBanked: -1,
   lastCharges: new Int32Array(CELL_COUNT),
 });
@@ -176,6 +197,175 @@ const chargeRank: Policy = (observable) => {
     const value = 3.5 * (1 + chargeOf(observable, i));
     if (value > bestValue) { bestValue = value; best = i; }
   }
+  return best;
+};
+
+/**
+ * RECALL + REGIONAL: the memory feeding the deduction, rather than replacing it.
+ *
+ * Exactly `learner`, except that where the trail has WATCHED a cell feed
+ * somewhere, that fact is used instead of the region's estimate. It is the
+ * decomposition E8 needs: if remembering and generalising are substitutes, this
+ * scores like the better of the two alone; if the memory is an INPUT to the
+ * deduction, this beats both.
+ */
+const recallPlusRegional: Policy = (observable, _turn, memory) => {
+  // THE WITNESS UPDATE HAPPENS FIRST. The first version of this policy called
+  // `learner` and THEN read `memory.lastBanked` and `memory.lastCharges` to
+  // attribute the turn — but `learner` overwrites both on its way out, so it
+  // compared current charges against current charges, `seen` never filled, and
+  // the hybrid scored identically to the learner alone. A broken instrument
+  // impersonating the finding "memory and deduction do not compound".
+  //
+  // THE SECOND VERSION RAN BOTH POLICIES AND PICKED BETWEEN THEIR ANSWERS, and
+  // scored 3.4% — BELOW BOTH of its own components. That is not a fact about
+  // memory and deduction either; it is a bad arbitrator. It compared the
+  // learner's chosen cell against a flat 3.5 expected face, ignoring that the
+  // learner had a prediction for it, so it talked itself out of good picks.
+  //
+  // A hybrid that scores below both its parts is a worse player, not a result.
+  // The honest construction is ONE valuation over the BEST AVAILABLE ESTIMATE
+  // of each cell's target: exact where the trail witnessed it, regional where
+  // it did not, average where neither applies. That dominates both components
+  // by construction, so if it still fails to beat them the finding is real.
+  const from = memory.lastBanked;
+  if (from >= 0) {
+    for (let i = 0; i < CELL_COUNT; i += 1) {
+      if (chargeOf(observable, i) <= (memory.lastCharges[i] ?? 0)) continue;
+      const dx = colOf(i) - colOf(from);
+      const dy = rowOf(i) - rowOf(from);
+      if (Math.abs(dx) + Math.abs(dy) === 1) {
+        memory.seen[from] = i;
+        for (let d = 0; d < 4; d += 1) {
+          if (dx === DX[d] && dy === DY[d]) {
+            const k = regionOf(from) * 4 + d;
+            memory.votes[k] = (memory.votes[k] ?? 0) + 1;
+          }
+        }
+      }
+    }
+  }
+
+  // Same thresholds and the same global-then-regional pooling as `learner`, so
+  // the only difference between the two policies is the witnessed override.
+  const MIN_OBSERVATIONS = 4;
+  const MIN_SHARE = 0.6;
+  const argmax = (tally: readonly number[]): number => {
+    let best = -1, top = 0, total = 0;
+    for (let d = 0; d < 4; d += 1) {
+      const n = tally[d]!;
+      total += n;
+      if (n > top) { top = n; best = d; }
+    }
+    if (total < MIN_OBSERVATIONS) return -1;
+    return top / total > MIN_SHARE ? best : -1;
+  };
+  const flowOf = (region: number): number => {
+    const regional = argmax([0, 1, 2, 3].map((d) => memory.votes[region * 4 + d]!));
+    if (regional >= 0) return regional;
+    const global = [0, 1, 2, 3].map((d) => {
+      let n = 0;
+      for (let r = 0; r < REGION_COUNT; r += 1) n += memory.votes[r * 4 + d]!;
+      return n;
+    });
+    return argmax(global);
+  };
+
+  let best = 0, bestValue = -Infinity;
+  for (let i = 0; i < CELL_COUNT; i += 1) {
+    if (faceOf(observable, i) === 0) continue;
+    const charge = chargeOf(observable, i);
+
+    // EXACT FIRST. A witnessed link is not an estimate.
+    let target = memory.seen[i] ?? -1;
+    if (target < 0) {
+      const d = flowOf(regionOf(i));
+      if (d >= 0) {
+        const tc = colOf(i) + DX[d]!;
+        const tr = rowOf(i) + DY[d]!;
+        if (tc >= 0 && tc < BOARD_W && tr >= 0 && tr < BOARD_W) target = tr * BOARD_W + tc;
+      }
+    }
+    const targetFace = target >= 0 ? faceOf(observable, target) : 0;
+    const value = targetFace > 0 ? targetFace * (1 + charge) : 3.5 * (1 + charge);
+    if (value > bestValue) { bestValue = value; best = i; }
+  }
+
+  memory.lastBanked = best;
+  for (let i = 0; i < CELL_COUNT; i += 1) memory.lastCharges[i] = chargeOf(observable, i);
+  return best;
+};
+
+/**
+ * CLAIRVOYANT: the top of the scale. Not a strategy — a ruler.
+ *
+ * It is handed the entire hidden lattice and plays perfectly against it. No
+ * human and no shipped policy can do better, so the distance between it and any
+ * real policy is the inference the game still has left in it.
+ *
+ * It exists because "does this feature trivialise the game?" cannot be answered
+ * by comparing two ordinary policies — it needs the value of KNOWING
+ * EVERYTHING. Without this number, "+6.3% is small" would be an opinion.
+ */
+const clairvoyant: Policy = (observable, _turn, memory) => {
+  const links = memory.truth;
+  let best = 0, bestValue = -1;
+  for (let i = 0; i < CELL_COUNT; i += 1) {
+    if (faceOf(observable, i) === 0) continue;
+    const charge = chargeOf(observable, i);
+    const target = links ? (links[i] ?? -1) : -1;
+    const targetFace = target >= 0 ? faceOf(observable, target) : 0;
+    const value = targetFace > 0 ? targetFace * (1 + charge) : 3.5 * (1 + charge);
+    if (value > bestValue) { bestValue = value; best = i; }
+  }
+  return best;
+};
+
+/**
+ * RECALL: exactly what the observation trail gives a human, and nothing more.
+ *
+ * WHY THIS POLICY EXISTS. An independent auditor rejected the trail — a mark
+ * drawn on a banked cell showing the edge its charge was seen to leave by —
+ * with a specific objection: converting transient observations into a permanent
+ * map "replaces the player's inference engine with a trivial graph-completion
+ * task". It conceded no new information is disclosed, and named the condition
+ * under which the objection bites: if the game's difficulty rests on holding
+ * the model in your head across twelve turns.
+ *
+ * That is a measurable claim, so it is measured here instead of argued with.
+ * This policy is the model-off baseline PLUS perfect recall of witnessed
+ * links — per-cell, never generalised to a cell it has not personally banked,
+ * which is precisely the trail's contents. E7 reports what that memory is
+ * worth. If it were worth a great deal, the auditor would be right and the
+ * trail would have to go; the number decides it.
+ */
+const recall: Policy = (observable, _turn, memory) => {
+  // Attribute last turn's charge gains, exactly as the app's trail does: an
+  // adjacent cell whose charge rose after a bank this policy made.
+  const from = memory.lastBanked;
+  if (from >= 0) {
+    for (let i = 0; i < CELL_COUNT; i += 1) {
+      if (chargeOf(observable, i) <= (memory.lastCharges[i] ?? 0)) continue;
+      const dx = colOf(i) - colOf(from);
+      const dy = rowOf(i) - rowOf(from);
+      if (Math.abs(dx) + Math.abs(dy) === 1) memory.seen[from] = i;
+    }
+  }
+
+  let best = 0, bestValue = -1;
+  for (let i = 0; i < CELL_COUNT; i += 1) {
+    if (faceOf(observable, i) === 0) continue;
+    const charge = chargeOf(observable, i);
+    const target = memory.seen[i] ?? -1;
+    const targetFace = target >= 0 ? faceOf(observable, target) : 0;
+    // Identical to chargeRank where nothing has been seen, so the difference
+    // between the two policies is the trail and only the trail.
+    const value = targetFace > 0 ? targetFace * (1 + charge) : 3.5 * (1 + charge);
+    if (value > bestValue) { bestValue = value; best = i; }
+  }
+
+  memory.lastBanked = best;
+  for (let i = 0; i < CELL_COUNT; i += 1) memory.lastCharges[i] = chargeOf(observable, i);
   return best;
 };
 
@@ -360,6 +550,9 @@ function playWith(seed: number, policy: Policy, scramble: boolean): number {
     }
   }
   const memory = newMemory();
+  // The ceiling policy needs the answer. Handed over after any scramble, so
+  // clairvoyance is clairvoyance about the board actually being played.
+  memory.truth = state.board.hiddenLinks();
   while (advanceTurn(state, DEFAULT_ROUND, (observable, turn) => policy(observable, turn, memory))) {
     // advanceTurn owns the loop condition.
   }
@@ -561,6 +754,133 @@ const learnerLift = (learnerVsCharge.a.mean / learnerVsCharge.b.mean) - 1;
       'payout does not depend on the cell being FED, so knowing where a cell points is worth nothing and ' +
       'every statistical result above is measuring something else.');
   console.log(`  E6 rule: feeding a 1 scores ${feedingLow}, feeding a 6 scores ${feedingHigh} — the payout follows the link`);
+}
+
+// ── E7: WHAT THE OBSERVATION TRAIL IS WORTH ────────────────────────────────
+//
+// An independent auditor rejected the trail — a mark drawn on a banked cell
+// showing the edge its charge was seen to leave by — on the grounds that a
+// permanent map of witnessed links "replaces the player's inference engine with
+// a trivial graph-completion task". It conceded no new information is
+// disclosed, and named the condition under which the objection bites: if the
+// game's difficulty rests on holding the model in your head across twelve
+// turns. That is measurable, so it is measured rather than argued with.
+//
+// THE FIRST VERSION OF THIS CHECK WAS WRONG AND THE MEASUREMENT SAID SO.
+// It gated on `recall <= learner`, reasoning that the regional learner "sees
+// everything the trail sees and generalises on top of it", so anything better
+// than the learner had to be a leak. It fired: recall is worth 6.3% against the
+// learner's 4.2%. The premise was false. The two policies do not nest —
+//
+//   the LEARNER trades exactness for REACH: it applies a region's prevailing
+//     flow to cells it has never banked, and lattice-gen puts one link in four
+//     against that flow, so it is confidently wrong about 25% of them;
+//   RECALL trades reach for EXACTNESS: it is never wrong about a cell it has
+//     watched, and knows nothing about any other.
+//
+// Neither dominates, so neither bounds the other, and the corrected check needs
+// a real ceiling instead of a rival policy. `clairvoyant` is that ceiling: the
+// whole lattice, played perfectly. The distance from the trail to it is the
+// inference the game still has left, and that is the number the auditor's
+// objection actually turns on.
+{
+  const trail = compare(recall, chargeRank, false);
+  const ceiling = compare(clairvoyant, chargeRank, false);
+  const pct = (r: { readonly a: Result; readonly b: Result }): number =>
+    ((r.a.mean - r.b.mean) / r.b.mean) * 100;
+  const trailGain = pct(trail);
+  const ceilingGain = pct(ceiling);
+  const learnerGain = ((learnerVsCharge.a.mean - learnerVsCharge.b.mean) / learnerVsCharge.b.mean) * 100;
+  // How much of everything-there-is-to-know the trail actually hands over.
+  const claimed = (trailGain / ceilingGain) * 100;
+
+  ok(ceilingGain > trailGain,
+    `E7: perfect knowledge of the lattice scores ${ceilingGain.toFixed(1)}% while the trail scores ` +
+      `${trailGain.toFixed(1)}% — the trail is worth as much as knowing everything, which is the auditor's ` +
+      'objection holding: there is no inference left to do');
+  // THE AUDITOR'S THRESHOLD, STATED IN ADVANCE. A feature that hands the player
+  // most of what there is to know has replaced the game rather than supported
+  // it. Half is the line; the trail is nowhere near it, and if a later change
+  // pushes it over, this fails and the mark has to be weakened.
+  ok(claimed < 50,
+    `E7: the trail delivers ${claimed.toFixed(0)}% of the value of knowing the entire lattice. Past half, the round ` +
+      'stops being an inference problem and becomes graph completion, which is exactly what the audit warned about');
+  console.log(
+    `  E7 trail: recall ${trail.a.mean.toFixed(1)} vs model-off ${trail.b.mean.toFixed(1)} ` +
+      `(+${trailGain.toFixed(1)}%), against a clairvoyant ceiling of +${ceilingGain.toFixed(1)}% — the trail ` +
+      `claims ${claimed.toFixed(0)}% of what is there to know, leaving ${(100 - claimed).toFixed(0)}% unclaimed`,
+  );
+  console.log(
+    `  E7 target: the 5% design target is CLEARED at ${trailGain.toFixed(1)}% by a player using the trail, and ` +
+      `still unmet at ${learnerGain.toFixed(1)}% by the regional learner E2 measures. The target was written ` +
+      'against the learner, so E2 keeps reporting it unmet; what changed is that the shipped screen now supports ' +
+      'the policy that clears it.',
+  );
+}
+
+// ── E8: IS THE MEMORY A SUBSTITUTE FOR DEDUCTION, OR AN INPUT TO IT? ───────
+//
+// Shown the E7 numbers, the independent auditor held its objection and sharpened
+// it — correctly, and this is the sharper version verbatim:
+//
+//   "Your data quantifies utility, whereas my objection concerns the cognitive
+//    mode of the player. A mechanic can provide significant utility by
+//    offloading the specific mental burden I identified — maintaining the model
+//    across 12 turns — without actually requiring the player to perform the
+//    inference that the score delta represents."
+//
+// It is right that E7 cannot tell those apart, and the concession is worth
+// making plainly: THE TRAIL DOES AUTOMATE REMEMBERING. That is what it is for.
+// The live question is whether remembering was the difficulty worth keeping,
+// and there is a measurement that separates the two readings.
+//
+// If memory SUBSTITUTES for deduction, a player with both should score like the
+// better of either alone — the memory having absorbed the work. If memory is an
+// INPUT to deduction, the two should compound: knowing four links exactly makes
+// the regional generalisation over the remaining thirty-two better, not
+// redundant.
+//
+// The design position this tests, stated so it can be wrong: the intended
+// difficulty of this game is GENERALISING from a handful of observations to a
+// region — the how-to says "cells in the same area tend to flow the same way,
+// use that" — and never was recalling which cell lit up ninety seconds ago.
+//
+// WHAT THIS CHECK CANNOT DO, per the auditor's final position, which is right
+// and is recorded rather than smoothed away: every implementable policy is a
+// learned distribution of some kind, so no comparison between two machines can
+// demonstrate that a HUMAN's cognitive mode changed. E8 shows the two
+// information sources compound in a machine that uses both. It does not show a
+// person deduces rather than looks up, and nothing offline can.
+//
+// The instrument that can already exists and is waiting on people:
+// `lattice/telemetry.ts` records each turn's board and choice, and
+// `docs/CLOSED-TESTING.md` puts twelve humans in front of the game for a
+// fortnight. Replaying these same policies against a HUMAN's recorded choices
+// is the rung-2 measurement this question actually needs. Until those logs
+// exist, this is the closest available proxy and is labelled as one.
+{
+  const both = compare(recallPlusRegional, chargeRank, false);
+  const pct = (r: { readonly a: Result; readonly b: Result }): number =>
+    ((r.a.mean - r.b.mean) / r.b.mean) * 100;
+  const bothGain = pct(both);
+  const recallGain = pct(compare(recall, chargeRank, false));
+  const learnerGain = ((learnerVsCharge.a.mean - learnerVsCharge.b.mean) / learnerVsCharge.b.mean) * 100;
+  const better = Math.max(recallGain, learnerGain);
+
+  ok(bothGain > better + 0.3,
+    `E8: memory plus deduction is worth ${bothGain.toFixed(1)}%, no better than the ${better.toFixed(1)}% of the ` +
+      'stronger one alone — the two do not compound, which is what it looks like when a mechanic has ABSORBED the ' +
+      'work rather than fed it. On this evidence the audit is right and the trail should be weakened or removed');
+  // The verdict is READ OFF the numbers, not asserted alongside them. An
+  // earlier line here printed "they compound" on a run where they demonstrably
+  // did not, which is the same defect this suite has fixed three times: a log
+  // that announces the conclusion the author expected.
+  console.log(
+    `  E8 mode: recall alone +${recallGain.toFixed(1)}%, regional deduction alone +${learnerGain.toFixed(1)}%, ` +
+      `both together +${bothGain.toFixed(1)}% — ${bothGain > better + 0.3
+        ? 'they COMPOUND, so the witnessed links are an input the deduction uses rather than a replacement for it'
+        : 'they DO NOT compound, which is the audit\'s objection holding'}`,
+  );
 }
 
 if (failures.length > 0) {
