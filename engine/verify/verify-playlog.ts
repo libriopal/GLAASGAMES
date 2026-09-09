@@ -328,15 +328,33 @@ try {
   ok(writes.length === 0, `L5: the page sent ${writes.length} write request(s): ${writes.slice(0, 5).join('; ')}`);
   console.log(`  L5 silence: 0 transmission attempts, 0 off-origin requests across ${seen.length} same-origin loads`);
 
-  // The platform's own guarantee, checked rather than assumed. Not just
-  // INTERNET: a permission of any kind is a channel this page's instrument
-  // cannot see, so the assertion is that there are NO `uses-permission`
-  // elements at all — which is also what the Data Safety declaration claims.
+  // The platform's own guarantee, checked rather than assumed.
+  //
+  // THIS WAS "ZERO PERMISSIONS" AND IS NOW AN ALLOWLIST, and the change is worth
+  // defending rather than slipping through. Item 4 added a haptic tick, which
+  // needs VIBRATE — a normal permission, granted at install, never prompted,
+  // that drives a motor and reads nothing. "Zero" would have forced a choice
+  // between a feature and a check, and the tempting resolution is to delete the
+  // assertion.
+  //
+  // An allowlist is the stronger instrument, not the weaker one. Every entry
+  // has to carry a written argument for why it cannot carry data off the
+  // device, and anything not on the list fails — INTERNET, Bluetooth, NFC,
+  // storage, or something a library adds without anyone noticing. A count
+  // cannot tell those apart from a vibration motor; a list has to say.
+  const ALLOWED: Readonly<Record<string, string>> = {
+    'android.permission.VIBRATE': 'drives the vibration motor; it is an output, reads nothing and opens no channel',
+  };
   const manifest = readFileSync(join(ROOT, 'android/app/src/main/AndroidManifest.xml'), 'utf8');
-  const declared = [...manifest.matchAll(/<uses-permission[^>]*android:name="([^"]+)"/g)].map((m) => m[1]);
-  ok(declared.length === 0,
-    `L5: the manifest declares ${declared.length} permission(s) (${declared.join(', ')}) — the log COULD leave the ` +
-      'device and "no data collected" stops being enforced by the platform');
+  const declared = [...manifest.matchAll(/<uses-permission[^>]*android:name="([^"]+)"/g)].map((m) => m[1]!);
+  const unlisted = declared.filter((name) => !(name in ALLOWED));
+  ok(unlisted.length === 0,
+    `L5: the manifest declares ${unlisted.length} permission(s) with no argument for why they cannot carry data ` +
+      `out: ${unlisted.join(', ')}. Add it to the allowlist WITH a reason, or remove it — "no data collected" is ` +
+      'enforced by the platform only for as long as the platform is given nothing to enforce with');
+  // The control: the allowlist must still reject the thing it exists to reject.
+  ok(!('android.permission.INTERNET' in ALLOWED),
+    'L5 NEGATIVE CONTROL FAILED: INTERNET is on the allowlist, so the check would pass an app that can transmit');
 
   // ── L7: THE NATIVE BRIDGE ────────────────────────────────────────────────
   //

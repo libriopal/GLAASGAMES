@@ -1,13 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  NOTE WHAT IS ABSENT. There is no <uses-permission> element at all — no
-  INTERNET, no storage, no location, no advertising ID. The game derives its
-  daily world from the date by integer arithmetic and ships every asset inside
-  the APK, so there is nothing to fetch and nothing to report. That makes the
-  Play Data Safety declaration a straight "no data collected, no data shared",
-  and it is true rather than merely claimed: an app without the INTERNET
-  permission cannot transmit anything, and the platform enforces that rather
-  than the developer promising it.
+  NOTE WHAT IS ABSENT. No INTERNET, no storage, no location, no advertising ID.
+  The game derives its daily world from the date by integer arithmetic and ships
+  every asset inside the APK, so there is nothing to fetch and nothing to
+  report. That makes the Play Data Safety declaration a straight "no data
+  collected, no data shared", and it is true rather than merely claimed: an app
+  without the INTERNET permission cannot transmit anything, and the platform
+  enforces that rather than the developer promising it.
+
+  EXACTLY ONE PERMISSION IS DECLARED, AND IT IS AN OUTPUT.
+  VIBRATE drives the motor in the phone. It reads nothing, opens nothing and
+  carries nothing off the device; it is a normal permission, granted at install,
+  never prompted, and it appears in no Data Safety answer because there is no
+  data in it. It is here so a tap can be felt as well as seen.
+
+  This file used to declare no permission at all, and `verify-playlog` L5 held
+  it to that. That check is now an ALLOWLIST rather than a count: the manifest
+  may declare only permissions that appear on a list in the oracle, each with a
+  written argument for why it cannot carry data out. That is a stronger check
+  than "zero", not a weaker one — "zero" would have been satisfied by deleting
+  the assertion, whereas an allowlist fails on INTERNET, on Bluetooth, on NFC,
+  and on anything else added without an argument, including by a library.
 
   It also settles the Minimum Functionality policy. Play rejects apps that are
   thin wrappers around a website; this one has no website to wrap. It runs
@@ -18,6 +31,11 @@
     <!-- The game needs a GPU for WebGL2; a device without one cannot run it, so
          declare it and let Play filter rather than crashing after install. -->
     <uses-feature android:glEsVersion="0x00030000" android:required="true" />
+
+    <!-- An output to the vibration motor. See the note above: it is the only
+         permission this app declares, and it cannot carry anything off the
+         device. Without it navigator.vibrate() silently does nothing. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:allowBackup="false"

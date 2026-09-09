@@ -86,6 +86,12 @@
     font: inherit; font-weight: 600; letter-spacing: .06em; cursor: pointer;
   }
   button.primary:disabled { color: var(--ink-dim); border-color: var(--ground-edge); cursor: default; }
+  /* The sound toggle is a real control with a real touch target, but it is not
+     one of the two things the player came here to press. It gets the full 48px
+     and none of the emphasis. */
+  button.primary.quiet {
+    flex: 0 0 auto; color: var(--ink-dim); border-color: var(--ground-edge); font-weight: 400;
+  }
 
   #proof {
     margin-top: 14px; padding: 10px; border-radius: 8px;
@@ -198,6 +204,7 @@
     <div id="actions">
       <button class="primary" id="btn-reveal" disabled>Show the answer</button>
       <button class="primary" id="btn-new">New round</button>
+      <button class="primary quiet" id="btn-sound" aria-pressed="true">Sound on</button>
     </div>
 
     <div id="proof">

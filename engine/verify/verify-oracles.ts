@@ -238,6 +238,25 @@ const CURATED: readonly Curated[] = [
       'playtest log left the device through Kotlin',
   },
   {
+    oracle: 'engine/verify/verify-feedback.ts',
+    subject: 'web/lattice-app.ts',
+    find: '  render(view);\n  feedback.commit();',
+    // NOT `await` — that is a syntax error in a non-async function, and the
+    // oracle would "catch" a mutant that never built. A caught mutant has to
+    // be caught by an assertion, not by tsc.
+    replace: '  feedback.commit();\n  setTimeout(() => render(view), 250);',
+    why: 'puts a quarter-second of suspense between a decision that is already made and the player seeing it — ' +
+      'the slot-machine near-miss, which is the exact pattern change 4 exists to invert',
+  },
+  {
+    oracle: 'engine/verify/verify-feedback.ts',
+    subject: 'web/feedback.ts',
+    find: '    try { navigator.vibrate?.(8); } catch { /* no vibrator, or no permission */ }',
+    replace: '    navigator.vibrate!(8);',
+    why: 'a device with no vibrator now throws out of the commit path, so the haptic failure takes the turn with ' +
+      'it — B4 plays a whole round on hardware that refuses both audio and vibration',
+  },
+  {
     oracle: 'engine/verify/verify-fixed.ts',
     subject: 'engine/math/fixed.ts',
     find: 'export function mulFixed',

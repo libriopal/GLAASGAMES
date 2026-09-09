@@ -17,11 +17,12 @@
 // pixels and APCA floors. A hex literal in the stylesheet would be a colour no
 // oracle governs.
 
-import { BOARD_W, CELL_COUNT, EMPTY, NO_LINK, STATE_CHARGED } from '../lattice/board.js';
+import { BOARD_W, CELL_COUNT, CHARGE_MAX, EMPTY, NO_LINK, STATE_CHARGED } from '../lattice/board.js';
 import { DEFAULT_ROUND } from '../lattice/round.js';
 import { computeRulesFromManifest } from '../lattice/rules-manifest.js';
 import { Session, type SavedSession, type SessionView } from '../lattice/session.js';
 import { Telemetry, type TurnRecord } from '../lattice/telemetry.js';
+import { Feedback } from './feedback.js';
 import {
   AMBER,
   CHARGE_GLOW,
@@ -75,6 +76,7 @@ const cells: HTMLButtonElement[] = [];
 let session: Session | null = null;
 let revealedLinks: Int32Array | null = null;
 const telemetry = new Telemetry();
+const feedback = new Feedback();
 
 // ── Item 3: persistence ────────────────────────────────────────────────────
 // Every storage access is wrapped: a private window, cleared site data, or a
@@ -127,6 +129,19 @@ function buildBoard(): void {
     // label is rewritten on every render with the cell's actual contents.
     cell.setAttribute('role', 'gridcell');
     cell.addEventListener('click', () => onBank(i));
+    // ── ANTICIPATION, AND ONLY WHILE THE CHOICE IS STILL OPEN ───────────────
+    // The tone starts on press and stops on release or cancel. Everything it
+    // does happens while the player can still lift their finger and pick a
+    // different cell, which is the entire difference between tension and a
+    // near-miss animation played to a result that is already fixed.
+    cell.addEventListener('pointerdown', () => {
+      if (!session || session.phase !== 'playing') return;
+      const charge = session.view().observable[i * 3 + 2] ?? 0;
+      feedback.anticipate(charge / CHARGE_MAX);
+    });
+    for (const done of ['pointerup', 'pointercancel', 'pointerleave']) {
+      cell.addEventListener(done, () => feedback.release());
+    }
     board.append(cell);
     cells.push(cell);
   }
@@ -197,7 +212,16 @@ function onBank(index: number): void {
   // Recorded BEFORE the turn is applied for the board, after it for the
   // consequence: what the player could see when they chose, and what happened.
   telemetry.record(before.turn, index, session.lastCharged, before.observable, performance.now());
+
+  // ── THE SCREEN FIRST. ALWAYS. ─────────────────────────────────────────────
+  // The outcome is already decided by the line above, so nothing may come
+  // between it and the player seeing it — not a sound, not a transition, not an
+  // await. Feedback is what happens AFTER the truth is on screen.
+  // `verify-feedback` B2 measures this gap and fails the build if it grows.
   render(view);
+  feedback.commit();
+  if (view.phase === 'ended') feedback.finish();
+
   saveRound();
   if (view.phase === 'ended') {
     proofBody.textContent = 'Round over. Show the answer to check the hidden layout against the lock made before you played.';
@@ -320,6 +344,20 @@ btnHowto.addEventListener('click', () => {
   howto.hidden = true;
   try { localStorage.setItem(HOWTO_KEY, 'done'); } catch { /* nothing to remember with */ }
 });
+
+// Sound is on by default and one tap from off. A game that makes noise with no
+// visible way to stop it gets muted at the OS level and never unmuted, which
+// costs the feedback its whole purpose.
+const btnSound = el<HTMLButtonElement>('btn-sound');
+function paintSound(): void {
+  btnSound.textContent = feedback.muted ? 'Sound off' : 'Sound on';
+  btnSound.setAttribute('aria-pressed', feedback.muted ? 'false' : 'true');
+}
+btnSound.addEventListener('click', () => {
+  feedback.setMuted(!feedback.muted);
+  paintSound();
+});
+paintSound();
 
 applyTheme();
 buildBoard();
