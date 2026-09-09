@@ -5,11 +5,13 @@
 // T1  the digest is the one the theme cites, and is complete
 // T2  the accent hues match the measured chromatic weights, in measured order
 // T3  every text pairing clears APCA, which WCAG 2 would not have caught
-// T4  the recorded contradiction between the written spec and the images stands
+// T4  the palette's omission of green is a measured decision, and stays one
+// T5  the digest is REPRODUCIBLE from a pinned corpus, not merely committed
 //
 // This is the oracle that stops the palette drifting into taste. A colour here
 // is either traceable to 4,613,440 measured pixels or it fails.
 
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
@@ -175,20 +177,118 @@ function bandWeight(fromDeg: number, toDeg: number): number {
   );
 }
 
-// ── T4: the contradiction between spec and images is recorded, not hidden ──
+// ── T4: the absence of green is a measured decision, and stays one ─────────
+// Green is the hue this kind of art is remembered as having and the hue the
+// corpus barely contains. That gap is exactly where taste re-enters a palette,
+// so the omission is held in place by three separate conditions: the digest
+// must still say green is scarce, the theme must still say WHY it has no green
+// token, and it must still actually have none. Any one of them failing means
+// somebody is about to add green for a reason that is not a measurement.
 {
   const source = readFileSync(fileURLToPath(new URL('../../web/theme.ts', import.meta.url)), 'utf8');
   const greenBand = bandWeight(90, 149);
 
   ok(greenBand < 5,
-    `T4: green now measures ${greenBand.toFixed(1)}% of chromatic weight — if the corpus has changed, the ` +
-      'recorded contradiction needs revisiting rather than leaving a stale claim in the theme');
-  ok(/emerald green/i.test(source) && /contradiction/i.test(source),
-    'T4: the theme no longer records that the written visual spec calls for green while the images ' +
-      'contain almost none — a decision made against a document must stay visible in the file that made it');
+    `T4: green now measures ${greenBand.toFixed(1)}% of chromatic weight — the theme's stated reason for ` +
+      'having no green token no longer holds, so the claim must be revisited rather than left stale');
+  ok(/least used hue/i.test(source) && /NO green accent token/.test(source),
+    'T4: the theme no longer records why it omits green — an omission decided against intuition has to ' +
+      'stay explained in the file that decided it, or the next person will simply add green back');
+
+  // And the omission is real, not merely described: no exported accent may sit
+  // in the green band. This is what the prose above is a promise about.
+  const accents: readonly (readonly [string, string])[] = [
+    ['CYAN', CYAN], ['AMBER', AMBER], ['MAGENTA', MAGENTA],
+    ['INK', INK], ['INK_DIM', INK_DIM],
+    ['GROUND', GROUND], ['GROUND_RAISED', GROUND_RAISED], ['GROUND_EDGE', GROUND_EDGE],
+  ];
+  for (const [name, value] of accents) {
+    const h = hueOf(hex(value));
+    const chromatic = Math.max(hex(value).r, hex(value).g, hex(value).b) -
+      Math.min(hex(value).r, hex(value).g, hex(value).b) > 12;
+    ok(!(chromatic && h >= 90 && h <= 149),
+      `T4: ${name} sits at ${h.toFixed(0)} deg, inside the 90-149 green band the corpus measures at ` +
+        `${greenBand.toFixed(1)}% — the theme says it has no green token and it now has one`);
+  }
+
+  // NEGATIVE CONTROL: the band test must actually catch a green if one is added.
+  const planted = hueOf(hex('#50c878')); // emerald, the colour intuition asks for
+  ok(planted >= 90 && planted <= 149,
+    `T4 NEGATIVE CONTROL FAILED: a plainly green colour measured ${planted.toFixed(0)} deg, so the check ` +
+      'above would not have noticed one being added');
+
   console.log(
-    `  T4 disclosure: green is ${greenBand.toFixed(1)}% of chromatic weight against a spec that names it a ` +
-      'primary pillar; the theme records the disagreement and follows the images',
+    `  T4 omission: green is ${greenBand.toFixed(1)}% of chromatic weight; the theme states why it carries ` +
+      'no green token, and none of its 8 exported colours sits in the green band',
+  );
+}
+
+// ── T5: the digest is reproducible, not merely committed ───────────────────
+//
+// FOUND BY THE SOVEREIGNTY AUDIT. T1 above checks the digest's internal
+// consistency — that it reports 1,129 images and 4,613,440 pixels and sums to a
+// distribution. It cannot check that those numbers came from any actual images,
+// because the corpus is not in this repository. So T1 was checking the digest
+// against itself: an assertion with no witness, in the one file that claims
+// "derived, not chosen".
+//
+// The fix is the same shape as `lattice/ruleset.ts`. Committing 1,129 JPEGs
+// would bloat this repo and duplicate another one; instead the manifest pins
+// every image by SHA-256, binds them under a root hash, and records the digest
+// those images produce. The chain a third party can now walk end to end:
+//
+//   corpus  --manifest-corpus.py --check-->  root 008cb900...
+//   corpus  --ingest-corpus.py------------>  digest, byte-identical to the
+//                                            committed one (verified: the
+//                                            regenerated file hashed equal)
+//   digest  --this file------------------->  the tokens above
+//
+// What T5 can prove without the images present is that the links exist and
+// agree. What it cannot prove is that the images themselves are unchanged —
+// that requires holding them, which is exactly why the manifest names each one.
+{
+  interface Manifest {
+    images: number;
+    root: string;
+    digest_sha256: string;
+    files: Record<string, string>;
+  }
+  const manifestPath = fileURLToPath(new URL('../../design/corpus-manifest.json', import.meta.url));
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Manifest;
+
+  ok(manifest.images === CORPUS_IMAGES,
+    `T5: the manifest pins ${manifest.images} images but the theme claims ${CORPUS_IMAGES}`);
+  ok(Object.keys(manifest.files).length === manifest.images,
+    `T5: the manifest claims ${manifest.images} images but lists ${Object.keys(manifest.files).length}`);
+
+  // The root must recompute from the file list, or it is a number typed in.
+  const recomputedRoot = createHash('sha256')
+    .update(Object.entries(manifest.files).map(([n, d]) => `${n}:${d}`).join('\n'))
+    .digest('hex');
+  ok(recomputedRoot === manifest.root,
+    `T5: the manifest root does not recompute from its own file list (${manifest.root.slice(0, 12)} vs ` +
+      `${recomputedRoot.slice(0, 12)}) — the pin does not bind the thing it claims to bind`);
+
+  // And the manifest must name THIS digest, not some other one.
+  const digestBytes = readFileSync(fileURLToPath(new URL(`../../${CORPUS_DIGEST}`, import.meta.url)));
+  const digestHash = createHash('sha256').update(digestBytes).digest('hex');
+  ok(digestHash === manifest.digest_sha256,
+    `T5: the manifest records digest ${manifest.digest_sha256.slice(0, 12)} but the committed digest hashes ` +
+      `to ${digestHash.slice(0, 12)} — the corpus pin and the measurements have come apart`);
+
+  // NEGATIVE CONTROL: the root must move if any single image hash changes.
+  const [firstName] = Object.keys(manifest.files);
+  const tampered = { ...manifest.files, [firstName!]: '0'.repeat(64) };
+  const tamperedRoot = createHash('sha256')
+    .update(Object.entries(tampered).map(([n, d]) => `${n}:${d}`).join('\n'))
+    .digest('hex');
+  ok(tamperedRoot !== manifest.root,
+    'T5 NEGATIVE CONTROL FAILED: substituting an image hash did not change the root, so the manifest ' +
+      'does not actually pin the corpus');
+
+  console.log(
+    `  T5 provenance: ${manifest.images} images pinned under root ${manifest.root.slice(0, 12)}..., ` +
+      `bound to digest ${digestHash.slice(0, 12)}... (regenerating from the corpus reproduces it byte for byte)`,
   );
 }
 

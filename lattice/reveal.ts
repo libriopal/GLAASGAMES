@@ -61,16 +61,26 @@ export function reconstructLattice(seed: number): Int32Array {
   return board.hiddenLinks();
 }
 
+/**
+ * Builds the disclosure a player sees at the end of a round.
+ *
+ * `localRulesHash` is the verifier's own `computeRules().hash`, threaded
+ * through rather than computed here so this module stays free of filesystem
+ * access and can run in a browser. It is required, not defaulted: a default
+ * would silently reduce `commitmentHolds` to the operator agreeing with
+ * itself, which is precisely the check that was missing before `ruleset.ts`.
+ */
 export async function buildReveal(
   commitment: Commitment,
   reveal: Reveal,
   seed: number,
+  localRulesHash: string,
 ): Promise<RoundReveal> {
   return {
     seed,
     serverSeed: reveal.serverSeed,
     clientSeed: reveal.clientSeed,
-    commitmentHolds: await checkReveal(commitment, reveal),
+    commitmentHolds: await checkReveal(commitment, reveal, localRulesHash),
     links: reconstructLattice(seed),
     flows: regionFlows(seed),
   };

@@ -66,9 +66,14 @@ await cp(
   join(out, 'engine', 'config', 'sim.json'),
 );
 
-// app.html becomes index.html: WebViewAssetLoader serves a directory index and
-// the Android host loads the assets root.
-await cp(join(root, 'web', 'app.html'), join(out, 'index.html'));
+// lattice.html becomes index.html — it is the GAME, and it is what a tester
+// must land on. app.html (the 4D engine demo) ships alongside as engine.html,
+// linked from the game screen. Until now the APK opened the engine demo and
+// nothing in web/ imported lattice/ at all, so every Slice 0 seam was verified
+// library code with no user-facing surface. Reversing this is a one-line
+// product decision, not a rebuild.
+await cp(join(root, 'web', 'lattice.html'), join(out, 'index.html'));
+await cp(join(root, 'web', 'app.html'), join(out, 'engine.html'));
 
 // Neither WebGPU entry point is shipped. Both need an adapter that a WebView
 // does not provide, so both would fail on every device that installs this, and

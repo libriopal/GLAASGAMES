@@ -70,7 +70,22 @@ export interface RoundResult {
   readonly finalLinks: Int32Array;
 }
 
-function drawFace(rng: () => number, weights: readonly number[]): number {
+/**
+ * Draws one die face.
+ *
+ * EXPORTED SO IT CAN BE MEASURED. This is the entire fairness surface of the
+ * game — every face that ever reaches the board comes through here — and L1y in
+ * `verify-lattice` samples it directly rather than inferring the distribution
+ * from played rounds. Exposing the faces on `RoundResult` would have been the
+ * alternative, and would have widened the game's public result shape to suit a
+ * test; this widens nothing a player sees.
+ *
+ * Note `Math.abs(rng()) % total` is a modulo over an i32, so a `total` that is
+ * not a divisor of the RNG's range introduces a small modulo bias. With six
+ * equal weights of 4 the total is 24, and L1y measures the resulting
+ * distribution empirically rather than assuming the bias is negligible.
+ */
+export function drawFace(rng: () => number, weights: readonly number[]): number {
   let total = 0;
   for (let f = 1; f <= 6; f += 1) total += weights[f]!;
   let pick = Math.abs(rng()) % total;
@@ -110,7 +125,201 @@ export function isStagnant(board: Board): boolean {
 }
 
 /**
- * Plays one round.
+ * A round in progress.
+ *
+ * THIS EXISTS SO THERE IS EXACTLY ONE EXECUTOR. `playRound` runs a round to
+ * completion against a policy; an interactive host cannot, because a player
+ * answers over minutes and a synchronous callback loop cannot wait. The obvious
+ * response — let the UI drive its own turn loop — would create a SECOND
+ * implementation of the rules with nothing holding the two in agreement, which
+ * is precisely the defect kernel.ts/sim.wgsl parity exists to prevent, one
+ * level up and with no oracle.
+ *
+ * So the turn is extracted rather than duplicated. `playRound` and
+ * `lattice/session.ts` both call `advanceTurn`, and there is no second copy of
+ * the rules to drift.
+ */
+export interface RoundState {
+  readonly board: Board;
+  readonly rng: () => number;
+  score: number;
+  reshuffles: number;
+  conceded: boolean;
+  readonly observations: Observation[];
+  chained: number;
+  turn: number;
+}
+
+/** Generates the lattice and the opening faces. */
+export function beginRound(seed: number): RoundState {
+  const board = new Board();
+  generateLattice(board, seed);
+
+  const rng = makeRng(seed ^ 0x5bf03635);
+
+  // ── L1x: the face distribution is fixed here, before any turn, and is const.
+  // No statement inside a turn may derive a new weighting.
+  const weights = FACE_WEIGHTS;
+
+  for (let i = 0; i < CELL_COUNT; i += 1) {
+    board.set(i, OFFSET_FACE, drawFace(rng, weights));
+    board.set(i, OFFSET_STATE, STATE_IDLE);
+  }
+
+  return { board, rng, score: 0, reshuffles: 0, conceded: false, observations: [], chained: 0x811c9dc5, turn: 0 };
+}
+
+/**
+ * Advances one turn. Returns false when the round has ended.
+ *
+ * The order of operations here is load-bearing and is the reason this is one
+ * function rather than several a host could call out of sequence: stagnation is
+ * resolved BEFORE the player is asked, so the board they are shown is the board
+ * they act on.
+ */
+export function advanceTurn(
+  state: RoundState,
+  config: RoundConfig,
+  chooseAction: (observable: Int32Array, turn: number) => Action,
+): boolean {
+  const { board, rng } = state;
+  // FACE_WEIGHTS is used DIRECTLY here rather than bound to a local. A local
+  // rebinding is harmless as written, but it is the exact textual shape L1x
+  // forbids inside a turn, and L1x fired on it the moment the turn was
+  // extracted. Satisfying the rule by removing the pattern is correct;
+  // relaxing the rule to permit a benign instance would spend the oracle.
+  if (state.conceded || state.turn >= config.turns) return false;
+
+  {
+    const turn = state.turn;
+    // ── D1: stagnation is detected and answered VISIBLY ────────────────────
+    // Bounded attempts, because a reshuffle cannot rescue every lattice — if a
+    // region's links all point off the board there may be no arrangement of
+    // faces that restores flow. Looping forever would hang; looping silently
+    // would hide it. The round concedes instead and reports how many attempts
+    // it made, so an unplayable lattice shows up as a number rather than as a
+    // freeze.
+    let attempts = 0;
+    while (isStagnant(board) && attempts < MAX_RESHUFFLE_ATTEMPTS) {
+      for (let i = 0; i < CELL_COUNT; i += 1) {
+        board.set(i, OFFSET_FACE, drawFace(rng, FACE_WEIGHTS));
+        board.set(i, OFFSET_STATE, STATE_IDLE);
+        board.set(i, OFFSET_CHARGE, 0);
+      }
+      state.reshuffles += 1;
+      attempts += 1;
+    }
+    if (attempts >= MAX_RESHUFFLE_ATTEMPTS && isStagnant(board)) {
+      state.conceded = true;
+      return false;
+    }
+
+    const banked = chooseAction(board.observable(), turn);
+    const target = banked >= 0 && banked < CELL_COUNT ? banked : 0;
+
+    const face = board.get(target, OFFSET_FACE);
+    const chargedCells: number[] = [];
+
+    if (face !== EMPTY) {
+      // ── YOU ARE PAID FOR WHAT YOU FEED, NOT FOR WHAT YOU HOLD ──────────
+      //
+      // The rule used to be `face * (1 + charge)` on the banked cell, and
+      // `verify-learnable` proved that rule made the hidden lattice worthless.
+      // Scrambling every link into uniform noise did not reduce a greedy
+      // player's advantage — it slightly INCREASED it (83.4% vs 79.8%) —
+      // because charge lands somewhere regardless of where links point, so
+      // "bank the biggest number" was the whole game.
+      //
+      // Now the payout is the face of the cell the banked cell FEEDS, scaled by
+      // the charge that had accumulated on the cell you banked. To score you
+      // must know where a cell points, and the only way to know is to watch
+      // where charge appeared on earlier turns. That is the inference loop the
+      // game claims to be about, and it is now the one the scoring rewards.
+      //
+      // A dead link still pays the cell's own face, so a board with no live
+      // links is playable but poor — the floor, not a punishment.
+      const charge = board.get(target, OFFSET_CHARGE);
+      const link = board.get(target, OFFSET_LINK);
+      const feedsLive = link !== NO_LINK && board.get(link, OFFSET_FACE) !== EMPTY;
+      // PAYING FOR THE SECOND HOP TOO WAS TRIED AND MEASURED WORSE. Charge
+      // travels two steps, so it was natural to pay for both cells it passes
+      // through — but the second hop is not predictable from one region's flow,
+      // so paying for it added noise the model cannot reduce and inference
+      // value FELL from 4.2% to 2.1%. The payout stays on the hop a player can
+      // actually infer.
+      state.score = feedsLive
+        ? (state.score + board.get(link, OFFSET_FACE) * (1 + charge)) | 0
+        : (state.score + face) | 0;
+
+      board.set(target, OFFSET_FACE, EMPTY);
+      board.set(target, OFFSET_CHARGE, 0);
+      board.set(target, OFFSET_STATE, STATE_SPENT);
+
+      // Discharge along the hidden link: the banked cell feeds the one it links
+      // to. This is the ONLY way charge moves, so every charge the player sees
+      // appear is evidence about the link that produced it.
+      if (feedsLive) {
+        const next = Math.min(board.get(link, OFFSET_CHARGE) + 1, CHARGE_MAX);
+        board.set(link, OFFSET_CHARGE, next);
+        board.set(link, OFFSET_STATE, STATE_CHARGED);
+        chargedCells.push(link);
+
+        // ── THE CHARGE TRAVELS TWO STEPS, NOT ONE ────────────────────────
+        //
+        // With a single hop only one cell gained charge per turn, so the
+        // highest-charge cell almost always dominated the choice and knowing
+        // where cells point rarely changed the pick. verify-learnable measured
+        // the consequence: modelling the lattice was worth a near-constant ~2.4
+        // points a round at 12, 16 and 20 turns — real, but under the 5% design
+        // target however long the round ran.
+        //
+        // A second hop puts two live candidates on the board each turn and
+        // makes the CHAIN, rather than one link, the thing worth knowing. It
+        // also gives the observer two data points per bank instead of one, so
+        // the lattice becomes inferable faster.
+        const second = board.get(link, OFFSET_LINK);
+        if (second !== NO_LINK && second !== target && board.get(second, OFFSET_FACE) !== EMPTY) {
+          const onward = Math.min(board.get(second, OFFSET_CHARGE) + 1, CHARGE_MAX);
+          board.set(second, OFFSET_CHARGE, onward);
+          board.set(second, OFFSET_STATE, STATE_CHARGED);
+          chargedCells.push(second);
+        }
+      }
+    }
+
+    // Refill, from the same fixed weights.
+    let refilled = 0;
+    for (let i = 0; i < CELL_COUNT && refilled < config.refill; i += 1) {
+      if (board.get(i, OFFSET_FACE) === EMPTY) {
+        board.set(i, OFFSET_FACE, drawFace(rng, FACE_WEIGHTS));
+        board.set(i, OFFSET_STATE, STATE_IDLE);
+        refilled += 1;
+      }
+    }
+
+    state.observations.push({ turn, chargedCells, banked: target });
+    state.chained = (state.chained ^ hashState(board.cells)) >>> 0;
+    state.chained = Math.imul(state.chained, 0x01000193) >>> 0;
+    state.turn += 1;
+    return true;
+  }
+}
+
+/** The result of a round, from its state. */
+export function finishRound(state: RoundState): RoundResult {
+  return {
+    score: state.score,
+    turnsPlayed: state.turn,
+    reshuffles: state.reshuffles,
+    conceded: state.conceded,
+    observations: state.observations,
+    digest: state.chained >>> 0,
+    finalLinks: state.board.hiddenLinks(),
+  };
+}
+
+/**
+ * Plays one round to completion against a policy.
  *
  * `chooseAction` is the player. It is handed only what a player can see — the
  * observable board — so a policy CANNOT read the hidden lattice even by
@@ -122,103 +331,12 @@ export function playRound(
   config: RoundConfig,
   chooseAction: (observable: Int32Array, turn: number) => Action,
 ): RoundResult {
-  const board = new Board();
-  generateLattice(board, seed);
-
-  const rng = makeRng(seed ^ 0x5bf03635);
-
-  // ── L1x: the face distribution is fixed here, before the loop, and is const.
-  // No statement inside the turn loop may derive a new weighting.
-  const weights = FACE_WEIGHTS;
-
-  for (let i = 0; i < CELL_COUNT; i += 1) {
-    board.set(i, OFFSET_FACE, drawFace(rng, weights));
-    board.set(i, OFFSET_STATE, STATE_IDLE);
+  const state = beginRound(seed);
+  while (advanceTurn(state, config, chooseAction)) {
+    // advanceTurn owns the loop condition, so the two drivers cannot disagree
+    // about when a round is over.
   }
-
-  let score = 0;
-  let reshuffles = 0;
-  let conceded = false;
-  const observations: Observation[] = [];
-  let chained = 0x811c9dc5;
-
-  let turn = 0;
-  for (; turn < config.turns; turn += 1) {
-    // ── D1: stagnation is detected and answered VISIBLY ────────────────────
-    // Bounded attempts, because a reshuffle cannot rescue every lattice — if a
-    // region's links all point off the board there may be no arrangement of
-    // faces that restores flow. Looping forever would hang; looping silently
-    // would hide it. The round concedes instead and reports how many attempts
-    // it made, so an unplayable lattice shows up as a number rather than as a
-    // freeze.
-    let attempts = 0;
-    while (isStagnant(board) && attempts < MAX_RESHUFFLE_ATTEMPTS) {
-      for (let i = 0; i < CELL_COUNT; i += 1) {
-        board.set(i, OFFSET_FACE, drawFace(rng, weights));
-        board.set(i, OFFSET_STATE, STATE_IDLE);
-        board.set(i, OFFSET_CHARGE, 0);
-      }
-      reshuffles += 1;
-      attempts += 1;
-    }
-    if (attempts >= MAX_RESHUFFLE_ATTEMPTS && isStagnant(board)) {
-      conceded = true;
-      break;
-    }
-
-    const banked = chooseAction(board.observable(), turn);
-    const target = banked >= 0 && banked < CELL_COUNT ? banked : 0;
-
-    const face = board.get(target, OFFSET_FACE);
-    const chargedCells: number[] = [];
-
-    if (face !== EMPTY) {
-      // Score is face value times one plus charge — so a cell that has been fed
-      // by the hidden lattice is worth more. That is the whole incentive to read
-      // the lattice, and it is why w is load-bearing rather than decorative.
-      const charge = board.get(target, OFFSET_CHARGE);
-      score = (score + face * (1 + charge)) | 0;
-
-      board.set(target, OFFSET_FACE, EMPTY);
-      board.set(target, OFFSET_CHARGE, 0);
-      board.set(target, OFFSET_STATE, STATE_SPENT);
-
-      // Discharge along the hidden link: the banked cell feeds the one it links
-      // to. This is the ONLY way charge moves, so every charge the player sees
-      // appear is evidence about the link that produced it.
-      const link = board.get(target, OFFSET_LINK);
-      if (link !== NO_LINK && board.get(link, OFFSET_FACE) !== EMPTY) {
-        const next = Math.min(board.get(link, OFFSET_CHARGE) + 1, CHARGE_MAX);
-        board.set(link, OFFSET_CHARGE, next);
-        board.set(link, OFFSET_STATE, STATE_CHARGED);
-        chargedCells.push(link);
-      }
-    }
-
-    // Refill, from the same fixed weights.
-    let refilled = 0;
-    for (let i = 0; i < CELL_COUNT && refilled < config.refill; i += 1) {
-      if (board.get(i, OFFSET_FACE) === EMPTY) {
-        board.set(i, OFFSET_FACE, drawFace(rng, weights));
-        board.set(i, OFFSET_STATE, STATE_IDLE);
-        refilled += 1;
-      }
-    }
-
-    observations.push({ turn, chargedCells, banked: target });
-    chained = (chained ^ hashState(board.cells)) >>> 0;
-    chained = Math.imul(chained, 0x01000193) >>> 0;
-  }
-
-  return {
-    score,
-    turnsPlayed: turn,
-    reshuffles,
-    conceded,
-    observations,
-    digest: chained >>> 0,
-    finalLinks: board.hiddenLinks(),
-  };
+  return finishRound(state);
 }
 
 /**

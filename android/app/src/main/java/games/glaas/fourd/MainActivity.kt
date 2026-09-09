@@ -46,7 +46,23 @@ class MainActivity : AppCompatActivity() {
                 android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
 
-        webView = WebView(this)
+        // CONSTRUCTING A WebView CAN THROW, and on the devices where it does,
+        // it throws on the very first launch. Android System WebView can be
+        // disabled by the user, removed by some OEM images, or left mid-update
+        // by the Play Store; in every one of those cases `WebView(this)` raises
+        // and an unguarded call takes the process down before a single pixel is
+        // drawn. The user sees a crash dialog, and a reviewer sees an app that
+        // does not open.
+        //
+        // The web page has its own startup failure panel for the case where the
+        // WebView works but the module does not load. This is the case that
+        // panel can never reach, because there is no WebView to render it in.
+        webView = try {
+            WebView(this)
+        } catch (error: Throwable) {
+            setContentView(buildWebViewMissingNotice(error))
+            return
+        }
         setContentView(webView)
 
         // Consume the insets here rather than letting the framework pad the
@@ -174,6 +190,36 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         webView.destroy()
         super.onDestroy()
+    }
+
+    /**
+     * The screen shown when there is no usable WebView.
+     *
+     * Built from plain Android views on purpose — every richer option depends
+     * on the component that is missing. It names the actual remedy rather than
+     * apologising, because "Android System WebView is disabled" is something a
+     * user can fix in about thirty seconds and "something went wrong" is not.
+     */
+    private fun buildWebViewMissingNotice(error: Throwable): android.widget.TextView {
+        return android.widget.TextView(this).apply {
+            val reason = error.message?.take(200) ?: error.javaClass.simpleName
+            text = buildString {
+                append("GLAAS can't start on this device.\n\n")
+                append("The game runs inside Android System WebView, and this device ")
+                append("doesn't have a usable copy of it.\n\n")
+                append("To fix it:\n")
+                append("  1. Open the Play Store\n")
+                append("  2. Search for \"Android System WebView\"\n")
+                append("  3. Enable or update it\n")
+                append("  4. Reopen GLAAS\n\n")
+                append("Details: ").append(reason)
+            }
+            setBackgroundColor(Color.parseColor("#080c12"))
+            setTextColor(Color.parseColor("#e9eef4"))
+            textSize = 15f
+            val pad = (24 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad * 3, pad, pad)
+        }
     }
 
     private companion object {

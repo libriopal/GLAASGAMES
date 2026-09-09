@@ -7,6 +7,7 @@
 //   H1  commit-reveal binds the seed                 (the operator cannot steer)
 //   V1  tokens never leave their cell                (4D rotation, 2D board)
 //   L1x no per-turn face bias                        (the OWC finding, permanent)
+//   L1y the face weights are actually UNIFORM        (found by verify-oracles)
 //   S1  payout === principal, prizes not bond-funded (the economy)
 //
 // Slice 0 exists to prove these five seams hold TOGETHER. Every subsystem is at
@@ -18,8 +19,10 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { Board, CELL_COUNT, EMPTY, NO_LINK, OFFSET_FACE, OFFSET_LINK } from '../../lattice/board.js';
 import { checkReveal, commit, seedFromReveal } from '../../lattice/commit.js';
+import { computeRules } from '../../lattice/ruleset.js';
 import { generateLattice, generateLattice as genLattice } from '../../lattice/lattice-gen.js';
-import { DEFAULT_ROUND, MAX_RESHUFFLE_ATTEMPTS, isStagnant, playRound, verifyRound } from '../../lattice/round.js';
+import { DEFAULT_ROUND, FACE_WEIGHTS, MAX_RESHUFFLE_ATTEMPTS, drawFace, isStagnant, playRound, verifyRound } from '../../lattice/round.js';
+import { makeRng } from '../../engine/sim/world-gen.js';
 import { buildReveal, directionOf, reconstructLattice, scoreInference } from '../../lattice/reveal.js';
 import { linkObservationJoint, mutualInformation } from '../../lattice/information.js';
 import { cellCentre, tileTransform, type BoardLayout } from '../../lattice/tile-transform.js';
@@ -89,25 +92,29 @@ const SEED = 0x3f1a7c05 | 0;
   console.log(`  P1 honesty: hidden lattice carries ${mi.toFixed(3)} bits about what the player can see (randomised control: ${noiseMi.toFixed(3)} bits)`);
 }
 
+// The verifier's OWN rules digest. Every commitment below is checked against
+// this rather than against the operator's claim — see lattice/ruleset.ts.
+const RULES = computeRules().hash;
+
 // ── H1: commit-reveal binds the seed ───────────────────────────────────────
 {
   const serverSeed = 'slice0-server-seed-8f1e';
   const clientSeed = 'player-chosen-4d2a';
-  const c = await commit(serverSeed, clientSeed);
+  const c = await commit(serverSeed, clientSeed, RULES);
 
-  ok(await checkReveal(c, { serverSeed, clientSeed }), 'H1: an honest reveal failed its own commitment');
+  ok(await checkReveal(c, { serverSeed, clientSeed, rulesHash: RULES }, RULES), 'H1: an honest reveal failed its own commitment');
 
   // Negative controls: a changed server seed, and a changed client seed.
-  ok(!(await checkReveal(c, { serverSeed: `${serverSeed}x`, clientSeed })),
+  ok(!(await checkReveal(c, { serverSeed: `${serverSeed}x`, clientSeed, rulesHash: RULES }, RULES)),
     'H1 NEGATIVE CONTROL FAILED: a different server seed satisfied the commitment');
-  ok(!(await checkReveal(c, { serverSeed, clientSeed: 'someone-elses' })),
+  ok(!(await checkReveal(c, { serverSeed, clientSeed: 'someone-elses', rulesHash: RULES }, RULES)),
     'H1 NEGATIVE CONTROL FAILED: a different client seed satisfied the commitment');
 
-  const seedA = await seedFromReveal({ serverSeed, clientSeed });
-  const seedB = await seedFromReveal({ serverSeed, clientSeed });
+  const seedA = await seedFromReveal({ serverSeed, clientSeed, rulesHash: RULES });
+  const seedB = await seedFromReveal({ serverSeed, clientSeed, rulesHash: RULES });
   ok(seedA === seedB, 'H1: the same reveal produced two different seeds');
   ok(Number.isInteger(seedA), `H1: the folded seed is not an integer: ${seedA}`);
-  ok(seedA !== await seedFromReveal({ serverSeed: `${serverSeed}x`, clientSeed }),
+  ok(seedA !== await seedFromReveal({ serverSeed: `${serverSeed}x`, clientSeed, rulesHash: RULES }),
     'H1: two different server seeds folded to the same lattice seed');
   console.log(`  H1 commitment: honest reveal verifies, both tampered reveals rejected, seed folds to i32 ${seedA}`);
 }
@@ -146,8 +153,14 @@ const SEED = 0x3f1a7c05 | 0;
   const source = readFileSync(fileURLToPath(new URL('../../lattice/round.ts', import.meta.url)), 'utf8');
   const code = source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1');
 
-  const loopStart = code.indexOf('for (; turn < config.turns');
-  ok(loopStart > 0, 'L1x: could not locate the turn loop in round.ts, so the scan cannot be trusted');
+  // The anchor is `advanceTurn`, which IS the turn. It used to be the `for`
+  // loop inside playRound; when that loop was extracted so an interactive host
+  // and the policy driver could share one executor, this guard fired and
+  // refused to trust itself rather than silently scanning nothing. That is the
+  // guard working — the anchor is re-pointed here, and the check itself is
+  // unchanged.
+  const loopStart = code.indexOf('export function advanceTurn');
+  ok(loopStart > 0, 'L1x: could not locate advanceTurn in round.ts, so the scan cannot be trusted');
   const loopBody = loopStart > 0 ? code.slice(loopStart) : '';
 
   const banned: readonly (readonly [RegExp, string])[] = [
@@ -167,6 +180,77 @@ const SEED = 0x3f1a7c05 | 0;
   ok(/spawnWeightAdjustment/i.test(`${loopBody}\nspawnWeightAdjustments.face_1 = 3;`),
     'L1x NEGATIVE CONTROL FAILED: the scan cannot detect a planted per-turn face bias');
   console.log(`  L1x immutability: none of the ${banned.length} mid-round weighting patterns appear, and the scan fires on a planted one`);
+}
+
+// ── L1y: the dice are FAIR, not merely un-re-weighted ──────────────────────
+//
+// FOUND BY verify-oracles, WHICH IS WHY THAT FILE EXISTS. The mutation harness
+// loaded the die — FACE_WEIGHTS [0,4,4,4,4,4,4] -> [0,9,4,4,4,4,1], nine times
+// the weight on face 1 and a quarter on face 6 — and L1x above passed without
+// complaint. It was right to: L1x asks whether the weights are RE-DERIVED
+// inside the turn loop, and a loaded constant is not re-derived. It is loaded
+// before the loop starts and then faithfully left alone.
+//
+// So the property actually proven was "the operator cannot change the odds
+// mid-round", and the property everyone assumed was proven was "the odds are
+// fair". Those are different sentences and only the first was ever checked.
+// Under a principal-return bond the second is the one the whole staking
+// argument rests on.
+//
+// Checked two ways, because they fail differently. The static check catches an
+// edited constant; the empirical check catches a bias introduced anywhere
+// downstream of it — in the RNG fold, in the selection arithmetic, in a lookup
+// table — which no amount of reading FACE_WEIGHTS would reveal.
+{
+  // Static: every rollable face carries identical weight.
+  const rollable = FACE_WEIGHTS.slice(1);
+  const first = rollable[0]!;
+  ok(rollable.length === 6, `L1y: ${rollable.length} rollable faces, expected 6`);
+  ok(rollable.every((w) => w === first),
+    `L1y: the face weights are not uniform — ${JSON.stringify([...FACE_WEIGHTS])}. A constant that is never ` +
+      're-derived mid-round is still a loaded die if it was loaded before the round began.');
+  ok(first > 0, 'L1y: the face weight is zero, so no face can ever be rolled');
+
+  // Empirical: the faces that actually reach the board are uniform.
+  // Chi-square with 5 degrees of freedom. The critical value at p=0.001 is
+  // 20.515; a fair generator exceeds it once in a thousand runs, and the seed
+  // is FIXED, so this is a deterministic check rather than a flaky one.
+  const chiSquare = (counts: readonly number[], sampled: number): number => {
+    const expected = sampled / 6;
+    let chi = 0;
+    for (let face = 1; face <= 6; face += 1) chi += ((counts[face]! - expected) ** 2) / expected;
+    return chi;
+  };
+
+  const SAMPLES = 60_000;
+  const rng = makeRng(0x5eed_face | 0);
+  const counts = new Array<number>(7).fill(0);
+  for (let i = 0; i < SAMPLES; i += 1) {
+    const face = drawFace(rng, FACE_WEIGHTS);
+    counts[face] = (counts[face] ?? 0) + 1;
+  }
+  const chi = chiSquare(counts, SAMPLES);
+
+  ok(chi < 20.515,
+    `L1y: ${SAMPLES} draws give chi-square ${chi.toFixed(2)} against a 20.515 critical value at p=0.001 — ` +
+      `the dice are measurably biased. Counts: ${JSON.stringify(counts.slice(1))}`);
+
+  // NEGATIVE CONTROL, and it runs the REAL function rather than arithmetic on a
+  // made-up table. A synthetic control would prove the chi-square formula
+  // works; this proves the whole path — rng, weights, selection — reports a
+  // loaded die as loaded.
+  const loadedRng = makeRng(0x5eed_face | 0);
+  const loadedCounts = new Array<number>(7).fill(0);
+  for (let i = 0; i < SAMPLES; i += 1) {
+    const face = drawFace(loadedRng, [0, 9, 4, 4, 4, 4, 1]);
+    loadedCounts[face] = (loadedCounts[face] ?? 0) + 1;
+  }
+  const loadedChi = chiSquare(loadedCounts, SAMPLES);
+  ok(loadedChi >= 20.515,
+    `L1y NEGATIVE CONTROL FAILED: the exact weights the mutation harness planted ([0,9,4,4,4,4,1]) scored ` +
+      `chi-square ${loadedChi.toFixed(2)}, below the threshold — this check cannot detect the bias it exists for`);
+
+  console.log(`  L1y fairness: weights uniform at ${first}; ${SAMPLES.toLocaleString()} draws give chi-square ${chi.toFixed(2)} (< 20.515), and the harness's loaded die scores ${loadedChi.toFixed(0)}`);
 }
 
 // ── S1: the economy ────────────────────────────────────────────────────────
@@ -235,11 +319,11 @@ const SEED = 0x3f1a7c05 | 0;
 {
   const serverSeed = 'reveal-server-c41f';
   const clientSeed = 'reveal-client-90ab';
-  const c = await commit(serverSeed, clientSeed);
-  const seed = await seedFromReveal({ serverSeed, clientSeed });
+  const c = await commit(serverSeed, clientSeed, RULES);
+  const seed = await seedFromReveal({ serverSeed, clientSeed, rulesHash: RULES });
   const round = playRound(seed, DEFAULT_ROUND, greedy);
 
-  const revealed = await buildReveal(c, { serverSeed, clientSeed }, seed);
+  const revealed = await buildReveal(c, { serverSeed, clientSeed, rulesHash: RULES }, seed, RULES);
   ok(revealed.commitmentHolds, 'P2: the reveal did not satisfy the commitment published before the round');
 
   // The reveal must reconstruct EXACTLY the lattice the round was played on,
@@ -363,9 +447,9 @@ const SEED = 0x3f1a7c05 | 0;
 {
   const serverSeed = 'integration-server';
   const clientSeed = 'integration-client';
-  const c = await commit(serverSeed, clientSeed);
-  ok(await checkReveal(c, { serverSeed, clientSeed }), 'integration: reveal failed');
-  const seed = await seedFromReveal({ serverSeed, clientSeed });
+  const c = await commit(serverSeed, clientSeed, RULES);
+  ok(await checkReveal(c, { serverSeed, clientSeed, rulesHash: RULES }, RULES), 'integration: reveal failed');
+  const seed = await seedFromReveal({ serverSeed, clientSeed, rulesHash: RULES });
 
   const actions: number[] = [];
   const played = playRound(seed, DEFAULT_ROUND, (observable, turn) => {
