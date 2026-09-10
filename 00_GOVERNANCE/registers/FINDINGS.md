@@ -647,3 +647,129 @@ MC-VETO — the retraction is itself VETOED by the independent audit
                      under §5.4 it may not widen scope to a twelve-item
                      remediation without a Tier 1 instruction. Both await the
                      human at the HITL gate.
+
+────────────────────────────────────────────────────────────────────────────────
+MC-C2 — cycle 2: the suite now searches for the rung the author missed
+────────────────────────────────────────────────────────────────────────────────
+
+  LANDED:            `foundry/montecarlo/siblings.ts` (NEW — generated grammar of
+                     memoryless trivial policies); `searchSiblings()` in
+                     harness.ts; M10 SIBLING SEARCH and M11 LEARNER FLOOR in
+                     verify-montecarlo.ts; corrected ladder and inference control.
+
+  REPRODUCED FIRST:  The veto's numbers were re-derived locally before being acted
+                     on, per §1 of MASTER_EXECUTION_PROMPT.md. 400 paired seeds:
+                       S1 CONFIRMED to the decimal — nbrSum 79.87 vs the declared
+                          best trivial 70.90 (+8.97 +-2.37).
+                       S2 CONFIRMED — learner-minus-inverted +11.54, but
+                          learner-minus-NO-BELIEF only +4.30 +-1.59.
+                       S5 CONFIRMED, and it falsifies a claim this register made.
+                       S3 NOT REPRODUCED — the auditor's `learnerPlus` reached the
+                          oracle (+0.49); mine scores -10.74 below it. No code was
+                          supplied. Disposition per the phase-2 audit: REJECT as
+                          unverifiable, burden of proof on the auditor. OPEN.
+
+  THE STRUCTURAL FIX The auditor's own conclusion was that a better rung is not
+  AND WHAT IT IS     the fix: "no ladder rung may be published without a search
+  NOT:               for a stronger sibling THAT THE SUITE ITSELF RUNS."
+                     `siblings.ts` enumerates a grammar (7 base terms x 3
+                     multipliers = 21 memoryless one-liners) and M10 asserts none
+                     beats the declared best trivial by more than its own 95%
+                     interval.
+
+                     ON ITS FIRST RUN IT FOUND A RUNG BETTER THAN EITHER HUMAN
+                     PASS HAD: `expPayout` at 77.52, ahead of the auditor's
+                     hand-found `nbrSum` at 76.10 and the author's declared rung
+                     at 68.1.
+
+                     The phase-2 audit was asked whether this closes the failure
+                     mode and said NO, and that answer is kept in the file rather
+                     than softened: "It is a relabelling... it cannot catch errors
+                     in functional form (e.g. non-linearities like sqrt or log),
+                     temporal dependencies, or complex conditional logic. You have
+                     moved from 'missing a rung' to MISSING A LADDER TYPE." The
+                     claim M10 supports is therefore narrow and exact: no policy
+                     IN THE DECLARED GRAMMAR beats the declared rung.
+
+  SEEN TO FAIL:      Both new checks were written and observed RED before any fix:
+                       M10: "3 machine-generated TRIVIAL policies beat the
+                            ladder's declared best trivial rung" — expPayout
+                            +9.45 +-4.91, nbrSum x(1+charge) +8.03, expPayout
+                            x(1+charge) +7.32.
+                       M11: "the learner scores 70.25 but the strongest
+                            MACHINE-GENERATED trivial policy scores 77.52."
+                     M10 then failed a SECOND time for the right reason: its first
+                     draft re-implemented the declared rung inline, so it audited
+                     a COPY the ladder no longer used and stayed red after the fix
+                     landed. `declaredBestTrivial` is now exported from the
+                     harness so the check cannot drift from the thing it audits.
+
+  SEEN TO PASS:      verify-montecarlo M0-M11 exit 0 at 60 and at 240 seeds;
+                     `verify:suite` 19 checks, coverage closed; tsc clean.
+
+  HEADLINE, THIRD    blind 41.6 / greedy 45.4 / charge 63.7 / nbr 70.2 /
+  REVISION (240      EXP-PAYOUT 78.0 / LEARNER 84.4 / region-oracle 86.9 /
+  seeds):            omniscient 97.9.
+                     The hidden lattice is worth 8.9 points over the best trivial
+                     policy. Previously published: ~1.4 (round 1), 20.2 (round 2).
+                     At 60 seeds this same figure reads 10.8, so it is still
+                     drifting down with sample size exactly as the auditor said —
+                     revision 12 (pin it with a CI) is NOT yet done and the number
+                     must not be treated as settled.
+
+  INFERENCE VALUE    6.4 points at 240 seeds (learner minus the SAME learner with
+  RE-SPECIFIED:      its belief switched off). The retracted figure, 9.5, used
+                     learner-minus-INVERTED, which reads 16.4 here and is kept
+                     only as a labelled upper bound. Inverting is strictly worse
+                     than not knowing, because the inverted direction is the one
+                     guaranteed not to be the link more often than chance.
+
+  THE FINDING KEPT   On an unlearnable board the belief is worth -3.0 points. The
+  RATHER THAN FIXED: learner tallies a modal direction out of pure noise and acts
+                     on it, LOSING against not believing. The phase-2 audit was
+                     asked whether to fix this and said: "Keep and report. S2b is
+                     a critical diagnostic of the learner's propensity to overfit
+                     noise. Changing the learner to 'fix' this would mask a
+                     fundamental architectural weakness." It is the apophenia
+                     hazard `lattice-gen.ts` gives as the safety rationale for the
+                     whole design, measured inside the instrument built to find it.
+
+                     M7's negative control was re-specified because of it. It used
+                     to demand |value| ~ 0 and FAILED at -4.47; the failure was
+                     correct information and the assertion was wrong. The property
+                     is MUST NOT PAY, not must be zero.
+
+  A CLAIM RETRACTED  "charge never exceeds 2 under real play, so CHARGE_MAX of 3
+  IN SOURCE:         NEVER BINDS" was false and is corrected in variants.ts with
+                     the histogram. It binds under every policy EXCEPT
+                     `chargeAware`, the one it was measured under — which banks
+                     the most-charged cell every turn and structurally cannot
+                     reach the cap. Same error shape as measuring `refill` with a
+                     policy that never empties a second cell.
+
+  VACUOUS CHECK:     Guarded by the audit, not by the author. The phase-2 auditor
+                     VETOED the proposed fix and named the Winner's Curse: "the
+                     maximum of N noisy estimates is biased upward, leading to
+                     frequent non-deterministic build failures." M10 therefore
+                     requires a sibling to beat the declared rung by more than its
+                     own 95% paired interval, rather than by any margin at all.
+                     It also named TRIVIAL INFLATION — the check is satisfiable by
+                     declaring an absurdly strong policy "trivial". Guarded
+                     structurally: `TrivialScore` takes `(observable, cell)` and
+                     has NO memory parameter, so every member of the space is
+                     memoryless BY TYPE and the compiler refuses anything else.
+
+  DISAGREEMENT:      With the auditor on S3 (see above) — not reproduced, not
+                     adopted, recorded open.
+
+  NOT DONE — 7 of    Revisions 2 (CI on the headline), 6 (rename regionOracle /
+  the 12 REQUIRED    stop calling it a ceiling), 7 (interval test for the
+  REVISIONS REMAIN:  degeneracy gate), 8 (never rank by skillDepth when it equals
+                     dominance), 10 (M8 probe under two policies), 11 (stop
+                     claiming 69 distinct GAMES on digest evidence alone), and 12
+                     (publish CIs, pin the headline so drift fails the build).
+
+                     Five are done, plus the two checks the audit called the
+                     highest-severity missing items. The remaining seven are
+                     carried, not closed. Nothing here marks a governance finding
+                     resolved — that is Tier 1.

@@ -39,12 +39,15 @@ import {
   loadedIds,
 } from '../../foundry/montecarlo/variants.js';
 import {
+  declaredBestTrivial,
   detectionRate,
   evaluate,
+  searchSiblings,
   faceSampleSize,
   faceUniformityChiSquare,
   sampleFaces,
 } from '../../foundry/montecarlo/harness.js';
+import { BASE_TERMS, MULTIPLIER_TERMS, siblings } from '../../foundry/montecarlo/siblings.js';
 import { CELL_COUNT, EMPTY } from '../../lattice/board.js';
 import { DEFAULT_ROUND, playRound } from '../../lattice/round.js';
 
@@ -150,7 +153,7 @@ const CHI_CRITICAL = 20.515;
   // to charge-chasing flattered it: X-MC8 found a no-memory neighbour heuristic
   // that beats charge-chasing by 7 points, and every ratio taken against the
   // weaker baseline overstated how much of the game inference explains.
-  const bestTrivial = Math.max(m.greedy, m.chargeAware, m.neighbourAware);
+  const bestTrivial = Math.max(m.greedy, m.chargeAware, m.neighbourAware, m.expectedPayout);
   ok(m.regionOracle > bestTrivial,
     `M0: the region oracle (${m.regionOracle.toFixed(1)}) does not exceed the best TRIVIAL policy ` +
       `(${bestTrivial.toFixed(1)}) — if knowing the flows buys nothing over a one-liner, the ` +
@@ -162,8 +165,9 @@ const CHI_CRITICAL = 20.515;
   ok(m.faceChiSquare < CHI_CRITICAL,
     `M0: the SHIPPED game fails its own fairness gate (chi-square ${m.faceChiSquare.toFixed(1)})`);
   console.log(`  M0 calibration: blind ${m.blind.toFixed(1)}, greedy ${m.greedy.toFixed(1)}, ` +
-    `charge ${m.chargeAware.toFixed(1)}, NEIGHBOUR ${m.neighbourAware.toFixed(1)}, ` +
-    `LEARNER ${m.regionFlow.toFixed(1)} (scrambled ${m.regionFlowScrambled.toFixed(1)}), ` +
+    `charge ${m.chargeAware.toFixed(1)}, nbr ${m.neighbourAware.toFixed(1)}, ` +
+    `EXP-PAYOUT ${m.expectedPayout.toFixed(1)}, LEARNER ${m.regionFlow.toFixed(1)} ` +
+    `(no-belief ${m.regionFlowNoBelief.toFixed(1)}), ` +
     `region-oracle ${m.regionOracle.toFixed(1)}, omniscient ${m.clairvoyant.toFixed(1)}`);
   console.log(`                 the hidden lattice is worth ${(m.regionOracle - bestTrivial).toFixed(1)} points ` +
     'over the best trivial policy — the quantity the retracted headline put at ~1.4');
@@ -194,14 +198,15 @@ const CHI_CRITICAL = 20.515;
       'policy and can only lose to it by acting on beliefs that are worse than nothing.');
 
   ok(m.inferenceValue > 3,
-    `M7: inverting the learner's belief costs only ${m.inferenceValue.toFixed(2)} points. A belief ` +
+    `M7: switching the learner's belief OFF costs only ${m.inferenceValue.toFixed(2)} points. A belief ` +
       'that is nearly as good upside down is not carrying information, and whatever the rung is ' +
       'gaining is coming from the shape of the scoring function — which is exactly the artifact ' +
       'that made the first two versions of this ladder wrong.');
 
   console.log(`  M7 the belief is load-bearing: learner ${m.regionFlow.toFixed(1)}, same rung with ` +
-    `its belief INVERTED ${m.regionFlowScrambled.toFixed(1)} — inference is worth ` +
-    `${m.inferenceValue.toFixed(1)} points`);
+    `its belief OFF ${m.regionFlowNoBelief.toFixed(1)} — inference is worth ` +
+    `${m.inferenceValue.toFixed(1)} points (inverting it would read ` +
+    `${m.inferenceUpperBound.toFixed(1)}, an upper bound the audit showed is ~2.7x too large)`);
 
   // NEGATIVE CONTROL: on a lattice with NO region structure, inverting a belief
   // about region structure must cost NOTHING. An effect claimed must be shown to
@@ -210,14 +215,43 @@ const CHI_CRITICAL = 20.515;
     { id: 'ctl', axis: 'control', note: 'deviation 1 — no region structure', config: { turns: 12, refill: 4, deviation: 1 } },
     SEEDS,
   );
-  ok(Math.abs(noise.inferenceValue) < m.inferenceValue / 2,
-    `M7 NEGATIVE CONTROL FAILED: on a lattice with NO region structure (deviation 1), inverting ` +
-      `the belief still moves the score by ${noise.inferenceValue.toFixed(2)} points, against ` +
-      `${m.inferenceValue.toFixed(2)} on the structured board. There is no region flow to be right ` +
-      'or wrong about there, so this must be ~0. If it is not, the rung is responding to something ' +
-      'other than the lattice.');
-  console.log(`  M7 control: on an unlearnable lattice the same inversion costs ` +
-    `${noise.inferenceValue.toFixed(1)} points — the effect vanishes where it cannot exist`);
+  // THE PROPERTY IS "MUST NOT PAY", NOT "MUST BE ZERO", and the difference is a
+  // finding rather than a tolerance.
+  //
+  // The first version of this control asserted |value| < half the structured
+  // value. It FAILED at -4.47, and the failure was correct information: on a
+  // board whose links ignore their region there is nothing to infer, so the
+  // learner's tally is pure noise — and acting on it costs 4.47 points against
+  // simply not believing. The instrument was right and the assertion was wrong.
+  //
+  // The independent audit was asked whether the learner should be changed to
+  // remove this, and said no: "Keep and report. S2b is a critical diagnostic of
+  // the learner's propensity to overfit noise. Changing the learner to 'fix'
+  // this would mask a fundamental architectural weakness."
+  //
+  // So the assertion is the one that can only be satisfied honestly: on a board
+  // with no structure, the belief must not PAY. A learner that gained there
+  // would be reading a pattern that is not present — which is precisely the
+  // apophenia hazard `lattice-gen.ts` gives as the safety rationale for making
+  // the lattice structured in the first place.
+  const NOISE_TOLERANCE = 1.0;
+  ok(noise.inferenceValue < NOISE_TOLERANCE,
+    `M7 NEGATIVE CONTROL FAILED: on a lattice with NO region structure (deviation 1) the belief ` +
+      `PAYS ${noise.inferenceValue.toFixed(2)} points. There is nothing there to be right about, so ` +
+      'a positive value means the rung is responding to something other than the lattice — or that ' +
+      'the deviation-1 board is not as structureless as it is supposed to be.');
+
+  // And the cost, reported rather than hidden. This is a property of the LEARNER,
+  // not of the game, and it is deliberately left in.
+  ok(noise.inferenceValue <= 0,
+    `M7: the apophenia cost is now ${noise.inferenceValue.toFixed(2)}, i.e. non-negative. That is ` +
+      'a CHANGE worth noticing rather than an error — it would mean the learner stopped being ' +
+      'harmed by acting on noise, and the claim should be re-derived rather than assumed.');
+  console.log(`  M7 control: on an unlearnable lattice the belief is worth ` +
+    `${noise.inferenceValue.toFixed(1)} points — NEGATIVE, and reported rather than fixed. The ` +
+    'learner tallies a modal direction out of pure noise and acts on it, losing points against ' +
+    'simply not believing. That is the apophenia failure lattice-gen.ts names as the safety ' +
+    'rationale for the whole design, measured here inside the instrument built to look for it.');
 }
 
 // ── M2 / M3 / M4: the sweep ────────────────────────────────────────────────
@@ -357,6 +391,72 @@ const CHI_CRITICAL = 20.515;
   ok(strongPower >= 0.99,
     `M9: a clearly top-heavy distribution is caught in only ${(strongPower * 100).toFixed(0)}% of ` +
       'trials — the gate is not reliable on the cases it is supposed to be reliable on');
+}
+
+// ── M10: THE SIBLING SEARCH ────────────────────────────────────────────────
+// The suite looks for a stronger trivial policy so the author does not have to.
+// This ladder has been published wrong three times and every time the cause was
+// the same: a trivial rung nobody tried.
+//
+// THE MARGIN IS NOT SLOP, IT IS THE WINNER'S CURSE. The independent audit:
+//
+//   "The 'Winner's Curse' (look-elsewhere effect) will cause the maximum of N
+//    noisy estimates to be biased upward, leading to frequent, non-deterministic
+//    build failures when the declared policy is statistically tied with a
+//    sibling. You must implement a Bonferroni correction or... an assertion of
+//    Score(declared) > max(Score(siblings)) - k * SE."
+//
+// Taking a maximum over ~21 noisy estimates biases it upward, so a bare `>`
+// would go red on ties and get switched off. A sibling must beat the declared
+// rung by more than its own 95% interval before the build fails.
+{
+  const m = evaluate(BASELINE, SEEDS);
+  const declaredBest = Math.max(m.greedy, m.chargeAware, m.neighbourAware, m.expectedPayout);
+
+  const found = searchSiblings(DEFAULT_ROUND, SEEDS, declaredBestTrivial);
+  const expected = BASE_TERMS.length * MULTIPLIER_TERMS.length;
+  ok(siblings().length === expected,
+    `M10: the grammar generated ${siblings().length} policies, expected ${expected} — the space ` +
+      'is pinned so that widening it is a number somebody has to defend');
+
+  const beaten = found.filter((f) => f.deltaVsDeclared - f.ci95 > 0);
+  ok(beaten.length === 0,
+    `M10 SIBLING SEARCH: ${beaten.length} machine-generated TRIVIAL policies beat the ladder's ` +
+      `declared best trivial rung by more than their own 95% interval. Strongest: ` +
+      beaten.slice(0, 3).map((b) => `${b.id} (+${b.deltaVsDeclared.toFixed(2)} +-${b.ci95.toFixed(2)})`).join(', ') +
+      '. Every published number that normalises against the trivial baseline is overstated by ' +
+      'that margin. This is the third time this ladder has missed a trivial rung.');
+
+  console.log(`  M10 sibling search: ${found.length} generated trivial policies played over ${SEEDS} ` +
+    `paired seeds; declared best trivial ${declaredBest.toFixed(1)}`);
+  for (const f of found.slice(0, 3)) {
+    console.log(`      ${f.id.padEnd(22)} ${f.mean.toFixed(2)}  delta ${f.deltaVsDeclared >= 0 ? '+' : ''}` +
+      `${f.deltaVsDeclared.toFixed(2)} +-${f.ci95.toFixed(2)}`);
+  }
+}
+
+// ── M11: THE LEARNER FLOOR ─────────────────────────────────────────────────
+// The audit's answer to "what is the highest-severity thing MISSING":
+//
+//   "The current solution only ensures that your 'trivial' baseline is
+//    internally consistent. It does nothing to ensure the learner is actually
+//    performing useful inference... If the learner cannot outperform the best
+//    policy in your generative trivial space, the learner has failed."
+//
+// M7 asserts the learner beats the rungs the AUTHOR wrote. M11 asserts it beats
+// every rung the MACHINE can write. Those are different claims and only the
+// second one is safe from the failure that has happened three times.
+{
+  const m = evaluate(BASELINE, SEEDS);
+  const strongest = searchSiblings(DEFAULT_ROUND, SEEDS, () => 0)
+    .reduce((a, b) => (a.mean > b.mean ? a : b));
+  ok(m.regionFlow > strongest.mean,
+    `M11 LEARNER FLOOR: the learner scores ${m.regionFlow.toFixed(2)} but the strongest ` +
+      `MACHINE-GENERATED trivial policy (${strongest.id}) scores ${strongest.mean.toFixed(2)}. ` +
+      'A learner that cannot beat a memoryless one-liner is not performing inference, and every ' +
+      'skill number derived from it is measuring something else.');
+  console.log(`  M11 learner floor: learner ${m.regionFlow.toFixed(2)} vs strongest generated ` +
+    `trivial ${strongest.id} ${strongest.mean.toFixed(2)}`);
 }
 
 // ── M6: the controls ───────────────────────────────────────────────────────

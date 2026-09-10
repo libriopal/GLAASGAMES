@@ -37,11 +37,27 @@
 //               65.4 at deviation 1 / 2 / 4 / 8 / 64). LIVE.
 //   faceWeights THE FAIRNESS KNOB. Uniform is shipped. LIVE.
 //   chargeMax   Charge is the payout multiplier, so this is how deep the reward
-//               for waiting goes. LIVE BUT NEARLY BINARY: measured, charge never
-//               exceeds 2 under real play, so 2, 3, 5 and 8 are the same game and
-//               only 1 differs (58.3 against 64.6). The shipped CHARGE_MAX of 3
-//               NEVER BINDS. Swept only as {1, default} for that reason, and the
-//               finding is recorded rather than papered over.
+//               for waiting goes. LIVE, and swept as {1, default}.
+//
+//               ── A CLAIM THAT WAS HERE AND WAS FALSE ─────────────────────────
+//               This comment used to read "charge never exceeds 2 under real
+//               play, so the shipped CHARGE_MAX of 3 NEVER BINDS." That is
+//               wrong, and the way it went wrong is worth keeping.
+//
+//               It was measured under `chargeAware` — the one policy that banks
+//               the most-charged cell every turn and therefore STRUCTURALLY
+//               CANNOT let charge reach the cap. Charge histogram over observed
+//               cells, 300 seeds, shipped config:
+//
+//                 chargeAware    3: 0.00%   MAX 2   <- what the claim was measured on
+//                 neighbourMean  3: 0.07%   MAX 3
+//                 neighbourSum   3: 0.14%   MAX 3
+//                 learner        3: 0.20%   MAX 3
+//
+//               The cap binds under every policy EXCEPT the one used to test it.
+//               A property measured through an instrument that cannot exhibit it
+//               will always read absent — the same error as measuring `refill`
+//               with a policy that never empties a second cell.
 //
 // Board size and region size are still NOT swept: both are compile-time
 // constants the shipped renderer, the GL instance buffer and four oracles depend

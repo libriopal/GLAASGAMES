@@ -92,6 +92,7 @@ import { BOARD_H, BOARD_W, CELL_COUNT, EMPTY, NO_LINK } from '../../lattice/boar
 import { type RoundConfig, drawFace, playRound } from '../../lattice/round.js';
 import { REGION, regionFlows } from '../../lattice/lattice-gen.js';
 import { makeRng } from '../../engine/sim/world-gen.js';
+import { type Sibling, asPolicy, siblings } from './siblings.js';
 
 /** A candidate variant: a name, an axis it probes, and the config it means. */
 export interface Variant {
@@ -108,8 +109,12 @@ export interface VariantMetrics {
   readonly blind: number;
   readonly greedy: number;
   readonly chargeAware: number;
-  /** "Bank next to big numbers." The STRONGEST TRIVIAL policy. */
+  /** "Bank next to big numbers." */
   readonly neighbourAware: number;
+  /** Expected payout under the real rule. The strongest trivial rung found. */
+  readonly expectedPayout: number;
+  /** The learner with its belief switched off — the honest inference control. */
+  readonly regionFlowNoBelief: number;
   /** The learner: infers region flow from the charge trail. */
   readonly regionFlow: number;
   /** The learner with its belief inverted. The control that prices inference. */
@@ -154,11 +159,15 @@ export interface VariantMetrics {
   /** How many faces that statistic was computed over. Power is a function of it. */
   readonly faceSamples: number;
   /**
-   * learner − scrambled learner. THE PRICE OF THE BELIEF, and the only number
-   * here that isolates inference from the shape of the scoring function.
-   * Must collapse to ~0 on a lattice with no region structure.
+   * learner − the SAME learner with its belief switched off.
+   *
+   * Not learner − inverted, which the independent audit showed overstates by
+   * ~2.7x because inverting is strictly worse than not knowing. Must collapse to
+   * ~0 — or go NEGATIVE — on a lattice with no region structure.
    */
   readonly inferenceValue: number;
+  /** learner − inverted learner. A labelled UPPER BOUND, never the headline. */
+  readonly inferenceUpperBound: number;
   /** Score spread across seeds for a FIXED policy — seed luck vs skill. */
   readonly seedVariance: number;
 }
@@ -278,6 +287,50 @@ function neighbourMean(o: Int32Array, c: number): number {
 const neighbourAware: Policy = (o) => argmax(o, (c) => neighbourMean(o, c) * (1 + chargeAt(o, c)));
 
 /**
+ * Expected payout under the REAL rule, with a uniform prior over which of the
+ * four directions is the link. A dead or off-board direction pays the cell's own
+ * face, exactly as `advanceTurn` does.
+ *
+ * ── THE MACHINE FOUND THIS ONE, NOT THE AUTHOR ──────────────────────────────
+ *
+ * `siblings.ts` enumerates a grammar of memoryless one-liners and plays them.
+ * On its FIRST run it returned `expPayout` at 77.52 against the author's
+ * declared best trivial rung at 68.1 — and ahead of `nbrSum` (76.10), which was
+ * the rung the independent auditor had found by hand. Two adversarial passes
+ * found two different rungs the author missed; the enumerated search found a
+ * better one than either, immediately.
+ *
+ * That is the argument for M10 existing. It is also why the learner below falls
+ * back to THIS estimate: a learner measured against a baseline weaker than the
+ * one a machine can write in a second is not measuring inference.
+ */
+const expectedPayoutOf = (o: Int32Array, c: number): number => {
+  let acc = 0;
+  for (let d = 0; d < 4; d += 1) {
+    const t = step(c, d);
+    acc += t >= 0 && faceAt(o, t) !== EMPTY
+      ? faceAt(o, t) * (1 + chargeAt(o, c))
+      : faceAt(o, c);
+  }
+  return acc / 4;
+};
+
+/** Rung 3b — the strongest trivial policy the generated grammar contains. */
+const expectedPayout: Policy = (o) => argmax(o, (c) => expectedPayoutOf(o, c));
+
+/**
+ * THE LADDER'S DECLARED BEST TRIVIAL POLICY, exported so the sibling search
+ * cannot drift from it.
+ *
+ * M10's first draft re-implemented the declared rung inline, which meant the
+ * check compared the grammar against a COPY that the ladder no longer used —
+ * it stayed red after the ladder was fixed, for the wrong reason. A check that
+ * duplicates the thing it audits will eventually audit the duplicate.
+ */
+export const declaredBestTrivial: (o: Int32Array) => number =
+  (o) => expectedPayout(o, null, { tally: [], flows: null, lastBanked: -1 });
+
+/**
  * How many agreeing observations before a region's flow is trusted.
  *
  * Measured, not chosen: 1 scores 74.1, 2 scores 72.8, 3 scores 72.2. Acting on
@@ -309,7 +362,26 @@ const CONFIDENCE = 1;
  *            between them is inference and nothing else.
  */
 const regionFlow: Policy = (o, _links, mem) =>
-  argmax(o, (c) => valueUnderBelief(o, c, mem, false));
+  argmax(o, (c) => valueUnderBelief(o, c, mem, 'true'));
+
+/**
+ * Rung 4'' — THE CONTROL THAT SHOULD ALWAYS HAVE BEEN THE CONTROL.
+ *
+ * The same policy with its belief switched OFF, so it falls back to
+ * `expectedPayout` everywhere. `learner - this` is the honest value of the
+ * belief, and it is what `inferenceValue` now reports.
+ *
+ * The published figure used `learner - INVERTED` instead, which the independent
+ * audit showed is ~2.7x too large: inverting a belief is strictly worse than
+ * holding none, because on this board the link is always one of the four
+ * neighbours and the inverted direction is the one guaranteed NOT to be it more
+ * often than chance. Reproduced locally at 400 paired seeds: learner minus
+ * inverted +11.54, learner minus random +6.99, learner minus no-belief +4.30.
+ * The inverted arm survives below as a labelled UPPER BOUND, never as the
+ * headline.
+ */
+const regionFlowNoBelief: Policy = (o, _links, mem) =>
+  argmax(o, (c) => valueUnderBelief(o, c, mem, 'none'));
 
 /**
  * Rung 4' — THE SCRAMBLED CONTROL. Learns exactly as much, then believes the
@@ -323,21 +395,31 @@ const regionFlow: Policy = (o, _links, mem) =>
  * also be shown to vanish where it cannot exist.
  */
 const regionFlowScrambled: Policy = (o, _links, mem) =>
-  argmax(o, (c) => valueUnderBelief(o, c, mem, true));
+  argmax(o, (c) => valueUnderBelief(o, c, mem, 'inverted'));
 
-function valueUnderBelief(o: Int32Array, c: number, mem: Memory, invert: boolean): number {
-  const fallback = neighbourMean(o, c);
+function valueUnderBelief(
+  o: Int32Array,
+  c: number,
+  mem: Memory,
+  mode: 'true' | 'inverted' | 'none',
+): number {
+  // THE FALLBACK IS THE BEST TRIVIAL ESTIMATE, NOT A WEAKER ONE. This is what
+  // makes the learner a strict SUPERSET of `expectedPayout`, so the gap between
+  // them is inference and nothing else. Falling back to `neighbourMean` — a rung
+  // a generated one-liner beats by ~9 points — meant the "value of inference"
+  // was partly just the fallback being bad at arithmetic.
+  const fallback = expectedPayoutOf(o, c);
+  if (mode === 'none') return fallback;
   const t = mem.tally[regionOf(c)]!;
   let bd = -1;
   let bv = 0;
   for (let d = 0; d < 4; d += 1) if (t[d]! > bv) { bv = t[d]!; bd = d; }
-  let expected = fallback;
-  if (bd >= 0 && bv >= CONFIDENCE) {
-    const use = invert ? (bd + 2) % 4 : bd;
-    const tgt = step(c, use);
-    expected = tgt >= 0 && faceAt(o, tgt) !== EMPTY ? faceAt(o, tgt) : fallback;
-  }
-  return expected * (1 + chargeAt(o, c));
+  if (bd < 0 || bv < CONFIDENCE) return fallback;
+  const use = mode === 'inverted' ? (bd + 2) % 4 : bd;
+  const tgt = step(c, use);
+  return tgt >= 0 && faceAt(o, tgt) !== EMPTY
+    ? faceAt(o, tgt) * (1 + chargeAt(o, c))
+    : fallback;
 }
 
 /**
@@ -527,7 +609,9 @@ export function evaluate(v: Variant, seeds: number): VariantMetrics {
   const g = run(greedy, 'none');
   const c = run(chargeAware, 'none');
   const na = run(neighbourAware, 'none');
+  const ep = run(expectedPayout, 'none');
   const rf = run(regionFlow, 'none');
+  const rn = run(regionFlowNoBelief, 'none');
   const rs = run(regionFlowScrambled, 'none');
   const ro = run(regionOracle, 'flows');
   const cl = run(clairvoyant, 'links');
@@ -536,7 +620,9 @@ export function evaluate(v: Variant, seeds: number): VariantMetrics {
   const mg = mean(g.scores);
   const mc = mean(c.scores);
   const mna = mean(na.scores);
+  const mep = mean(ep.scores);
   const mrf = mean(rf.scores);
+  const mrn = mean(rn.scores);
   const mrs = mean(rs.scores);
   const mro = mean(ro.scores);
   const mcl = mean(cl.scores);
@@ -544,7 +630,7 @@ export function evaluate(v: Variant, seeds: number): VariantMetrics {
   // The inferable span is the denominator. See X-MC3.
   const inferable = mro - mb;
   const absolute = mcl - mb;
-  const bestTrivial = Math.max(mg, mc, mna);
+  const bestTrivial = Math.max(mg, mc, mna, mep);
   const bestLearnable = Math.max(mrf, bestTrivial);
 
   // A span below this means knowing every region flow buys less than a point
@@ -561,7 +647,9 @@ export function evaluate(v: Variant, seeds: number): VariantMetrics {
     greedy: mg,
     chargeAware: mc,
     neighbourAware: mna,
+    expectedPayout: mep,
     regionFlow: mrf,
+    regionFlowNoBelief: mrn,
     regionFlowScrambled: mrs,
     regionOracle: mro,
     clairvoyant: mcl,
@@ -575,10 +663,64 @@ export function evaluate(v: Variant, seeds: number): VariantMetrics {
     headroom: mro - bestTrivial <= 0 ? 0 : (bestLearnable - bestTrivial) / (mro - bestTrivial),
     inferableSpan: span,
     degenerate: span < DEGENERATE_SPAN,
-    inferenceValue: mrf - mrs,
+    inferenceValue: mrf - mrn,
+    inferenceUpperBound: mrf - mrs,
     stagnation: rf.conceded,
     faceChiSquare: faceUniformityChiSquare(faces),
     faceSamples: n,
     seedVariance: stdev(rf.scores),
   };
+}
+
+// ── THE SIBLING SEARCH ──────────────────────────────────────────────────────
+// See `siblings.ts` for why this exists and, more importantly, for what it
+// cannot catch.
+
+export interface SiblingResult {
+  readonly id: string;
+  readonly mean: number;
+  /** Paired difference against the ladder's declared best trivial rung. */
+  readonly deltaVsDeclared: number;
+  /** 95% half-width of that paired difference. */
+  readonly ci95: number;
+}
+
+/**
+ * Plays every generated sibling on the same seeds as the declared best trivial
+ * policy, and reports PAIRED differences.
+ *
+ * PAIRED, because the seeds are the dominant source of variance here and an
+ * unpaired comparison would drown an 8-point effect in seed luck.
+ */
+export function searchSiblings(
+  config: RoundConfig,
+  seeds: number,
+  declared: (o: Int32Array) => number,
+): readonly SiblingResult[] {
+  const runPolicy = (p: (o: Int32Array) => number): number[] => {
+    const out: number[] = [];
+    for (let s = 1; s <= seeds; s += 1) {
+      out.push(playRound(s, config, (o) => p(o)).score);
+    }
+    return out;
+  };
+
+  const base = runPolicy(declared);
+  const out: SiblingResult[] = [];
+  for (const sib of siblings() as readonly Sibling[]) {
+    const mine = runPolicy(asPolicy(sib.score));
+    const diffs = mine.map((v, i) => v - base[i]!);
+    const m = mean(diffs);
+    // Standard error of the paired mean, then the 95% half-width.
+    const sd = Math.sqrt(
+      diffs.reduce((a, d) => a + (d - m) ** 2, 0) / Math.max(1, diffs.length - 1),
+    );
+    out.push({
+      id: sib.id,
+      mean: mean(mine),
+      deltaVsDeclared: m,
+      ci95: 1.96 * sd / Math.sqrt(diffs.length),
+    });
+  }
+  return out.sort((a, b) => b.deltaVsDeclared - a.deltaVsDeclared);
 }
