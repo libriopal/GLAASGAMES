@@ -502,3 +502,148 @@ BOOT-001 — master execution prompt, synthesized and independently audited
   STILL OPEN:        The MC-RETRACTION independent audit remains OWED. A second
                      evaluator is running at the time of writing and has not
                      returned. Under §3 that claim is not closed.
+
+────────────────────────────────────────────────────────────────────────────────
+MC-VETO — the retraction is itself VETOED by the independent audit
+────────────────────────────────────────────────────────────────────────────────
+
+  STATUS:            The MC-RETRACTION headline above ("the hidden lattice is
+                     worth 20.2 points over the best trivial policy") is
+                     WITHDRAWN PENDING REVISION. It is a 60-seed maximum for a
+                     quantity that converges 3.8 points lower, and it is ~52%
+                     overstated once the trivial ladder is corrected. Do not cite
+                     it. The corrected converged figure the auditor measured is
+                     ~7.5 points; it is recorded here as the auditor's number, NOT
+                     yet reproduced by this author, and is therefore itself open.
+
+  WITNESS:           Independent adversarial audit, EINCOL rung 3, dispatched
+                     under §3 of MASTER_EXECUTION_PROMPT.md. It ran its own
+                     probes against the executing code, reported paired means with
+                     95% CIs, and left `git status` clean.
+
+  VERDICT:           VETOED. Twelve required revisions. Six of seven questions put
+                     to it resolved against the author.
+
+  THE CRITICAL ONE   S1. `neighbourMean` divides the neighbour faces by the count
+  (S1):              of LIVE neighbours, discarding the most important trivial
+                     fact on the board — how many of the four directions have a
+                     live target at all, i.e. the probability of getting the
+                     multiplier rather than the consolation payout. Removing the
+                     division gives `neighbourSum`, describable in the same one
+                     sentence the file demands: "bank the cell with the biggest
+                     total of numbers around it."
+
+                     Shipped config, 400 paired seeds:
+                       chargeAware      62.65
+                       neighbourAware   70.90   (this author's "strongest trivial")
+                       neighbourMax     66.72
+                       secondHop        78.71   (+7.81 +-2.23)
+                       expectedPayout   78.89   (+7.99 +-2.10)
+                       interiorBias     79.79   (+8.89 +-1.85)
+                       neighbourSum     79.87   (+8.97 +-2.36)
+
+                     Four one-liners beat it, all outside the 95% CI. Adding only
+                     `neighbourSum` to this author's own suite, changing nothing
+                     else, at MC_SEEDS=120:
+                       span      17.9 -> 9.8
+                       dominance 0.596 -> 0.780
+                       headroom  0.318 -> 0.000
+                       degenerate 5/39 -> 18/39
+                       M7 FAILS: learner 74.7 does not beat best trivial 77.1
+
+  S2:                M7 measures the COST OF BEING WRONG, not the value of being
+                     right, and is 2.74x overstated. Inverting a belief is
+                     strictly worse than holding none, because the inverted
+                     direction is guaranteed not to be the link more often than
+                     chance. Paired, 800 seeds:
+                       learner - inverted        +10.37 +-1.38  (published as
+                                                                "value of inference")
+                       learner - random belief    +7.92 +-1.29
+                       learner - NO belief        +3.79 +-1.12  (the true figure)
+                       inverted - no belief       -7.23 +-1.54  (self-inflicted)
+                     "The belief is worth 9.5 points" should read ~3.8.
+
+                     Worse: on the UNLEARNABLE board the learner scores 1.91
+                     BELOW no-belief. It tallies a modal direction out of pure
+                     noise and acts on it. That is the apophenia failure
+                     `lattice-gen.ts` names as the safety rationale for the entire
+                     design, occurring inside this author's own instrument,
+                     uncaught.
+
+  S3:                `regionOracle` is not a ceiling. `learnerPlus` — charge trail
+                     only, NO privileged information — reaches 88.08 against the
+                     "ceiling" of 87.58. A denominator an unprivileged policy
+                     already attains is not a bound, and `skillDepth` has no
+                     interpretation. It is also badly played: pricing the same
+                     four directions against the real payout rule gains 2.3
+                     points with no extra information.
+
+  S4:                The degeneracy gate is UNPOWERED, not fitted. On seeds
+                     1001-1120 instead of 1-120, ALL FIVE published top-five
+                     survivors flip to degenerate. The threshold (2 points) is
+                     smaller than the 95% CI of the statistic it gates (+-2.5 to
+                     +-8.3). The M4a positive control passes at every threshold
+                     from 0.5 to 8 and therefore constrains nothing.
+
+  S5, AND THE        The `chargeMax: 1` ranking is an ARTIFACT, by exactly the
+  CLAIM THAT WAS     denominator mechanic M4a was built to stop. Every one of the
+  SIMPLY WRONG:      top ten survivors has skillDepth BIT-IDENTICAL to dominance,
+                     which happens only when the learner adds nothing — the suite
+                     was silently ranking by exploitability. Capping charge drops
+                     the denominator 45.9 -> 31.3 and starves the learner
+                     (observations per round 9.23 -> 6.67).
+
+                     AND: "charge never exceeds 2 under real play, so the shipped
+                     CHARGE_MAX of 3 NEVER BINDS" IS FALSE. Charge histogram, 300
+                     seeds, shipped config — the cap binds under FIVE OF SIX
+                     rungs including the learner. It reaches 3 under blind,
+                     greedy, neighbourAware, neighbourSum and regionFlow. It was
+                     measured under `chargeAware`, the ONE policy that banks
+                     charge away and structurally cannot reach the cap. Same class
+                     of error as S6: a property measured through an instrument
+                     that cannot exhibit it.
+
+  S6:                M8's probe MANUFACTURES distinctness. Under `leastCharged`,
+                     chargeMax 3/4/5/8 produce four different digests; under a
+                     policy resembling play they are one game, byte for byte. A
+                     check that certifies four identical games as distinct is not
+                     a distinctness check. Also: digest-distinct is not
+                     hypothesis-distinct — `A-t12-d8` vs `A-t12-d64` differ by
+                     -0.71 +-2.07, inside the noise, while variants.ts cites those
+                     very gaps as proof deviation "measurably moves the game".
+
+  S7:                THREE different numbers are published for one quantity: 20.2
+                     (this register), ~16.8 (harness header), 17.9 (what the
+                     suite prints today). Seed sweep: 30->14.0, 60->20.2,
+                     120->17.9, 240->16.7, 960->16.4 +-1.7. The published headline
+                     is the single highest point in the sweep. Nothing in M0-M9
+                     asserts it, so the suite prints a new number over a green run.
+
+  VACUOUS CHECK:     This audit is the opposite of vacuous: it VETOED, with
+                     reproduced measurements and deleted probe files. The author's
+                     own suite still exits 0 on the unmodified tree — which is the
+                     finding, not a defence.
+
+  DISAGREEMENT:      None recorded. The author has not yet reproduced these
+                     numbers independently. Every figure above is attributed to
+                     the auditor and must be re-derived locally before it is
+                     itself treated as established — the same standard that
+                     produced this veto.
+
+  THE PROCESS NOTE   Quoted because it is the most useful sentence in the audit:
+  THAT MATTERS:      "The pattern across all three is identical: a rung of the
+                     ladder the author did not think of, discovered only by an
+                     adversarial arm. The structural fix is not a better rung — it
+                     is that NO LADDER RUNG MAY BE PUBLISHED WITHOUT A SEARCH FOR
+                     A STRONGER SIBLING THAT THE SUITE ITSELF RUNS."
+
+                     That is a check, not a resolution, and it is the one revision
+                     that would have caught all three failures. It is proposed for
+                     the next cycle.
+
+  NOT DONE:          All twelve required revisions. This entry RECORDS the veto;
+                     it resolves nothing. Under §0 of MASTER_EXECUTION_PROMPT.md a
+                     Tier 2 core may not mark a governance finding resolved, and
+                     under §5.4 it may not widen scope to a twelve-item
+                     remediation without a Tier 1 instruction. Both await the
+                     human at the HITL gate.
