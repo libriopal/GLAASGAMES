@@ -22,7 +22,13 @@ export interface FitnessBreakdown {
 export interface GateProvenance {
   modelIdentity: string; // MUST be the real engine
   commitSha: string;
-  isStandIn: false; // type-level: a stand-in can never be recorded
+  // WIDENED FROM THE LITERAL `false` BY R2, and the widening is the point.
+  // Typing this as `false` did not prevent a stand-in from being recorded — it
+  // only forced every caller that wanted to TEST the refusal to write
+  // `true as unknown as false`, an ill-typed cast that made the call site
+  // itself a plausible source of an incidental throw. The runtime guard in
+  // computeFitness is what enforces LAW 3; the type was never doing it.
+  isStandIn: boolean;
   timestamp: string;
 }
 
@@ -30,4 +36,33 @@ export interface FitnessResult {
   fitness: number;
   breakdown: FitnessBreakdown;
   provenance: GateProvenance;
+}
+
+/**
+ * Thrown when fitness is asked to score a run whose provenance is a stand-in.
+ *
+ * A distinct class, not a message convention: the oracle asserts on the class
+ * and on `field`, so an incidental TypeError can no longer impersonate a
+ * refusal. REJECTED ALTERNATIVE — do not re-derive: matching on `err.message`
+ * text. That measures the wording of an error string, which any refactor
+ * silently changes, and it passes on an unrelated TypeError whose message
+ * happens to contain "stand-in".
+ */
+export class StandInProvenanceError extends Error {
+  readonly field: string;
+  constructor(field: string) {
+    super(`fitness refused: provenance.${field} indicates a stand-in model`);
+    this.name = 'StandInProvenanceError';
+    this.field = field;
+  }
+}
+
+/** Thrown when provenance is structurally unusable (missing commitSha, etc.). */
+export class InvalidProvenanceError extends Error {
+  readonly field: string;
+  constructor(field: string) {
+    super(`fitness refused: provenance.${field} is missing or empty`);
+    this.name = 'InvalidProvenanceError';
+    this.field = field;
+  }
 }

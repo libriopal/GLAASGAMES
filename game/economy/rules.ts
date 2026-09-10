@@ -35,6 +35,25 @@ export function verifyEconomyInvisibility(accounts: Account[], renderedEconomyFo
   return { passed: violations.length === 0, violations };
 }
 
+/**
+ * R3. The same rule, but the witness is a RECORDER rather than an argument.
+ *
+ * `verifyEconomyInvisibility(accounts, ['minor'])` above proves the list the
+ * caller wrote agrees with the rule the caller wrote. This overload takes an
+ * `EconomySurfaceRecorder` whose set was COMPUTED by the surfaces themselves, so
+ * the caller cannot assert the answer into existence.
+ *
+ * Typed structurally (`{ grantedTo(): string[] }`) rather than importing the
+ * class, so `rules.ts` keeps no dependency on the recorder module and the
+ * ratified code path stays where it is.
+ */
+export function verifyEconomyInvisibilityFromRecorder(
+  accounts: Account[],
+  recorder: { grantedTo(): string[] },
+): EconomyVisibilityResult {
+  return verifyEconomyInvisibility(accounts, recorder.grantedTo());
+}
+
 // --- §6.2 — no solicitation to reverse self-exclusion -----------------------
 
 export interface SelfExclusionSolicitResult {
