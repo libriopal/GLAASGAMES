@@ -31,7 +31,7 @@ import {
   STATE_IDLE,
   STATE_SPENT,
 } from './board.js';
-import { generateLattice } from './lattice-gen.js';
+import { DEFAULT_DEVIATION, generateLattice } from './lattice-gen.js';
 import { makeRng } from '../engine/sim/world-gen.js';
 import { hashState } from '../engine/sim/hash.js';
 
@@ -57,6 +57,26 @@ export interface RoundConfig {
    * OWC finding.
    */
   readonly faceWeights?: readonly number[];
+  /**
+   * How often a hidden link deviates from its region's prevailing flow: one draw
+   * in `deviation`. Omitted, it is `DEFAULT_DEVIATION` (4) and the lattice is
+   * the shipped one.
+   *
+   * ADDITIVE, AND IT REPLACES AN AXIS THAT WAS MEASURED TO BE INERT. The balance
+   * sweep used to vary `refill`; a digest comparison across refill 1/2/4/6 at 6,
+   * 12 and 20 turns returned the SAME digest every time, because only one cell is
+   * ever empty when the refill runs. Deviation is the knob that actually decides
+   * whether the hidden lattice is inferable, which is the property the whole
+   * design rests on.
+   */
+  readonly deviation?: number;
+  /**
+   * Charge ceiling. Omitted, it is `CHARGE_MAX` (3) and the shipped game is
+   * unchanged. Charge is the payout MULTIPLIER, so this is the depth of the
+   * reward for holding a cell rather than banking it early — a real balance axis
+   * and, unlike refill, one that moves the digest.
+   */
+  readonly chargeMax?: number;
 }
 
 export const DEFAULT_ROUND: RoundConfig = { turns: 12, refill: 4 };
@@ -171,12 +191,18 @@ export interface RoundState {
    * defensible.
    */
   readonly weights: readonly number[];
+  /**
+   * The charge ceiling in force for this round, resolved in `beginRound` for the
+   * same reason `weights` is: a turn must never reach into the config for a
+   * balance parameter, only into state that was fixed before turn 1.
+   */
+  readonly chargeMax: number;
 }
 
 /** Generates the lattice and the opening faces. */
 export function beginRound(seed: number, config?: RoundConfig): RoundState {
   const board = new Board();
-  generateLattice(board, seed);
+  generateLattice(board, seed, config?.deviation ?? DEFAULT_DEVIATION);
 
   const rng = makeRng(seed ^ 0x5bf03635);
 
@@ -190,7 +216,7 @@ export function beginRound(seed: number, config?: RoundConfig): RoundState {
     board.set(i, OFFSET_STATE, STATE_IDLE);
   }
 
-  return { board, rng, score: 0, reshuffles: 0, conceded: false, observations: [], chained: 0x811c9dc5, turn: 0, weights };
+  return { board, rng, score: 0, reshuffles: 0, conceded: false, observations: [], chained: 0x811c9dc5, turn: 0, weights, chargeMax: config?.chargeMax ?? CHARGE_MAX };
 }
 
 /**
@@ -283,7 +309,7 @@ export function advanceTurn(
       // to. This is the ONLY way charge moves, so every charge the player sees
       // appear is evidence about the link that produced it.
       if (feedsLive) {
-        const next = Math.min(board.get(link, OFFSET_CHARGE) + 1, CHARGE_MAX);
+        const next = Math.min(board.get(link, OFFSET_CHARGE) + 1, state.chargeMax);
         board.set(link, OFFSET_CHARGE, next);
         board.set(link, OFFSET_STATE, STATE_CHARGED);
         chargedCells.push(link);
@@ -303,7 +329,7 @@ export function advanceTurn(
         // the lattice becomes inferable faster.
         const second = board.get(link, OFFSET_LINK);
         if (second !== NO_LINK && second !== target && board.get(second, OFFSET_FACE) !== EMPTY) {
-          const onward = Math.min(board.get(second, OFFSET_CHARGE) + 1, CHARGE_MAX);
+          const onward = Math.min(board.get(second, OFFSET_CHARGE) + 1, state.chargeMax);
           board.set(second, OFFSET_CHARGE, onward);
           board.set(second, OFFSET_STATE, STATE_CHARGED);
           chargedCells.push(second);

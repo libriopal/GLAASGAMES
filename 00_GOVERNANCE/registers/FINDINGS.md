@@ -290,3 +290,128 @@ Per §1: the run is right. Recorded rather than worked around.
                      manifest precisely so names cannot be added casually. The
                      reconcile branch is exercised by the probe recorded above;
                      wiring it into the suite is proposed, not done.
+
+────────────────────────────────────────────────────────────────────────────────
+MC-RETRACTION — the Monte Carlo balance result, withdrawn and replaced
+────────────────────────────────────────────────────────────────────────────────
+
+  LANDED:            `foundry/montecarlo/harness.ts` rebuilt (7-rung ladder,
+                     degeneracy gate, scrambled-belief control);
+                     `foundry/montecarlo/variants.ts` rebuilt (69 candidates over
+                     axes that measurably move the game);
+                     `engine/verify/verify-montecarlo.ts` gained M4a, M7, M8, M9;
+                     `lattice/round.ts` gained optional `deviation` + `chargeMax`;
+                     `lattice/lattice-gen.ts` gained the `deviation` parameter and
+                     exports `REGION`.
+
+  WHAT WAS CLAIMED:  Commit 333553e reported skill depth 0.432, dominance 0.406,
+                     headroom 0.042, and the headline "a one-line heuristic
+                     captures 40.6% of achievable value, and knowing the hidden
+                     lattice adds only ~1.4 points on top." That headline is
+                     RETRACTED. On the shipped board the hidden lattice is worth
+                     20.2 points over the best trivial policy.
+
+  HOW IT FAILED:     Nine probes, each run against the executing code.
+
+                     X-MC1  The "learnable" rung learned almost nothing. Charge
+                            travels two hops, so two cells rise per bank, and the
+                            rung recorded a link only when EXACTLY ONE rose —
+                            discarding 443 of 994 observations (44.6%). At
+                            decision time only 1.52% of open cells had a usable
+                            learned target. It was charge-chasing 98.5% of the
+                            time, so `headroom` measured the policy's ignorance.
+
+                     X-MC3  `clairvoyant` was not the ceiling of what a player can
+                            infer. Handed only the true region flows, an agent
+                            scores 88.1 against clairvoyant's 97.7 — the ~9.6
+                            point remainder is the 25% of links that deviate from
+                            their region, learnable one cell at a time and never
+                            in aggregate. Normalising skill against 97.7 charged
+                            the player for information the generator deliberately
+                            made un-inferable.
+
+                     X-MC4  Only SIX distinct chi-square values existed across all
+                            69 candidates. Faces were sampled from the opening
+                            deal, which `turns` and `refill` never touch, so the
+                            24 fair variants produced ONE identical number and
+                            each loaded distribution produced one, nine times
+                            over. "45/45 caught, 0/24 false positives" was five
+                            tests and one test, reported as 45 and 24.
+
+                     X-MC6  `refill` IS INERT. Across refill 1/2/4/6 at 6, 12 and
+                            20 turns the round DIGEST was identical every time —
+                            after banking one cell exactly one cell is empty, so
+                            `refill > 1` has nothing to fill. The 69 candidates
+                            were 20 distinct games.
+
+                     X-MC7  The REPLACEMENT rung was falsified too, by a
+                            scrambled-belief control. A third arm — a policy that
+                            never learns and always believes "every cell feeds
+                            north" — scored 70.8, beating the real learner's 66.7.
+                            A zero-information constant cannot beat inference
+                            unless the SCORING SHAPE is doing the work, and it
+                            was: `expectedFace x (1 + charge)` rewards banking
+                            next to big numbers whatever you believe, because the
+                            link IS one of the neighbours.
+
+                     X-MC8  So the missing rung was the strongest TRIVIAL policy:
+                            "bank the cell surrounded by the biggest numbers",
+                            69.9 with no memory at all. The original 40.6% was
+                            measured against a weaker trivial baseline than the
+                            game admits.
+
+  NEGATIVE CONTROL:  The scrambled-belief arm, which is now M7. Same board, same
+                     policy shape, same learning — belief rotated 180 degrees.
+                     Shipped board: learner 70.3, scrambled 60.8, so the belief is
+                     worth 9.5 points. This isolates inference from the scoring
+                     shape, which no earlier version of the ladder did.
+
+  SEEN TO FAIL:      Every new check was watched failing before it was trusted.
+                     M8 fired twice on the author's OWN catalogue — first on three
+                     Block D duplicates of Block A points, then on a fourth
+                     (`{turns:20, deviation:1, chargeMax:1}` hashes identically to
+                     `A-t20-d1`, because on a lattice whose links ignore their
+                     region so few links are live that charge never reaches even
+                     the default cap). M4 fired on dominance 189.9%. M8's probe
+                     policy was itself caught being too weak: banking cell 0
+                     forever never lets charge reach its cap, so `chargeMax`
+                     looked as inert as `refill`.
+
+  SEEN TO PASS:      verify-montecarlo M0-M9 exit 0; `verify:suite` 19 checks,
+                     coverage closed; tsc --noEmit clean. M5 holds the shipped
+                     game at score 32 / digest 3740550746 across all three new
+                     config fields.
+
+  VACUOUS CHECK:     Found and fixed, in this suite's own fairness gate. The five
+                     loaded distributions scored chi-square 69, 451, 494, 1537 and
+                     7200 against a critical value of 20.515 — the mildest was
+                     3.4x over the line, so "caught" proved only that the gate
+                     detects the obvious. The catalogue now carries `marginal-6`,
+                     a 10% single-face bias that the gate DOES NOT CATCH, and M9
+                     publishes the power curve: 0% at +5%, 5% at +10%, 78% at
+                     +25%, 100% at +50%. The gate's sensitivity is now a measured
+                     number with a stated floor.
+
+  DISAGREEMENT:      With the previous commit, which is the author's own. 333553e
+                     flagged the exploitability finding as "deserving
+                     investigation, not a conclusion" and that hedge was correct —
+                     the investigation overturned it. The direction matters: the
+                     retracted claim made the game look WORSE than it is, so the
+                     error was not self-flattering, but it was still wrong and was
+                     published as a headline.
+
+  NOT DONE:          The independent EINCOL step-5 audit. An evaluator was
+                     dispatched and terminated on a session rate limit before
+                     returning a verdict. Everything above is the author's own
+                     falsification (EINCOL step 4), which is NOT a substitute —
+                     a parser cannot witness itself, and this file has now twice
+                     recorded the author's own instrument deceiving the author.
+                     The audit is owed and is the next action on this work.
+
+  OPEN QUESTION:     The ranking now favours `chargeMax: 1` variants (best:
+                     C-flat1-t6-d2 at depth 0.744 against the shipped 0.596).
+                     Capping charge at 1 removes a multiplier that MEASUREMENT
+                     SHOWS NEVER BINDS ANYWAY — charge never exceeds 2 under real
+                     play, so the shipped CHARGE_MAX of 3 is unreachable. Whether
+                     that ranking is a real design finding or another artifact is
+                     NOT resolved here and must not be acted on before the audit.

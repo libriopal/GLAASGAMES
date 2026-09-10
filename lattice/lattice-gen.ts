@@ -28,12 +28,15 @@ const NEIGHBOUR_DX = [0, 1, 0, -1] as const;
 const NEIGHBOUR_DY = [-1, 0, 1, 0] as const;
 
 /**
- * Regions the board is divided into. Each gets a prevailing flow direction, so
- * links correlate spatially rather than being independent per cell — that
- * correlation is precisely what makes the lattice inferable from a handful of
- * observations instead of requiring all 36 to be seen individually.
+ * Region edge, in cells: 3x3 blocks over a 6x6 board, so four regions.
+ *
+ * Each region gets a prevailing flow direction, so links correlate spatially
+ * rather than being independent per cell — that correlation is precisely what
+ * makes the lattice inferable from a handful of observations instead of
+ * requiring all 36 to be seen individually. The Monte Carlo learner reads this
+ * to know which cells share a flow.
  */
-const REGION = 3; // 3x3 blocks over a 6x6 board => 4 regions
+export const REGION = 3;
 
 export interface LatticeStats {
   readonly linked: number;
@@ -42,12 +45,31 @@ export interface LatticeStats {
 }
 
 /**
+ * How often a link DEVIATES from its region's prevailing flow: one draw in
+ * `deviation`. Shipped is 4, i.e. 1 in 4.
+ *
+ * THIS IS THE LEARNABILITY KNOB, AND IT IS THE ONE THE BALANCE SWEEP NEEDED.
+ * The Monte Carlo catalogue originally swept `refill`, which a digest comparison
+ * proved completely inert — after banking one cell exactly one cell is empty, so
+ * `refill > 1` has nothing to fill and all four settings produce byte-identical
+ * rounds. Sweeping it produced 69 labels over 20 distinct games.
+ *
+ * Deviation is the opposite: it moves the exact property the design argues
+ * about. At 1 the lattice is pure noise and nothing is inferable — the apophenia
+ * hazard this file's header calls a machine for exploiting pattern-seekers. At a
+ * very large value every link follows its region and one observation gives the
+ * whole region away. The shipped 1-in-4 is a claim that the band between those
+ * is where the game lives, and until now that claim had never been swept.
+ */
+export const DEFAULT_DEVIATION = 4;
+
+/**
  * Writes the hidden link and w columns into the board.
  *
  * Returns statistics rather than nothing, because a generator whose output is
  * never measured is a generator nobody notices has broken.
  */
-export function generateLattice(board: Board, seed: number): LatticeStats {
+export function generateLattice(board: Board, seed: number, deviation: number = DEFAULT_DEVIATION): LatticeStats {
   const rng = makeRng(seed);
   const draw = (n: number): number => Math.abs(rng()) % n;
 
@@ -71,7 +93,7 @@ export function generateLattice(board: Board, seed: number): LatticeStats {
     // lattice would be trivially guessable after one observation and there would
     // be no skill in reading it; without a prevailing flow it would be
     // unlearnable. The band between those is where the game lives.
-    const direction = draw(4) === 0 ? draw(4) : prefer;
+    const direction = draw(deviation) === 0 ? draw(4) : prefer;
 
     const targetColumn = column + NEIGHBOUR_DX[direction]!;
     const targetRow = row + NEIGHBOUR_DY[direction]!;
