@@ -1,0 +1,10 @@
+import { chromium } from 'playwright-core';
+import { fileURLToPath } from 'node:url';
+const url = new URL('../design/store/feature-graphic.html', import.meta.url).href;
+const out = fileURLToPath(new URL('../design/store/feature-graphic.png', import.meta.url));
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
+const page = await browser.newPage({ viewport: { width: 1024, height: 500 }, deviceScaleFactor: 1 });
+await page.goto(url, { waitUntil: 'networkidle' });
+await page.screenshot({ path: out });
+await browser.close();
+console.log('shot', out);

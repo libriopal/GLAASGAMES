@@ -1093,3 +1093,91 @@ NET-001 — the transport, and an attack that killed my own commit-reveal design
                      string is recorded, not checked. Visual/audio, the
                      whole-application audit and the APK remain. E29 and E32 are
                      open and Tier 1.
+
+────────────────────────────────────────────────────────────────────────────────
+VIS-001 — three design tools, one rejected asset, and a new gate
+────────────────────────────────────────────────────────────────────────────────
+
+  LANDED:            `engine/verify/verify-store-assets.ts` (NEW — V1-V4, with an
+                     inline PNG decoder); `scripts/gen-store-graphic.ts` and
+                     `scripts/shoot-store-graphic.mjs` (NEW); typography tokens in
+                     `web/theme.ts`; `design/store/feature-graphic.png`.
+
+  WHAT EACH TOOL     ADOBE — `font_recommend` returned the faces, and with them the
+  ACTUALLY DID:      insight that mattered: this game's screens are almost entirely
+                     NUMBERS that change every turn, and a proportional face makes
+                     a score ticking 118 -> 188 shuffle the layout sideways. Every
+                     new type token sets `tabular-nums` because of that.
+                     `get_fontkit_embed_url` returned kit nxq5lsl with the real
+                     CSS stacks. `theme.ts` had NO type tokens before this.
+
+                     FIGMA — `create_new_file` (M7b8nvQ4oBKgocE9j6adkL) and
+                     `generate_diagram`, which produced a FigJam board of the heat
+                     state machine at figma.com/board/LDth4JvWYTivVuC7e1zQDa. That
+                     ordering IS the security argument (reveal cannot precede
+                     close; a beacon cannot be drawn while entry is open), so a
+                     reviewable picture of it is worth more than a mockup.
+
+                     CANVA — `generate-design` / `export-design` produced two store
+                     graphics. BOTH WERE REJECTED. See below.
+
+  THE REJECTION,     v1 came back correctly sized, free of the casino imagery the
+  AND WHY IT IS THE  IARC declaration forbids, and using pip faces rather than
+  MOST USEFUL        numerals. Then it was MEASURED against this project's own
+  RESULT HERE:       APCA function: title ink rgb(76,105,127) on black is
+                     |Lc| 20.5, against floors of 90 (body) and 75 (large UI).
+                     The shipped app's own ink on its ground is 95.0. The listing
+                     art was ~4.5x less legible than the product it advertises,
+                     and a store thumbnail renders small.
+
+                     v2, regenerated with explicit contrast direction, fixed that
+                     to |Lc| 107.2 — and drew NUMERALS on the tiles: 4, 11, 16,
+                     17, 21, 25. This game replaced digits with pip clusters
+                     deliberately (the whole of `tokens.ts` PIP_LAYOUT), and 11 is
+                     not a dice face. It also drew ten columns where the board has
+                     six.
+
+                     So v1 was right about pips and wrong about contrast; v2 was
+                     right about contrast and wrong about the product. A generator
+                     cannot know the rules, so it cannot be relied on to depict
+                     them.
+
+  THE LIMIT OF THE   `verify-store-assets` caught the contrast defect and is
+  GATE, STATED:      STRUCTURALLY BLIND to the semantic one. It measures pixels,
+                     and "this is not what the game looks like" is not a property
+                     of pixels. That is a real limit of the check and it is
+                     recorded rather than glossed: a green V1-V4 does not mean an
+                     asset is truthful, only that it is legible.
+
+  THE FIX:           The board is now drawn by `tokenSvg` — the same function that
+                     draws it in the app — from the palette pinned in `theme.ts`,
+                     rasterised through the Chromium already present for
+                     Playwright. It cannot render a face the game does not have or
+                     a colour the corpus did not yield, because it IS the
+                     product's renderer. Result: 36 tiles in 6 rows of six, real
+                     faces 1-6, the charged state (amber ring, two charge ticks)
+                     and the spent state both visible, |Lc| 95.0 — the same number
+                     the app itself measures.
+
+  SEEN TO FAIL:      V2 was watched failing on v1 at |Lc| 20.5 before anything was
+                     fixed. V4's control asserts BOTH directions: the rejected
+                     pairing must still measure below the floor (20.5) and the
+                     app's shipped ink must still clear it (95.0), so the check
+                     cannot be satisfied by moving the floor.
+
+                     A second failure was caught by SCREENSHOT and would not have
+                     been caught by review: the first generated board came out as
+                     an empty plate, because `tokenSvg` returns a complete
+                     `<svg viewBox="0 0 1 1">` per token and nesting those inside
+                     an outer SVG renders nothing. The layout is CSS grid now.
+
+  SEEN TO PASS:      verify-store-assets V1-V4; verify-theme (palette still traces
+                     to 4.6M pixels, every pairing clears APCA); verify-tokens
+                     P1-P9; verify:suite 19 checks; tsc clean.
+
+  NOT DONE:          The in-app heat and staking SCREENS are not built — this
+                     cycle delivered the type system, the store asset and the
+                     asset gate, not the UI. No sound or music. The Typekit embed
+                     is recorded but deliberately NOT linked, because first paint
+                     in an offline APK must not wait on a network round trip.
+                     The whole-application production audit and the APK remain.

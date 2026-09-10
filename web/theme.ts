@@ -168,3 +168,75 @@ export const SPENT = '#3a4657';
 /** The six die faces are one colour. A die is a die; its VALUE is its pips. */
 export const DIE_BODY = '#141b26';
 export const DIE_EDGE = '#263346';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TYPOGRAPHY — and the reason it is not a taste decision.
+//
+// This file pinned a palette to 1129 corpus images and never addressed type at
+// all. The gap mattered more than it looked: this game's screens are almost
+// entirely NUMBERS that change every turn — a face value, a charge multiplier, a
+// running score, a stake, a projected payout band, a round digest.
+//
+// A proportional face renders "1" narrow and "8" wide, so a score ticking from
+// 118 to 188 makes the whole readout shuffle sideways. The player's eye is
+// tracking a quantity and the layout moves under it. That is why every one of
+// these tokens sets `tabular-nums`: in a tabular face each digit occupies an
+// identical advance width, so a changing number changes its VALUE and nothing
+// else.
+//
+// The faces were recommended by Adobe Fonts for this brief — a dark technical
+// game UI whose figures must hold up small. Source Code Pro (Paul D. Hunt and
+// Teo Tuominen, Adobe Originals) is monospaced by construction and carries the
+// figures; IBM Plex Sans Condensed (Mike Abbink, Paul van der Laan and Pieter
+// van Rosmalen, IBM) is condensed, which buys horizontal room on a phone.
+//
+// BOTH STACKS DEGRADE TO SYSTEM FACES ON PURPOSE. The app ships as an APK and
+// must render correctly with no network on first launch, so a webfont that has
+// not loaded must not leave the score column unreadable. The named faces are
+// preferences; the fallbacks are the guarantee.
+
+/** Headings and labels. Condensed, so a long label survives a narrow phone. */
+export const FONT_DISPLAY =
+  '"ibm-plex-sans-condensed","IBM Plex Sans Condensed","Roboto Condensed",system-ui,sans-serif';
+
+/**
+ * Every figure the player reads: scores, stakes, payouts, charge, digests.
+ *
+ * Monospaced so a value that changes does not move the things next to it.
+ */
+export const FONT_FIGURE = '"source-code-pro","Source Code Pro",ui-monospace,SFMono-Regular,monospace';
+
+/** Body copy — rules text, explanations, the reveal. */
+export const FONT_BODY = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+
+/**
+ * The Adobe Fonts kit backing the two named faces above.
+ *
+ * Recorded rather than embedded: adding this <link> makes first paint depend on
+ * a network round trip, which an offline-first APK must not do. It is here so
+ * the provenance of the type is checkable, and so a future web build can opt in
+ * deliberately.
+ */
+export const TYPEKIT_EMBED = '<link rel="stylesheet" href="https://use.typekit.net/nxq5lsl.css">';
+
+/** Type scale, in px. Four steps — a fifth would be a decision nobody defends. */
+export const TYPE_SCALE = {
+  /** The one number a player watches most. */
+  hero: 44,
+  /** Screen titles. */
+  title: 26,
+  /** Figures in a row: stake, payout, charge. */
+  figure: 18,
+  /** Labels and secondary copy. */
+  label: 13,
+} as const;
+
+/** A CSS declaration block for a given role. Figures always get tabular digits. */
+export function typeCss(role: keyof typeof TYPE_SCALE): string {
+  const size = TYPE_SCALE[role];
+  const family = role === 'hero' || role === 'figure' ? FONT_FIGURE
+    : role === 'title' ? FONT_DISPLAY
+    : FONT_BODY;
+  const tabular = family === FONT_FIGURE ? 'font-variant-numeric:tabular-nums;' : '';
+  return `font-family:${family};font-size:${size}px;${tabular}`;
+}
