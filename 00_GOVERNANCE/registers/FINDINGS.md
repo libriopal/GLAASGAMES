@@ -773,3 +773,121 @@ MC-C2 — cycle 2: the suite now searches for the rung the author missed
                      highest-severity missing items. The remaining seven are
                      carried, not closed. Nothing here marks a governance finding
                      resolved — that is Tier 1.
+
+────────────────────────────────────────────────────────────────────────────────
+PM-001 — pari-mutuel settlement, built and proven fair, money still off
+────────────────────────────────────────────────────────────────────────────────
+
+  LANDED:            `game/economy/fixed-bigint.ts` (NEW — exact BigInt fixed
+                     point, single-rounding rational powers);
+                     `game/economy/pari-mutuel.ts` (NEW — Spec 36 / E25delta
+                     settlement); `engine/verify/verify-parimutuel.ts` (NEW —
+                     P0..P14); wired as `npm run verify:parimutuel`.
+
+  THE GATE, STATED   FEATURE_RM_SETTLEMENT is FALSE and P0 asserts it. Election
+  NOT ASSUMED:       E29 (counsel) gates real money and only Tier 1 may resolve
+                     it. Spec 36 says this of ITSELF, in its own red box:
+                     "Adopting pari-mutuel mathematics does not confer
+                     pari-mutuel legal status... E29 remains the gate, and this
+                     document raises rather than lowers its urgency."
+
+                     The independent audit was asked directly whether building
+                     the engine behind a flag stays on the correct side of E29
+                     and answered that it is a SOFT boundary: "in many
+                     jurisdictions, providing the software used for gambling is a
+                     regulated activity regardless of the FEATURE_RM_SETTLEMENT
+                     flag... The line is the functionality of the settlement
+                     logic itself. It is a risk." That answer is recorded in the
+                     module header and here. It is NOT resolved by this work and
+                     it is a Tier 1 matter.
+
+  DESIGN AUDITED     The solution vector was VETOED before a line was written.
+  BEFORE CODE:       Four fixes required, all applied:
+                       (2) remainder tie-breaking must be order-invariant
+                       (3) remainder distributed, not handed to one entry
+                       (4) integer/rational powers, no double rounding
+                       (5) enforce a minimum heat size
+                     Four MISSING properties named, all now verified as P10-P13:
+                     public verifiability, entropy independence, front-running
+                     resistance, non-malleability of commit->settlement.
+
+  SEEN TO FAIL —     THE SPEC AS WRITTEN CONTAINS A BUG, AND THE CHECK CAUGHT IT.
+  THE SPEC'S OWN     Spec 36 section 2.4 awards the rounding remainder to "the
+  DEFECT:            single top-ranked entry". The auditor predicted, from the
+                     prose alone, that ties make this ambiguous and that a
+                     find-first-max implementation would make payouts depend on
+                     ARRAY POSITION.
+
+                     That exact implementation was planted and run. P3 fired:
+                       three tied entries settled as alpha:307 mike:307 zeta:309
+                       reversed, the same three settled  alpha:307 mike:309 zeta:307
+                     Five failures across n=4, 9 and 17. The remainder moved with
+                     input order, destroying the order invariance that is the
+                     entire reason heats are scored on a CLOSED cohort — the
+                     property that makes entering at minute 1 identical to
+                     entering at minute 11.
+
+                     Fix: the remainder is split across ALL tied top entries, and
+                     leftover units are assigned by SORTED ENTRY ID, an intrinsic
+                     key. Array position is never consulted.
+
+  A SECOND DEFECT    The planted run also exposed a flaw in the HARNESS: the P3
+  THE PLANT FOUND,   summary line "reversal and rotation leave every payout
+  IN MY OWN          byte-identical" printed IMMEDIATELY ABOVE its own three
+  HARNESS:           failures, because the log was unconditional. A green
+                     sentence next to a red one is how a suite talks somebody out
+                     of reading its output. Every summary is now guarded by
+                     `summarise(mark, ...)` and prints "[suppressed: N failures]"
+                     instead.
+
+  A CHECK THAT WAS   P4 originally asserted that Neuberg maps the BOTTOM of a
+  WRONG, AND WHAT    small heat and a large heat to the same percentile. It
+  ITS FAILURE        FAILED — 9-heat last place 0.097, 40-heat last place 0.0095
+  TAUGHT:            — and the failure was correct. At m=0 the formula gives
+                     m' = N/n - 1, which depends on n by construction: beating
+                     nobody out of 8 is a weaker statement than beating nobody out
+                     of 39, so short cohorts compress toward the middle.
+
+                     What Neuberg actually equalises is WEIGHT, not span. The two
+                     properties that hold and that the payout curve depends on are
+                     now asserted instead: a TOP maps to exactly p=1 at every heat
+                     size (n=2,9,17,40,64), and a heat's TOTAL contribution is
+                     size-invariant. The compression is asserted as a property in
+                     its own right rather than asserted away.
+
+  THE DOUBLE-        The audit warned that computing p^(12/5) as nth-root-then-
+  ROUNDING TRAP,     power rounds twice and can invert two adjacent percentiles,
+  AVOIDED RATHER     letting a higher score pay less. Rather than bound the error,
+  THAN BOUNDED:      the intermediate rounding was removed entirely: R is defined
+                     as the largest integer with R^5 * S^7 <= X^12, found by
+                     binary search on EXACT BigInt comparisons. There is exactly
+                     one floor and it is the definition of the answer.
+                     Monotonicity is then structural: X1 < X2 implies R1 <= R2,
+                     because there is no second rounding to invert it. P6 checks
+                     it anyway, over 20 heats of 24 and 65 sample points.
+
+  SEEN TO PASS:      verify-parimutuel P0-P14 exit 0. Selected measurements:
+                       P1  pool closes EXACTLY over n=2..40 x 12 seeds, worst
+                           discrepancy 0 minor units
+                       P7  at 0/100/600/1000 bps the operator retains the declared
+                           commission and NOTHING else — no breakage, no second
+                           margin (a deliberate divergence from racing practice,
+                           which keeps the remainder)
+                       P8  last place still receives 197 minor units — FLOOR_W is
+                           real, the product is not a total-loss machine
+                       P9  distributed === handle - takeout at every rate tested;
+                           system RTP is identically 1-t with no pay table
+                       P12 a late entrant changes 10/10 existing payouts, so the
+                           pool is genuinely mutual
+                     `verify:suite` 19 checks coverage closed; tsc clean.
+
+  VACUOUS CHECK:     Guarded three ways. P3 was watched failing on the real
+                     defect. P5's float scan was watched firing on a planted
+                     decimal literal. P4's original form failed and was replaced
+                     rather than relaxed.
+
+  NOT DONE:          The seven carried Monte Carlo revisions from MC-C2. The
+                     shared-board MULTIPLAYER transport (this is the settlement
+                     mathematics, not a netcode). Visual/audio polish, the
+                     production audit and the APK. Nothing here resolves E29 or
+                     any other election.
