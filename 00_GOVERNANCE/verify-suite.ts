@@ -17,6 +17,7 @@ import type { BandRender } from '../families/expression/pipeline.ts';
 import { makeProvenanceNote, verifyProvenanceNoteComplete } from '../families/provenance/types.ts';
 import { scanForForbiddenTelemetryFields } from '../foundry/telemetry/types.ts';
 import { computeFitness } from '../foundry/fitness/index.ts';
+import { StandInProvenanceError } from '../foundry/fitness/types.ts';
 import type { GateProvenance, JudgmentAggregate, TelemetryAggregate } from '../foundry/fitness/types.ts';
 import { isValidProvenance, checkExperienceConformance } from '../foundry/gates/suite.ts';
 import { runKotCalibration } from '../foundry/gates/kot-calibration.ts';
@@ -26,7 +27,8 @@ import { assertFixedPoint, toFixedPoint } from '../game/determinism/fixed-point.
 import { branchANoBotsHolds } from '../game/branch-a/constraint.ts';
 import { verifyAuditLogComplete, buildAuditLog } from '../game/branch-a/audit-log.ts';
 import { verifyMessageContracts } from '../game/branch-a/message-contracts.ts';
-import { verifyEconomyInvisibility, verifySelfExclusionNoSolicit, verifyAntiManipulation } from '../game/economy/rules.ts';
+import { verifyEconomyInvisibility, verifyEconomyInvisibilityFromRecorder, verifySelfExclusionNoSolicit, verifyAntiManipulation } from '../game/economy/rules.ts';
+import { EconomySurfaceRecorder } from '../game/economy/surface-recorder.ts';
 import type { Account, AccountMessage, SessionUXConfig } from '../game/economy/types.ts';
 import type { SessionRecord, TurnRecord } from '../foundry/types.ts';
 import { join } from 'node:path';
@@ -38,6 +40,75 @@ const check = (name: string, cond: boolean, detail: string) => {
   console.log(`${cond ? 'PASS' : 'FAIL'}  ${name} — ${detail}`);
   if (!cond) failures++;
 };
+
+/**
+ * The §9 checklist, lifted out of prose into code. This array is the WITNESS;
+ * the run is the SUBJECT. They are separate objects, which is the whole point.
+ *
+ * Adding a check to the suite without adding it here is a failure, and vice
+ * versa. Do not sort this list to match the run order — the sets are compared,
+ * not the sequences, and coupling them would reintroduce ordering as a hidden
+ * assertion.
+ *
+ * REJECTED ALTERNATIVE — do not re-derive this: asserting
+ * `checkNames.length === 18`. A count is satisfied by a rename or a duplicate,
+ * so it measures cardinality, not identity. This measures identity, in both
+ * directions, and refuses duplicates.
+ */
+const SECTION_9_CHECKS: readonly string[] = Object.freeze([
+  'verify-novelty-gate',
+  'verify-fitness-multiplicative',
+  'verify-no-retention-inputs',
+  'verify-gate-provenance',
+  'verify-no-standin-models',
+  'verify-determinism-fullchain',
+  'verify-message-contracts',
+  'verify-branch-a-no-bots',
+  'verify-audit-log-complete',
+  'verify-economy-invisibility',
+  'verify-self-exclusion-no-solicit',
+  'verify-anti-manipulation',
+  'verify-expression-prohibition',
+  'verify-band-honesty',
+  'verify-no-math-random',
+  'verify-fixed-point-scoring',
+  'verify-experience-conformance',
+  'verify-provenance-notes',
+]);
+
+/**
+ * Checks that are deliberately outside §9 and must not count toward coverage.
+ * Kept explicit so an out-of-spec check is a declared exception rather than an
+ * unnoticed one.
+ */
+const NON_SECTION_9: readonly string[] = Object.freeze([
+  'w7-kot-calibration (not in §9, but the load-bearing gate)',
+]);
+
+interface CoverageReport {
+  readonly missing: readonly string[];
+  readonly undeclared: readonly string[];
+  readonly duplicated: readonly string[];
+  readonly ok: boolean;
+}
+
+function coverage(exercised: readonly string[]): CoverageReport {
+  const declared = new Set(SECTION_9_CHECKS);
+  const exempt = new Set(NON_SECTION_9);
+  const seen = new Map<string, number>();
+  for (const name of exercised) seen.set(name, (seen.get(name) ?? 0) + 1);
+
+  const missing = SECTION_9_CHECKS.filter((n) => !seen.has(n));
+  const undeclared = [...seen.keys()].filter((n) => !declared.has(n) && !exempt.has(n));
+  const duplicated = [...seen.entries()].filter(([, c]) => c > 1).map(([n]) => n);
+
+  return {
+    missing,
+    undeclared,
+    duplicated,
+    ok: missing.length === 0 && undeclared.length === 0 && duplicated.length === 0,
+  };
+}
 
 // --- shared fixtures ---------------------------------------------------------
 
@@ -79,9 +150,42 @@ check('verify-no-retention-inputs', !retentionScan.clean, 'smuggled returnRate f
 check('verify-gate-provenance', isValidProvenance(provenance) && !isValidProvenance({ ...provenance, commitSha: '' }), 'valid provenance accepted, empty commitSha rejected');
 
 // 5. verify-no-standin-models
-let standInRejected = false;
-try { computeFitness(telemetry, judgment, { ...provenance, isStandIn: true as unknown as false }); } catch { standInRejected = true; }
-check('verify-no-standin-models', standInRejected, 'stand-in provenance refused by computeFitness');
+//
+// Three assertions, not one. The negative case must throw the RIGHT CLASS with
+// the RIGHT field, and the positive case must not throw at all — a check with no
+// positive control cannot distinguish "refuses stand-ins" from "refuses
+// everything", which is the failure a bare catch invites.
+//
+// SEEN TO FAIL (R2, this build): with the guard replaced by
+// `throw new TypeError("Cannot read properties of undefined (reading 'breakdown')")`
+// the OLD bare-catch version of this check printed PASS and the suite exited 0 —
+// a dropped connection recorded as a refusal. This version reports the class.
+let standInRefusedCorrectly = false;
+let standInField = '';
+try {
+  computeFitness(telemetry, judgment, { ...provenance, isStandIn: true });
+} catch (e) {
+  standInRefusedCorrectly = e instanceof StandInProvenanceError;
+  standInField = standInRefusedCorrectly
+    ? (e as StandInProvenanceError).field
+    : `wrong error: ${(e as Error).name}`;
+}
+
+let validProvenanceAccepted = false;
+try {
+  computeFitness(telemetry, judgment, provenance);
+  validProvenanceAccepted = true;
+} catch (e) {
+  validProvenanceAccepted = false;
+  console.log(`  (positive control threw unexpectedly: ${(e as Error).name}: ${(e as Error).message})`);
+}
+
+check(
+  'verify-no-standin-models',
+  standInRefusedCorrectly && standInField === 'isStandIn' && validProvenanceAccepted,
+  `stand-in refused with StandInProvenanceError(field=${standInField || 'none'}); ` +
+    `real provenance ${validProvenanceAccepted ? 'accepted' : 'WRONGLY REFUSED'}`,
+);
 
 // 6. verify-determinism-fullchain
 const seed = new Uint8Array([1, 2, 3, 4, 5]);
@@ -103,7 +207,32 @@ check('verify-audit-log-complete', verifyAuditLogComplete(auditLog) && !verifyAu
 
 // 10. verify-economy-invisibility
 const under21: Account = { id: 'minor', ageVerified21Plus: false, selfExcluded: false };
-check('verify-economy-invisibility', !verifyEconomyInvisibility([under21], ['minor']).passed, 'economy rendered for an under-21 account is caught');
+const adultAcct: Account = { id: 'adult', ageVerified21Plus: true, selfExcluded: false };
+const excludedAcct: Account = { id: 'ex1', ageVerified21Plus: true, selfExcluded: true };
+// 10. verify-economy-invisibility — R3: the witness is the recorder, not a literal.
+//
+// The old form was `verifyEconomyInvisibility([under21], ['minor'])`. The
+// `['minor']` was written by the author of this file, so the oracle compared one
+// of the author's sentences against another. Here every account is driven
+// through the recorder, which computes the granted set by asking economyVisible
+// itself — so the set is DERIVED, and inverting the rule moves it.
+//
+// The granted set is PRINTED on purpose: EINCOL §4's vacuous control is a
+// perturbation that changes nothing the system reads, and the only way to show
+// this one is not vacuous is to show the set differ between the two runs.
+//   clean:     [adult]
+//   perturbed: [ex1, minor, adult]   (economyVisible -> return true)
+const economyAccounts = [under21, adultAcct, excludedAcct];
+const surfaceRecorder = new EconomySurfaceRecorder();
+for (const acct of economyAccounts) surfaceRecorder.gate(acct, 'wallet-panel');
+const granted = surfaceRecorder.grantedTo();
+console.log(`  economy surfaces granted to: [${granted.join(', ')}]`);
+check(
+  'verify-economy-invisibility',
+  verifyEconomyInvisibilityFromRecorder(economyAccounts, surfaceRecorder).passed
+    && !granted.includes('minor') && !granted.includes('ex1'),
+  `economy granted to [${granted.join(', ')}] — no minor, no self-excluded account`,
+);
 
 // 11. verify-self-exclusion-no-solicit
 const excluded: Account = { id: 'ex1', ageVerified21Plus: true, selfExcluded: true };
@@ -152,12 +281,35 @@ check('verify-provenance-notes', !verifyProvenanceNoteComplete(incompleteNote), 
 const { gateResult } = runKotCalibration();
 check('w7-kot-calibration (not in §9, but the load-bearing gate)', gateResult.passed, 'KoT calibration artifact passes every gate in this build');
 
+const cov = coverage(checkNames);
+let coverageFailures = 0;
+
+for (const name of cov.missing) {
+  console.log(`COVERAGE FAIL: ${name} declared in §9 manifest, never exercised`);
+  coverageFailures++;
+}
+for (const name of cov.undeclared) {
+  console.log(`COVERAGE FAIL: ${name} exercised but never declared in the §9 manifest`);
+  coverageFailures++;
+}
+for (const name of cov.duplicated) {
+  console.log(`COVERAGE FAIL: ${name} exercised more than once — a duplicate hides a deletion`);
+  coverageFailures++;
+}
+
 console.log('');
-console.log(`${checkNames.length} named checks exercised.`);
-if (failures === 0) {
-  console.log('§9 VERIFY SUITE HELD: all 18 named checks correctly distinguish PASS from FAIL cases.');
+console.log(
+  `${checkNames.length} checks exercised · ${SECTION_9_CHECKS.length} declared in §9 · ` +
+    `${cov.ok ? 'coverage closed' : `${coverageFailures} coverage failure(s)`}`,
+);
+
+if (failures === 0 && coverageFailures === 0) {
+  console.log(
+    `§9 VERIFY SUITE HELD: every one of the ${SECTION_9_CHECKS.length} declared checks was ` +
+      'exercised exactly once and correctly distinguished its PASS from its FAIL case.',
+  );
   process.exit(0);
 } else {
-  console.log(`${failures} CHECK(S) FAILED.`);
+  console.log(`${failures} check failure(s), ${coverageFailures} coverage failure(s).`);
   process.exit(1);
 }

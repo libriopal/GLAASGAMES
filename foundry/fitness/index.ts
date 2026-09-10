@@ -7,6 +7,7 @@
 // TERM (LAW 2) — enforced structurally below, not just by convention.
 
 import { scanForForbiddenTelemetryFields } from '../telemetry/types.ts';
+import { InvalidProvenanceError, StandInProvenanceError } from './types.ts';
 import type { FitnessResult, GateProvenance, JudgmentAggregate, TelemetryAggregate } from './types.ts';
 
 const MIN_VIABLE_COMPLETION_RATE = 0.5;
@@ -66,8 +67,17 @@ export function computeFitness(
   if (forbidden) {
     throw new Error(`verify-no-retention-inputs: forbidden field(s) in fitness input: ${forbidden.found.join(', ')}`);
   }
-  if (provenance.isStandIn !== false) {
-    throw new Error('verify-no-standin-models: fitness cannot be computed against a stand-in model');
+  // TYPED, so "any throw" stops counting as "refused". verify-suite check 5
+  // asserts on the CLASS and on `field`; a TypeError from a dropped connection
+  // can no longer impersonate this refusal.
+  if (provenance.isStandIn) {
+    throw new StandInProvenanceError('isStandIn');
+  }
+  if (!provenance.commitSha) {
+    throw new InvalidProvenanceError('commitSha');
+  }
+  if (!provenance.modelIdentity) {
+    throw new InvalidProvenanceError('modelIdentity');
   }
 
   const fTel = scoreTelemetry(telemetry);

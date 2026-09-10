@@ -80,7 +80,7 @@ ok(threw, 'a smuggled retention field (returnRate) on the telemetry input is rej
 // 7. Stand-in provenance is refused at the type/runtime boundary (LAW 3 / verify-no-standin-models).
 let standInThrew = false;
 try {
-  computeFitness(richTelemetry, richJudgment, { ...provenance, isStandIn: true as unknown as false });
+  computeFitness(richTelemetry, richJudgment, { ...provenance, isStandIn: true });
 } catch {
   standInThrew = true;
 }
