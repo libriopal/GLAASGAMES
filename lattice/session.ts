@@ -162,7 +162,7 @@ export class Session {
   /** Deals the opening board. */
   start(): SessionView {
     if (this.#phase !== 'committed') throw new Error(`Session.start: cannot start from phase "${this.#phase}"`);
-    this.#state = beginRound(this.seed);
+    this.#state = beginRound(this.seed, this.config);
     this.#phase = 'playing';
     return this.view();
   }

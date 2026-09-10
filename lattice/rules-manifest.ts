@@ -4,7 +4,7 @@
 // bundle can publish it in a commitment without reading the filesystem.
 // verify-ruleset R7 fails the build if this drifts from computeRules().
 
-export const RULES_HASH = '2f2c472898d7aad478c99b9b52d69557cd7c389d0141b054077fc917c31cd522';
+export const RULES_HASH = '3d1d1285813122f0b38fa23583c9b0b0b32912008a3ad44f2152873a65708df8';
 
 /** The pinned rules hash. Named for symmetry with computeRules(). */
 export function computeRulesFromManifest(): string {

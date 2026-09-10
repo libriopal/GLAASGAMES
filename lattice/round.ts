@@ -42,6 +42,21 @@ export interface RoundConfig {
   readonly turns: number;
   /** Cells refilled per turn. */
   readonly refill: number;
+  /**
+   * The face distribution, as weights over faces 0..6 (index 0 = EMPTY, unused).
+   *
+   * ADDITIVE AND OPTIONAL. Omitted, it is `FACE_WEIGHTS` and the game is
+   * byte-identical to the one that shipped — `verify-montecarlo` M0 asserts that
+   * against the digest. It exists so the Monte Carlo harness can vary the ONE
+   * knob that decides fairness, and so a variant that loads the dice is a thing
+   * the fairness oracle can be pointed at rather than a thing nobody can express.
+   *
+   * L1x still holds: this is read ONCE, before turn 1, and never re-derived
+   * inside a turn from game state. A per-GAME distribution chosen before the
+   * first roll is not a per-TURN bias, and the distinction is the whole of the
+   * OWC finding.
+   */
+  readonly faceWeights?: readonly number[];
 }
 
 export const DEFAULT_ROUND: RoundConfig = { turns: 12, refill: 4 };
@@ -148,25 +163,34 @@ export interface RoundState {
   readonly observations: Observation[];
   chained: number;
   turn: number;
+  /**
+   * The face distribution IN FORCE for this round, resolved once in
+   * `beginRound` before the first roll and never recomputed. Refills read this
+   * rather than reaching for a config field mid-turn, so L1x's guarantee — no
+   * weighting derived inside a turn — stays literally true rather than merely
+   * defensible.
+   */
+  readonly weights: readonly number[];
 }
 
 /** Generates the lattice and the opening faces. */
-export function beginRound(seed: number): RoundState {
+export function beginRound(seed: number, config?: RoundConfig): RoundState {
   const board = new Board();
   generateLattice(board, seed);
 
   const rng = makeRng(seed ^ 0x5bf03635);
 
   // ── L1x: the face distribution is fixed here, before any turn, and is const.
-  // No statement inside a turn may derive a new weighting.
-  const weights = FACE_WEIGHTS;
+  // No statement inside a turn may derive a new weighting. A config-supplied
+  // distribution is resolved HERE, once, before the first roll — never later.
+  const weights = config?.faceWeights ?? FACE_WEIGHTS;
 
   for (let i = 0; i < CELL_COUNT; i += 1) {
     board.set(i, OFFSET_FACE, drawFace(rng, weights));
     board.set(i, OFFSET_STATE, STATE_IDLE);
   }
 
-  return { board, rng, score: 0, reshuffles: 0, conceded: false, observations: [], chained: 0x811c9dc5, turn: 0 };
+  return { board, rng, score: 0, reshuffles: 0, conceded: false, observations: [], chained: 0x811c9dc5, turn: 0, weights };
 }
 
 /**
@@ -202,7 +226,7 @@ export function advanceTurn(
     let attempts = 0;
     while (isStagnant(board) && attempts < MAX_RESHUFFLE_ATTEMPTS) {
       for (let i = 0; i < CELL_COUNT; i += 1) {
-        board.set(i, OFFSET_FACE, drawFace(rng, FACE_WEIGHTS));
+        board.set(i, OFFSET_FACE, drawFace(rng, state.weights));
         board.set(i, OFFSET_STATE, STATE_IDLE);
         board.set(i, OFFSET_CHARGE, 0);
       }
@@ -291,7 +315,7 @@ export function advanceTurn(
     let refilled = 0;
     for (let i = 0; i < CELL_COUNT && refilled < config.refill; i += 1) {
       if (board.get(i, OFFSET_FACE) === EMPTY) {
-        board.set(i, OFFSET_FACE, drawFace(rng, FACE_WEIGHTS));
+        board.set(i, OFFSET_FACE, drawFace(rng, state.weights));
         board.set(i, OFFSET_STATE, STATE_IDLE);
         refilled += 1;
       }
@@ -331,7 +355,7 @@ export function playRound(
   config: RoundConfig,
   chooseAction: (observable: Int32Array, turn: number) => Action,
 ): RoundResult {
-  const state = beginRound(seed);
+  const state = beginRound(seed, config);
   while (advanceTurn(state, config, chooseAction)) {
     // advanceTurn owns the loop condition, so the two drivers cannot disagree
     // about when a round is over.
