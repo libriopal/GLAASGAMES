@@ -1181,3 +1181,97 @@ VIS-001 — three design tools, one rejected asset, and a new gate
                      is recorded but deliberately NOT linked, because first paint
                      in an offline APK must not wait on a network round trip.
                      The whole-application production audit and the APK remain.
+
+────────────────────────────────────────────────────────────────────────────────
+4D-001 — a redesign whose headline candidate was refuted by its own renderer
+────────────────────────────────────────────────────────────────────────────────
+
+  LANDED:            `design/redesign-4d.md` (14 candidates, distribution,
+                     falsification, refutation); `web/board4d.ts` (NEW — 4D token
+                     projection using the REAL rotor4 engine); `scripts/gen-4d-
+                     sheet.ts` + `shoot-4d-sheet.mjs`; `design/4d-sheet.png`.
+
+  BACKEND UNTOUCHED: Not one line of lattice/, game/economy/, net/, foundry/ or
+                     any oracle. verify-tokens P1-P9, verify-theme, verify:suite
+                     and tsc all still pass unchanged.
+
+  THE RULE THAT      `web/lattice-gl.ts` records that a first design put the
+  GOVERNED IT:       hidden links at w != 0 behind a shader slice gate and that it
+                     "is elegant and it is WRONG" — a client that declines to draw
+                     a secret still holds it. So: the fourth axis may carry public
+                     meaning and never secret information. Three of the fourteen
+                     candidates died on that rule before any code was written, and
+                     the independent audit confirmed the rule was applied
+                     "correctly and completely" with no surviving leak.
+
+  C1 WAS THE         "Face n rotates its token in rotation plane n" — weighted
+  HEADLINE AT 0.75.  0.75, the highest in the distribution, on the observation that
+  IT IS NOW 0.00.    PLANE_COUNT is 6 and a die has six faces.
+
+                     X-4D1: for a FLAT token, XZ/XW separate by 0.46 px at 48 px
+                     and YZ/YW likewise — six planes are four. Mechanism: pips at
+                     z=0, w=0 have no extent for those planes to rotate into.
+                     REPAIRED by embossing 0.16 token widths, restoring 5.00 px.
+
+                     X-4D2: rendered against the REAL per-face pip layouts, face 1
+                     displaces 0.000 at every phase and face 6 only 0.032, under
+                     the 0.04 glance threshold. Face 1's single pip sits AT THE
+                     ORIGIN and no rotation about the centre can move it. X-4D1
+                     used ONE test cluster for all six planes and so could not see
+                     this — the measurement and the design disagreed about what
+                     was being measured, and nothing caught it until it was drawn.
+
+                     X-4D3: scoring every face against every plane for BOTH
+                     displacement and pip occlusion — XY is the best clean plane
+                     for five of six faces, ZW is ~0.02 for all six, and every
+                     non-XY plane merges pips on faces 4, 5 and 6. There is no
+                     assignment of six planes to six faces that gives each a
+                     readable signature without merging its pips.
+
+  THE ADMISSION:     PLANE_COUNT being 6 and a die having 6 faces is NUMEROLOGY. A
+                     headline candidate was built on a coincidence of integers and
+                     weighted above everything else in the distribution.
+
+                     The deeper error is worth more than the finding.
+                     `verify-tokens` P1-P9 ALREADY proves a player recovers the
+                     face value from pips alone, in greyscale, at the narrowest
+                     phone. A redundant motion channel for face value is solving a
+                     solved problem, and it was spending the scarcest channel in
+                     the interface on the one quantity already communicated
+                     perfectly.
+
+  WHAT THE AUDIT     Asked for the biggest ARTISTIC weakness, the independent audit
+  CONTRIBUTED:       named "loss of visual grounding and intuitive spatial
+                     rhythm... cognitively exhausting rather than immersive", with
+                     nothing to bridge 4D mathematics and "the low-dimensional
+                     spatial intuition required for natural gameplay." Its fix — a
+                     persistent shadow at each token's rest position as a fixed
+                     spatial baseline — was implemented as C15 and is the single
+                     best idea produced this cycle. It is visible in the specimen
+                     sheet as the faint rings, and it is what makes any of the
+                     motion legible.
+
+                     It also called C3 (uncertainty as w-thickness) a "legibility
+                     trap": a player cannot separate "wide in w because uncertain"
+                     from "wide in z because far". C3 dropped 0.70 -> 0.30 and now
+                     requires a distinct visual language, not extent alone.
+
+  SEEN TO FAIL:      C1 was watched failing three times, each time for a different
+                     and more fundamental reason. The specimen sheet is KEPT as
+                     evidence rather than deleted: it is a picture of a refuted
+                     design and the two dead rows are visible in it.
+
+  WHAT SURVIVES:     C15 the anchor; C4 charge as depth (charge has no spatial
+                     encoding today); C2 belief as a bivector (the player's
+                     inference has NO representation at all today — the largest
+                     genuine gap in the interface); embossing, as the precondition
+                     for any w-touching rotation.
+
+                     The rule the cycle produced: SPEND THE FOURTH AXIS ON WHAT IS
+                     NOT ALREADY ENCODED. Face value is encoded. Charge is
+                     half-encoded. Belief and uncertainty are not encoded at all.
+
+  NOT DONE:          C2 and C4 are designed and measured but NOT built into a
+                     playable surface. The redesign is a specimen sheet and a
+                     refutation, not a shipped UI. No sound. The whole-application
+                     audit and the APK remain.
