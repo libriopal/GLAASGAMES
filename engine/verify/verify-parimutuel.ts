@@ -101,7 +101,7 @@ function heat(n: number, seed: number): Entry[] {
   let worst = 0n;
   for (let n = 2; n <= 40; n += 1) {
     for (let s = 1; s <= 12; s += 1) {
-      const r = settle(heat(n, s * 7919 + n));
+      const r = settle(heat(n, s * 7919 + n), DEFAULT_PARAMS, false);
       const gap = r.netPool - r.distributed;
       if (gap !== 0n) worst = gap;
       ok(gap === 0n,
@@ -139,10 +139,10 @@ function heat(n: number, seed: number): Entry[] {
   for (const n of [4, 9, 17]) {
     for (let s = 1; s <= 6; s += 1) {
       const base = heat(n, s * 31 + n);
-      const canonical = settle(base);
+      const canonical = settle(base, DEFAULT_PARAMS, false);
       // Reverse, and a rotation — two different permutations.
-      const reversed = settle([...base].reverse());
-      const rotated = settle([...base.slice(3), ...base.slice(0, 3)]);
+      const reversed = settle([...base].reverse(), DEFAULT_PARAMS, false);
+      const rotated = settle([...base.slice(3), ...base.slice(0, 3)], DEFAULT_PARAMS, false);
       const key = (r: ReturnType<typeof settle>): string =>
         [...r.payouts].sort((a, b) => (a.id < b.id ? -1 : 1)).map((p) => `${p.id}:${p.payout}`).join(',');
       ok(key(canonical) === key(reversed),
@@ -164,8 +164,8 @@ function heat(n: number, seed: number): Entry[] {
     { id: 'alpha', score: 50, stake: 337n },
     { id: 'mike', score: 50, stake: 337n },
   ];
-  const a = settle(tied);
-  const b = settle([...tied].reverse());
+  const a = settle(tied, DEFAULT_PARAMS, false);
+  const b = settle([...tied].reverse(), DEFAULT_PARAMS, false);
   const norm = (r: ReturnType<typeof settle>): string =>
     [...r.payouts].sort((x, y) => (x.id < y.id ? -1 : 1)).map((p) => `${p.id}:${p.payout}`).join(',');
   ok(norm(a) === norm(b),
@@ -267,14 +267,30 @@ function heat(n: number, seed: number): Entry[] {
     'patterns, and the scan fires on a planted decimal');
 }
 
-// ── P6: MONOTONICITY ───────────────────────────────────────────────────────
-// The audit's specific warning about double rounding: "round the 5th root, then
-// round the payout division... can violate monotonicity."
+// ── P6: MONOTONICITY, AT CONSTANT STAKE ────────────────────────────────────
+//
+// The audit's warning about double rounding: "round the 5th root, then round the
+// payout division... can violate monotonicity."
+//
+// ── THIS CHECK WAS RE-SPECIFIED WHEN P15 WAS FIXED, AND THE REASON MATTERS ──
+//
+// P6 originally asserted that a higher score never pays less, over a heat with
+// MIXED stakes. Once settlement became stake-weighted (see P15) it failed
+// immediately and correctly: at seed 20 a score of 145 paid 371 while a score of
+// 135 paid 876, because the 135 had staked far more. That is not a rounding
+// defect — it is a pari-mutuel working. Your claim is proportional to what you
+// wagered, so a small stake with a better rank can and should return less than a
+// large stake with a worse one.
+//
+// Monotonicity is therefore a property of the WEIGHT CURVE, and it is tested
+// where it actually lives: at CONSTANT STAKE, a better score must never pay
+// less. Holding the stake fixed is what isolates the curve from the wager.
 {
   const _m = mark();
   for (let s = 1; s <= 20; s += 1) {
-    const e = heat(24, s * 101);
-    const r = settle(e);
+    // Constant stake across the heat — see the note above.
+    const e = heat(24, s * 101).map((x) => ({ ...x, stake: 500n }));
+    const r = settle(e, DEFAULT_PARAMS, false);
     const byId = new Map(r.payouts.map((p) => [p.id, p]));
     const sorted = [...e].sort((a, b) => a.score - b.score);
     for (let i = 1; i < sorted.length; i += 1) {
@@ -305,7 +321,7 @@ function heat(n: number, seed: number): Entry[] {
   const _m = mark();
   for (const bps of [0n, 100n, 600n, 1000n]) {
     const e = heat(20, 777);
-    const r = settle(e, { ...DEFAULT_PARAMS, takeoutBps: bps, carryBps: 0n });
+    const r = settle(e, { ...DEFAULT_PARAMS, takeoutBps: bps, carryBps: 0n }, false);
     const expected = (r.handle * bps) / 10000n;
     ok(r.takeout === expected,
       `P7: at ${bps}bps the takeout is ${r.takeout}, expected ${expected}`);
@@ -323,7 +339,7 @@ function heat(n: number, seed: number): Entry[] {
 // ── P8: the floor is real ──────────────────────────────────────────────────
 {
   const e = heat(30, 9001);
-  const r = settle(e);
+  const r = settle(e, DEFAULT_PARAMS, false);
   const worst = r.payouts.reduce((a, p) => (p.payout < a.payout ? p : a));
   ok(worst.payout > 0n,
     `P8: the last-placed entry received ${worst.payout}. FLOOR_W > 0 is a duty-of-care decision — ` +
@@ -337,7 +353,7 @@ function heat(n: number, seed: number): Entry[] {
   for (const bps of [0n, 250n, 600n, 900n]) {
     for (const n of [3, 11, 29]) {
       const e = heat(n, 5150 + n);
-      const r = settle(e, { ...DEFAULT_PARAMS, takeoutBps: bps, carryBps: 0n });
+      const r = settle(e, { ...DEFAULT_PARAMS, takeoutBps: bps, carryBps: 0n }, false);
       // Returned / staked must be exactly (handle − takeout) / handle.
       ok(r.distributed * 10000n === (r.handle - r.takeout) * 10000n,
         `P9: at ${bps}bps n=${n}, distributed ${r.distributed} != handle−takeout ` +
@@ -376,8 +392,8 @@ function heat(n: number, seed: number): Entry[] {
   // seed must not be reachable by editing entries.
   const e1 = heat(12, 31337);
   const withDifferentIds = e1.map((e, i) => ({ ...e, id: `zzz${i}` }));
-  const s1 = settle(e1);
-  const s2 = settle(withDifferentIds);
+  const s1 = settle(e1, DEFAULT_PARAMS, false);
+  const s2 = settle(withDifferentIds, DEFAULT_PARAMS, false);
   ok(s1.payouts.map((p) => p.payout).join(',') === s2.payouts.map((p) => p.payout).join(','),
     'P11: renaming the entrants changed the payout vector. Entry-supplied data must not influence ' +
       'the settlement beyond the score and stake it declares.');
@@ -389,8 +405,8 @@ function heat(n: number, seed: number): Entry[] {
   // in arrival order and in reverse arrival order settles identically (P3), AND
   // no entry's payout changes when a LATER entry is appended and removed again.
   const cohort = heat(10, 606);
-  const before = settle(cohort);
-  const plusLate = settle([...cohort, { id: 'late', score: 999, stake: 500n }]);
+  const before = settle(cohort, DEFAULT_PARAMS, false);
+  const plusLate = settle([...cohort, { id: 'late', score: 999, stake: 500n }], DEFAULT_PARAMS, false);
   const beforeIds = new Map(before.payouts.map((p) => [p.id, p.payout]));
   let changed = 0;
   for (const p of plusLate.payouts) {
@@ -406,7 +422,7 @@ function heat(n: number, seed: number): Entry[] {
 
   // P13 — PUBLIC VERIFIABILITY. A third party with the entries and parameters
   // must reproduce the settlement exactly, twice.
-  const again = settle(cohort);
+  const again = settle(cohort, DEFAULT_PARAMS, false);
   ok(JSON.stringify(before.payouts.map((p) => `${p.id}:${p.payout}`)) ===
      JSON.stringify(again.payouts.map((p) => `${p.id}:${p.payout}`)),
     'P13: two settlements of identical input disagreed — the result is not reproducible and ' +
@@ -414,12 +430,64 @@ function heat(n: number, seed: number): Entry[] {
   console.log('  P13 public verifiability: identical input reproduces the settlement exactly');
 }
 
+// ── P15: YOUR STAKE MUST MATTER ────────────────────────────────────────────
+//
+// THE EXPLOIT THAT PASSED EVERY OTHER CHECK IN THIS FILE.
+//
+// Spec 36 §2.4 settles as π_i = Π·g(p_i)/Σg(p_j) — a function of RANK ALONE,
+// with the entry's own stake appearing nowhere. Measured on the code as first
+// written: four entries staking 10000 each, and one staking 1 that placed
+// second.
+//
+//     whale-A   stake 10000  ->  payout 14415       144%
+//     MINNOW    stake     1  ->  payout  9446    944600%
+//
+// The pool closed exactly. Order invariance held. Monotonicity held. RTP was
+// identically 1−t. P1 through P14 all passed, because none of them asks whether
+// what you put in has anything to do with what you take out.
+//
+// The spec contradicts itself here: §3.1's live projection is
+// `stake · (1−t) · g(p̂)/E[g]`, which IS stake-proportional, while §2.4's
+// settlement is not. §3.1 is right — a pari-mutuel claim is proportional to what
+// was wagered, adjusted by outcome, which is how every real pool works.
+{
+  const _m = mark();
+  const mixed: Entry[] = [
+    { id: 'whale-A', score: 150, stake: 10000n },
+    { id: 'whale-B', score: 140, stake: 10000n },
+    { id: 'whale-C', score: 130, stake: 10000n },
+    { id: 'whale-D', score: 120, stake: 10000n },
+    { id: 'minnow', score: 145, stake: 1n },
+  ];
+  const r = settle(mixed, DEFAULT_PARAMS, false);
+  const byId = new Map(r.payouts.map((p) => [p.id, p.payout]));
+  const minnow = byId.get('minnow')!;
+  const whaleB = byId.get('whale-B')!;
+
+  // The minnow out-ranks whale-B but staked one ten-thousandth as much. It must
+  // not out-earn it.
+  ok(minnow < whaleB,
+    `P15: an entry staking 1 unit received ${minnow} while an entry staking 10000 received ` +
+      `${whaleB}. Settlement is ignoring the stake entirely, so the cheapest possible entry ` +
+      'extracts from the pool at the same rate as the largest. Every other check in this file ' +
+      'passes while this is true.');
+
+  // And the return on stake must not explode for a dust entry.
+  ok(minnow <= mixed[4]!.stake * 100n,
+    `P15: the 1-unit entry returned ${minnow}, a ${Number(minnow) * 100}% return on stake. A ` +
+      'dust entry cannot be the most profitable position in the pool.');
+
+  summarise(_m, `  P15 stake matters: a 1-unit entry ranking 2nd receives ${minnow}, below the ` +
+    `${whaleB} taken by a 10000-unit entry ranking 3rd — claim on the pool scales with what was ` +
+    'wagered');
+}
+
 // ── P14: the heat-size floor is enforced ───────────────────────────────────
 {
   const _m = mark();
   for (const n of [0, 1]) {
     let threw = false;
-    try { settle(heat(Math.max(n, 0), 1).slice(0, n)); } catch { threw = true; }
+    try { settle(heat(Math.max(n, 0), 1).slice(0, n), DEFAULT_PARAMS, false); } catch { threw = true; }
     ok(threw,
       `P14: a heat of ${n} was settled rather than rejected. Matchpointing divides by M = n − 1, so ` +
         'n = 1 divides by zero and n = 0 has no cohort at all.');

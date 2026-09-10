@@ -34,6 +34,7 @@
 // closes.
 
 import { ONE, SCALE, fromRatio, weight } from './fixed-bigint.js';
+import { MAX_POOL_SHARE_BPS } from './heat.js';
 
 /** Real-money settlement. FALSE, and only a human may change it. See E29. */
 export const FEATURE_RM_SETTLEMENT = false;
@@ -181,6 +182,28 @@ export function neubergPercentile(mX2: number, n: number, N: number): bigint {
 export function settle(
   entries: readonly Entry[],
   params: SettlementParams = DEFAULT_PARAMS,
+  /**
+   * Enforce the concentration limit. TRUE on every production path.
+   *
+   * ── WHY THIS IS CHECKED TWICE ────────────────────────────────────────────
+   *
+   * The limit was first placed in `close()` alone, which looked sufficient: a
+   * heat that cannot close cannot be settled. Then `verify-staking` S4 failed,
+   * because its sybil probe called `settle()` DIRECTLY and never went through
+   * the heat lifecycle at all. The guard was real and the path around it was
+   * trivial.
+   *
+   * A limit that protects the pool belongs where the pool is divided. `close()`
+   * still checks it, so an inadmissible heat is refused early with a message
+   * about gaining entrants; this check is the one that cannot be walked around.
+   *
+   * It is FALSE in exactly two places, both deliberate and both documented at
+   * the call site: `verify-parimutuel`, which exercises settlement arithmetic on
+   * cohorts smaller than production admission allows (a 2-entry heat is 50% each
+   * by construction and can never satisfy a 25% cap), and the S4 positive
+   * control, which must be able to demonstrate that the attack is real.
+   */
+  enforceConcentration = true,
 ): Settlement {
   const n = entries.length;
   if (n < 2) {
@@ -193,6 +216,20 @@ export function settle(
   if (ids.size !== n) throw new RangeError('settle: duplicate entry ids — order invariance relies on ids being unique');
 
   const handle = entries.reduce((a, e) => a + e.stake, 0n);
+  if (enforceConcentration) {
+    for (const e of entries) {
+      if (e.stake * 10000n > handle * MAX_POOL_SHARE_BPS) {
+        const share = handle === 0n ? 0n : (e.stake * 10000n) / handle;
+        throw new RangeError(
+          `settle: ${e.id} holds ${share} bps of the handle, above the ${MAX_POOL_SHARE_BPS} bps ` +
+            'limit. Measured, a dominant entrant makes the sybil attack profitable — an edge of about ' +
+            '138 basis points once one entrant holds roughly three fifths of the pool. Pass ' +
+            'enforceConcentration=false only to test settlement arithmetic on cohorts below ' +
+            'production admission rules.',
+        );
+      }
+    }
+  }
   const takeout = (handle * params.takeoutBps) / 10000n;
   const grossAfterTakeout = handle - takeout;
   const carryOut = (grossAfterTakeout * params.carryBps) / 10000n;
@@ -205,7 +242,22 @@ export function settle(
   );
   const weightSum = weights.reduce((a, w) => a + w, 0n);
 
-  const raw = weights.map((w) => (weightSum === 0n ? 0n : (netPool * w) / weightSum));
+  // ── CLAIM ON THE POOL SCALES WITH WHAT WAS WAGERED ────────────────────────
+  //
+  // Spec 36 §2.4 settles on g(p) alone, with the entry's own stake appearing
+  // nowhere. That is an exploit, and it is measured in `verify-parimutuel` P15:
+  // four entries staking 10000 and one staking 1 that placed second returned
+  // 9446 to the 1-unit entry — a 944,600% return — while the pool still closed
+  // exactly and every other fairness property still passed.
+  //
+  // The spec contradicts itself on this point. §3.1's live projection is
+  // `stake · (1−t) · g(p̂)/E[g]`, which IS stake-proportional. §3.1 is the
+  // correct one: a pari-mutuel claim is proportional to what was wagered,
+  // adjusted by outcome, which is how every real pool works — winning tickets
+  // share the pool in proportion to ticket value, not merely by having won.
+  const claims = weights.map((w, i) => w * entries[i]!.stake);
+  const claimSum = claims.reduce((a, c) => a + c, 0n);
+  const raw = claims.map((c) => (claimSum === 0n ? 0n : (netPool * c) / claimSum));
   const distributedBeforeRemainder = raw.reduce((a, p) => a + p, 0n);
   let remainder = netPool - distributedBeforeRemainder;
 

@@ -724,3 +724,28 @@ export function searchSiblings(
   }
   return out.sort((a, b) => b.deltaVsDeclared - a.deltaVsDeclared);
 }
+
+/**
+ * Plays ONE seed under a named ladder rung and returns the score.
+ *
+ * Exported so `staking.ts` drives the SAME policies this file measures, rather
+ * than a second copy of them. Two implementations of a ladder is the drift this
+ * repository forbids everywhere else, and a staking simulation ranking a
+ * different set of agents than the balance harness would be comparing two
+ * different games.
+ */
+export function ladderScores(config: RoundConfig, seed: number, rung: string): number {
+  const table: Record<string, { p: Policy; reveal: 'none' | 'flows' | 'links' }> = {
+    blind: { p: blind, reveal: 'none' },
+    greedy: { p: greedy, reveal: 'none' },
+    chargeAware: { p: chargeAware, reveal: 'none' },
+    neighbourAware: { p: neighbourAware, reveal: 'none' },
+    expectedPayout: { p: expectedPayout, reveal: 'none' },
+    regionFlow: { p: regionFlow, reveal: 'none' },
+    regionOracle: { p: regionOracle, reveal: 'flows' },
+    clairvoyant: { p: clairvoyant, reveal: 'links' },
+  };
+  const entry = table[rung];
+  if (entry === undefined) throw new RangeError(`ladderScores: unknown rung ${rung}`);
+  return playOne(seed, config, entry.p, entry.reveal).score;
+}

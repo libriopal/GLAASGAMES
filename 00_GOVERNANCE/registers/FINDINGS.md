@@ -891,3 +891,115 @@ PM-001 — pari-mutuel settlement, built and proven fair, money still off
                      mathematics, not a netcode). Visual/audio polish, the
                      production audit and the APK. Nothing here resolves E29 or
                      any other election.
+
+────────────────────────────────────────────────────────────────────────────────
+MP-001 — shared-board multiplayer, and a critical exploit in the ratified spec
+────────────────────────────────────────────────────────────────────────────────
+
+  LANDED:            `game/economy/heat.ts` (NEW — heat lifecycle, commit-reveal,
+                     concentration limit, live projection);
+                     `foundry/montecarlo/staking.ts` (NEW — the balance harness
+                     pointed at a POOL); `engine/verify/verify-heat.ts` (H1-H11);
+                     `engine/verify/verify-staking.ts` (S1-S4);
+                     `ladderScores` exported from harness.ts; stake-weighted
+                     settlement in pari-mutuel.ts; P15 in verify-parimutuel.
+
+  THE CRITICAL       PAYOUT IGNORED YOUR OWN STAKE. Spec 36 §2.4 settles as
+  EXPLOIT:           pi_i = Pi * g(p_i) / sum_j g(p_j) — a function of RANK ALONE.
+                     Measured on the code as built: four entries staking 10000
+                     each and one staking 1 that placed second.
+
+                       whale-A  stake 10000 -> payout 14415       144%
+                       MINNOW   stake     1 -> payout  9446    944600%
+
+                     THE POOL STILL CLOSED EXACTLY. Order invariance held.
+                     Monotonicity held. RTP was identically 1-t. P1 through P14
+                     ALL PASSED, because not one of them asks whether what you put
+                     in relates to what you take out. The engine was provably fair
+                     and economically broken at the same time.
+
+                     The spec contradicts itself: §3.1's live projection is
+                     stake * (1-t) * g(p)/E[g], which IS stake-proportional.
+                     §3.1 is right. Settlement is now
+                     pi_i = Pi * (stake_i * g(p_i)) / sum_j (stake_j * g(p_j)),
+                     and the minnow receives 1 instead of 9446.
+
+  SEEN TO FAIL:      P15 was written first and watched failing on the real
+                     exploit. Three defects were then planted in heat.ts and each
+                     fired on exactly the right check: reveal-while-OPEN -> H3;
+                     stake bounds removed -> H8; boardSeed unsorted -> H6.
+
+  AN AUDIT ANSWERED  Asked whether stake-weighting revives the sybil attack, the
+  BY ASSERTION AND   design audit said: "No, sybils are neutralized by the
+  WAS WRONG:         requirement of minimum stake per account." MEASURED, FALSE.
+                     A colluder running 8 MIN_STAKE throwaways earned -9.6%
+                     against -10.7% honest — a repeatable +1.1pp edge.
+
+                     Characterising it properly took two more probes. The lever is
+                     not the MAX:MIN stake ratio (safe at every ratio when the
+                     field stakes evenly) but the attacker's SHARE OF THE POOL:
+
+                       share    honest    with 8 sybils     edge
+                         6%      +2.2%        -29.8%     -32.02pp
+                        25%      -5.5%        -12.6%      -7.09pp
+                        40%      -9.3%        -11.0%      -1.64pp
+                        62%     -12.1%        -10.7%   *** +1.38pp
+                        86%     -11.2%         -9.9%   *** +1.28pp
+
+                     A MIN_STAKE sybil lifts a dominant attacker's rank by a full
+                     place while diluting a pool they already own by almost
+                     nothing. MAX_STAKE cannot express this, because whether 10000
+                     is dominant depends on who else turned up.
+
+                     Fix: MAX_POOL_SHARE_BPS = 2500, checked at heat close where
+                     the whole cohort is known. The exact figure belongs to
+                     election E32 (collusion policy) and is NOT resolved here;
+                     what is settled is the mechanism and the measurement.
+
+  A HOLE THE CHECK   The limit went into `close()` alone, which looked sufficient:
+  FOUND IN THE FIX:  a heat that cannot close cannot be settled. Then S4 failed —
+                     its probe called `settle()` DIRECTLY and never touched the
+                     lifecycle. The guard was real and the path around it was
+                     trivial. `settle()` now enforces it too. A limit that
+                     protects the pool belongs where the pool is divided.
+
+  P5 CAUGHT ITS OWN  The float scan flagged "+1.38" inside a STRING LITERAL in the
+  AUTHOR:            new error message. It cannot distinguish prose from
+                     arithmetic and should not try; the message was rewritten in
+                     basis points, which is the file's own unit.
+
+  P6 RE-SPECIFIED:   P6 asserted a higher score never pays less, over MIXED
+                     stakes. Once settlement became stake-weighted it failed
+                     correctly — at seed 20 a score of 145 paid 371 while 135 paid
+                     876, because the 135 staked more. That is a pari-mutuel
+                     working, not a rounding defect. Monotonicity is a property of
+                     the WEIGHT CURVE and is now tested at CONSTANT STAKE.
+
+  THE AUDIT REMEDY   The audit named the LEADERBOARD ORACLE ATTACK as the most
+  THAT WAS REJECTED: likely silent unfairness and proposed ZK-proofs over
+                     leaderboard state. REJECTED, and recorded rather than done
+                     quietly: proving the integrity of a signal that should not be
+                     published is the wrong repair. Spec 36 already solves it —
+                     the live readout reads a PAR CURVE committed at heat open, so
+                     "the live actual field aggregate is never exposed."
+                     `liveProjection` therefore has NO PARAMETER through which the
+                     live field could arrive, and H9 asserts its arity. Absence of
+                     the information beats a proof about it.
+
+  MEASURED           S1/S2  skill pays in rank order: blind -48% < greedy -43% <
+  ECONOMICS:                chargeAware -15% < expectedPayout +27% < regionFlow
+                            +36%. An 84 percentage point premium for skill.
+                     S3     all 120 simulated heats distributed their net pool
+                            exactly.
+                     S4     under the limit collusion COSTS 34.9pp; unconstrained
+                            it GAINS 1.3pp. The positive control demonstrates the
+                            attack is real and that the limit is what removes it.
+
+  SEEN TO PASS:      verify-parimutuel P0-P15, verify-heat H1-H11, verify-staking
+                     S1-S4, verify-montecarlo M0-M11, verify:suite 19 checks
+                     coverage closed, verify-lattice, verify-ruleset, tsc clean.
+
+  NOT DONE:          Network transport (this is the heat MATHEMATICS and its
+                     lifecycle, not netcode). Visual/audio polish, the production
+                     audit and the APK. The seven carried Monte Carlo revisions.
+                     E29 and E32 remain open and are Tier 1.
