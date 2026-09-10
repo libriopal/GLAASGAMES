@@ -1003,3 +1003,93 @@ MP-001 — shared-board multiplayer, and a critical exploit in the ratified spec
                      lifecycle, not netcode). Visual/audio polish, the production
                      audit and the APK. The seven carried Monte Carlo revisions.
                      E29 and E32 remain open and are Tier 1.
+
+────────────────────────────────────────────────────────────────────────────────
+NET-001 — the transport, and an attack that killed my own commit-reveal design
+────────────────────────────────────────────────────────────────────────────────
+
+  LANDED:            `net/heat-server.ts` (NEW — authoritative submission path);
+                     `engine/verify/verify-net.ts` (T1-T9); `heat.ts` gains
+                     `Beacon`, `drawBeacon`, `fairnessLevel`, a BEACONED phase,
+                     and a board seed that no longer depends on the cohort;
+                     H5/H6 REPLACED by H12/H13.
+
+  THE ATTACK, ON MY  The board was derived from the server seed AND every client
+  OWN DESIGN:        commitment hash. That reads like an entropy improvement —
+                     every entrant contributes, so nobody picks the board alone.
+                     It is a hole.
+
+                     Because the board depended on WHICH entrants were present,
+                     and the operator knows the server seed from heat open, the
+                     operator could compute the board each possible admission
+                     would produce and choose. Measured: eight committed
+                     entrants, twelve waiting candidates, target player's
+                     achievable score by admission —
+
+                       48  54  55  75  91  102  103  104  106  110  117  123
+
+                     A 75-POINT SPREAD. The entire skill ladder, blind policy to
+                     best learner, spans about 40. The operator could hand a
+                     chosen player a better board than skill is worth purely by
+                     deciding who got in.
+
+                     H5 ("every entrant moves the board seed") and H6 ("arrival
+                     order does not") both PASSED throughout. They were not merely
+                     obsolete — H5 was asserting the vulnerability as a feature.
+                     Both are replaced by H12, which asserts the opposite: all 13
+                     cohort variations must produce the SAME board. They do.
+
+  FIX:               Cohort-dependence removed; the board is fixed before anyone
+                     enters. Player-contributed entropy dropped with it — it was
+                     protecting against an operator-chosen board, which is the
+                     beacon's job and was never really the client hashes' job.
+
+  THE RESIDUAL RISK, The operator still knows the server seed early, so an
+  NOT PAPERED OVER:  operator colluding with a player can hand them the board in
+                     advance. The audit's ordering closes it, adopted verbatim:
+                     commit H(serverSeed) -> cohort CLOSES -> beacon retrieved ->
+                     reveal seed AND beacon -> players verify both. `drawBeacon`
+                     is legal only from CLOSED, so the ordering is a phase
+                     transition rather than a convention.
+
+  A MARKETING CLAIM  The audit required: "Prohibit 'Provably Fair' claims for any
+  MADE FALSIFIABLE:  deployment where the external beacon is not integrated." A
+                     rule in a document is a rule nobody can check, so it is
+                     DERIVED instead. `fairnessLevel` returns OPERATOR_TRUSTED
+                     with no beacon, BEACON_UNVERIFIED for a beacon with no source
+                     reference, and PROVABLY_FAIR only for one carrying a
+                     checkable public source. There is no branch that could
+                     overclaim, and the receipt publishes the level — so an
+                     unbeaconed heat tells its own players the operator saw the
+                     board first.
+
+  THE TRANSPORT      The server does not score anything. A client submits its
+  SCORES NOTHING:    ACTIONS; the server re-executes them through `verifyRound`,
+                     the same function the single-player build uses and that
+                     `verify-session` N5 already proves rejects inflated scores,
+                     flipped digests, reordered actions, false seeds and foreign
+                     rulesets. This is the server-authoritative pattern the
+                     literature describes — "the server performs all crucial
+                     checks and simulations, refusing to blindly trust client
+                     input" (arXiv 2512.21377) — with the difference that the
+                     simulation is not a re-implementation, it IS the shipped
+                     game. T9 scans the server source and fails the build if it
+                     acquires one: no advanceTurn, no drawFace, no
+                     generateLattice, no direct board-column reads.
+
+  SEEN TO PASS:      verify-net T1-T9; verify-heat H1-H13; verify-parimutuel
+                     P0-P15; verify-staking S1-S4; verify:suite 19 checks;
+                     verify-ruleset; tsc clean. Measured: an honest run scores 44
+                     by replay, a +500 forgery and a reversed action list are both
+                     rejected, and with 6 of 8 entrants never submitting the
+                     handle is still 800 and the pool closes exactly.
+
+  NOT DONE:          No socket, no HTTP handler, no persistence — those are
+                     deployment concerns and the file says so. A REAL beacon
+                     feed (drand/block) is not wired; the interface exists and
+                     `fairnessLevel` reports honestly without one. Beacon-source
+                     verification (fetching the drand round and checking it) is
+                     the audit's revision 1 and is NOT implemented — the source
+                     string is recorded, not checked. Visual/audio, the
+                     whole-application audit and the APK remain. E29 and E32 are
+                     open and Tier 1.

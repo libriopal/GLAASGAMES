@@ -4,8 +4,8 @@
 // H2  a substituted server seed is REJECTED at reveal
 // H3  reveal CANNOT precede close          (the anti-grinding ordering)
 // H4  entry after close is REJECTED                    (the anti-snipe)
-// H5  every entrant contributes entropy to the board
-// H6  the board seed is ORDER-INVARIANT across arrival order
+// H12 the board does NOT depend on who is in the cohort   (the admission attack)
+// H13 the beacon, and an honest account of fairness
 // H7  abandonment is a losing bet, never a refund
 // H8  stake bounds are enforced at BOTH ends
 // H9  the live projection cannot see the live field   (leaderboard oracle)
@@ -19,12 +19,15 @@
 // of not publishing the signal at all — see `heat.ts` `liveProjection`.
 
 import {
+  type Beacon,
   MAX_POOL_SHARE_BPS,
   MAX_STAKE,
   MIN_STAKE,
   abandon,
   boardSeed,
   close,
+  drawBeacon,
+  fairnessLevel,
   enter,
   heatDigest,
   hashText,
@@ -108,41 +111,80 @@ function populated(n: number, capacity = 64) {
   summarise(_m, '  H4 strict close: entry is refused once CLOSED or REVEALED, and at capacity');
 }
 
-// ── H5 / H6: entropy, and order invariance of the board ────────────────────
+// ── H12: THE BOARD DOES NOT DEPEND ON WHO IS IN THE COHORT ─────────────────
+//
+// THIS CHECK REPLACES TWO THAT WERE PASSING WHILE THE DESIGN WAS BROKEN.
+//
+// H5 asserted that every entrant moves the board seed, and H6 that arrival order
+// does not. Both passed. Both were properties of a design in which the board
+// depended on the cohort — and that dependence was the vulnerability: because the
+// operator knows the server seed from the moment the heat opens, they could
+// compute the board each possible admission would produce and choose one.
+// Measured across twelve candidate admissions, a target player's achievable
+// score ranged 48 to 123, a 75-point spread against a skill ladder spanning ~40.
+//
+// So H5 is not merely obsolete, it was asserting the hole. The property that
+// matters is the opposite one.
 {
   const _m = mark();
-  const a = reveal(close(populated(8)), SERVER_SEED);
-  const seedA = boardSeed(a);
+  const board = (extra: string | null): number => {
+    let h = openHeat('H-ADMIT', SERVER_SEED);
+    for (let i = 0; i < 8; i += 1) {
+      h = enter(h, { playerId: `p${i}`, clientSeedHash: hashText(`c:${i}`), stake: 100n });
+    }
+    if (extra !== null) {
+      h = enter(h, { playerId: extra, clientSeedHash: hashText(`c:${extra}`), stake: 100n });
+    }
+    return boardSeed(reveal(close(h), SERVER_SEED));
+  };
+  const base = board(null);
+  const seen = new Set<number>([base]);
+  for (let k = 0; k < 12; k += 1) seen.add(board(`cand${k}`));
+  ok(seen.size === 1,
+    `H12: admitting different entrants produced ${seen.size} different boards. The operator knows ` +
+      'the server seed from heat open, so a cohort-dependent board lets them audition admissions ' +
+      'and hand a chosen player the board they want — measured at a 75-point swing, against a ' +
+      'skill ladder worth about 40.');
+  summarise(_m, `  H12 admission cannot steer: all 13 cohort variations produce the SAME board ` +
+    `(${base}) — the board is fixed before anyone enters`);
+}
 
-  // H5 — changing ONE entrant's contribution must move the board.
-  let b = openHeat('H-001', SERVER_SEED);
-  for (let i = 0; i < 8; i += 1) {
-    b = enter(b, {
-      playerId: `p${String(i).padStart(2, '0')}`,
-      clientSeedHash: i === 3 ? hashText('client:3:DIFFERENT') : hashText(`client:${i}:${i * 7919}`),
-      stake: 100n + BigInt(i * 3),
-    });
-  }
-  const seedB = boardSeed(reveal(close(b), SERVER_SEED));
-  ok(seedA !== seedB,
-    'H5: changing one entrant\'s client seed left the board seed unchanged. If a single entrant ' +
-      'contributes no entropy, the operator plus the remaining entrants determine the board alone.');
+// ── H13: THE BEACON, AND AN HONEST ACCOUNT OF FAIRNESS ─────────────────────
+// The audit required: "Prohibit 'Provably Fair' claims for any deployment where
+// the external beacon is not integrated." Enforced by derivation rather than by
+// documentation — `fairnessLevel` has no branch that could overclaim.
+{
+  const _m = mark();
+  const closed = close(populated(8));
 
-  // H6 — arrival order must not.
-  let c = openHeat('H-001', SERVER_SEED);
-  for (let i = 7; i >= 0; i -= 1) {
-    c = enter(c, {
-      playerId: `p${String(i).padStart(2, '0')}`,
-      clientSeedHash: hashText(`client:${i}:${i * 7919}`),
-      stake: 100n + BigInt(i * 3),
-    });
-  }
-  const seedC = boardSeed(reveal(close(c), SERVER_SEED));
-  ok(seedA === seedC,
-    `H6: the board seed depends on arrival order (${seedA} vs ${seedC}). Whoever entered first ` +
-      'would then have a different board from whoever entered last, and the heat is not shared.');
-  summarise(_m, `  H5/H6 entropy: every entrant moves the board seed, and arrival order does not ` +
-    `(${seedA} either way)`);
+  // No beacon: honest about being operator-trusted.
+  ok(fairnessLevel(reveal(closed, SERVER_SEED)) === 'OPERATOR_TRUSTED',
+    'H13: a heat with no beacon did not report OPERATOR_TRUSTED. Without a beacon the operator ' +
+      'knows the board before any player does, and the build must say so.');
+
+  // A beacon with no checkable source is not proof of anything.
+  const vague: Beacon = { value: 12345, source: '' };
+  ok(fairnessLevel(reveal(drawBeacon(closed, vague), SERVER_SEED)) === 'BEACON_UNVERIFIED',
+    'H13: a beacon with no source reference was treated as verifiable. An operator can invent a ' +
+      'number; the point of the beacon is that a third party can fetch it independently.');
+
+  // A sourced beacon is the real thing.
+  const real: Beacon = { value: 987654, source: 'drand:mainnet:4210987' };
+  const done = reveal(drawBeacon(closed, real), SERVER_SEED);
+  ok(fairnessLevel(done) === 'PROVABLY_FAIR',
+    'H13: a beacon with a checkable public source was not accepted as provably fair');
+
+  // The beacon must actually change the board, or it is decoration.
+  ok(boardSeed(done) !== boardSeed(reveal(closed, SERVER_SEED)),
+    'H13: drawing a beacon left the board unchanged — it is not an input, it is an ornament');
+
+  // ORDERING: the audit's sequence is enforced by the state machine.
+  ok(threw(() => drawBeacon(populated(8), real)),
+    'H13: a beacon was drawn while the heat was still OPEN. Drawing before the cohort locks lets ' +
+      'the operator admit entrants against a known beacon.');
+  summarise(_m, '  H13 beacon: no beacon reports OPERATOR_TRUSTED, an unsourced one ' +
+    'BEACON_UNVERIFIED, a drand-sourced one PROVABLY_FAIR; the beacon moves the board, and it ' +
+    'cannot be drawn before the cohort locks');
 }
 
 // ── H7: abandonment is a losing bet, not a refund ──────────────────────────
@@ -279,5 +321,5 @@ if (failures.length > 0) {
   for (const f of failures) console.error(`  ${f}`);
   process.exit(1);
 }
-console.log('verify-heat: H1-H11 pass. The board is committed before entry, cannot be ground by an ' +
+console.log('verify-heat: H1-H13 pass. The board is committed before entry, cannot be ground by an ' +
   'entrant, cannot be joined by a sniper, and no live field reaches the player.');

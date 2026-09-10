@@ -42,7 +42,44 @@ export function hashText(s: string): number {
   return hashState(codes) >>> 0;
 }
 
-export type HeatPhase = 'OPEN' | 'CLOSED' | 'REVEALED';
+export type HeatPhase = 'OPEN' | 'CLOSED' | 'BEACONED' | 'REVEALED';
+
+/**
+ * How strong this heat's fairness guarantee actually is.
+ *
+ * ── THIS EXISTS BECAUSE AN AUDIT FORBADE A MARKETING CLAIM ──────────────────
+ *
+ * Reviewing the transport design, the independent audit ruled that shipping
+ * without an external randomness beacon is acceptable "ONLY for no-money
+ * testing" and required: "Prohibit 'Provably Fair' claims for any deployment
+ * where the external beacon is not integrated."
+ *
+ * A rule like that, written in a document, is a rule nobody can check. So the
+ * heat computes its own level and `verify-heat` asserts it, which makes the
+ * claim falsifiable: a build without a beacon CANNOT report PROVABLY_FAIR,
+ * because the value is derived rather than declared.
+ */
+export type FairnessLevel =
+  /** No beacon. The operator knows the board before any player does. */
+  | 'OPERATOR_TRUSTED'
+  /** A beacon was supplied but carries no verifiable source reference. */
+  | 'BEACON_UNVERIFIED'
+  /** A beacon with a checkable public source. Nobody knows the board early. */
+  | 'PROVABLY_FAIR';
+
+/**
+ * An external public randomness beacon, drawn AFTER the cohort closes.
+ *
+ * `source` must identify a value a third party can independently fetch — a drand
+ * round number, a block height. Without it the operator could simply invent the
+ * number, which is the "proof of beacon integrity" the audit named as the single
+ * missing piece.
+ */
+export interface Beacon {
+  readonly value: number;
+  /** e.g. "drand:mainnet:4210987" or "btc:block:912345". Empty = unverifiable. */
+  readonly source: string;
+}
 
 /**
  * Stake bounds.
@@ -101,6 +138,8 @@ export interface HeatState {
   readonly serverSeedHash: number;
   /** The server seed, present only once REVEALED. */
   readonly serverSeed: number | null;
+  /** The public beacon, present once BEACONED. Null means operator-trusted. */
+  readonly beacon: Beacon | null;
   readonly commitments: readonly Commitment[];
   /** Entrants who never submitted a score. Treated as zero, never refunded. */
   readonly abandoned: readonly string[];
@@ -113,6 +152,7 @@ export function openHeat(id: string, serverSeed: number, capacity = 64): HeatSta
     phase: 'OPEN',
     serverSeedHash: hashText(`server:${serverSeed}`),
     serverSeed: null,
+    beacon: null,
     commitments: [],
     abandoned: [],
     capacity,
@@ -183,11 +223,30 @@ export function close(heat: HeatState): HeatState {
  * the cohort is locked the server seed is disclosed and every entrant can
  * recompute the board and check the hash published at OPEN.
  */
-export function reveal(heat: HeatState, serverSeed: number): HeatState {
+/**
+ * Draws the external beacon. Legal only once the cohort is CLOSED.
+ *
+ * THE ORDERING IS THE AUDIT'S, VERBATIM: "Commit H(serverSeed) -> Cohort Close
+ * -> Beacon Retrieval -> Dual Reveal." Drawing the beacon before the cohort
+ * locks would let the operator admit entrants against a known beacon; revealing
+ * the server seed before the beacon is drawn would let them wait for a beacon
+ * they like. Both are impossible here because both are phase transitions.
+ */
+export function drawBeacon(heat: HeatState, beacon: Beacon): HeatState {
   if (heat.phase !== 'CLOSED') {
     throw new RangeError(
-      `reveal: heat ${heat.id} is ${heat.phase}, not CLOSED. Revealing the server seed while entry ` +
-        'is still open would let the last entrant grind a client seed against a known server seed.',
+      `drawBeacon: heat ${heat.id} is ${heat.phase}, not CLOSED. A beacon drawn while entry is open ` +
+        'is a beacon the operator can admit entrants against.',
+    );
+  }
+  return { ...heat, phase: 'BEACONED', beacon };
+}
+
+export function reveal(heat: HeatState, serverSeed: number): HeatState {
+  if (heat.phase !== 'CLOSED' && heat.phase !== 'BEACONED') {
+    throw new RangeError(
+      `reveal: heat ${heat.id} is ${heat.phase}. The server seed may only be revealed once the ` +
+        'cohort is locked — and, where a beacon is used, only after it has been drawn.',
     );
   }
   if (hashText(`server:${serverSeed}`) !== heat.serverSeedHash) {
@@ -200,19 +259,54 @@ export function reveal(heat: HeatState, serverSeed: number): HeatState {
 }
 
 /**
- * The board seed, from the server seed and every client commitment.
+ * The board seed.
  *
- * The client hashes are sorted, so the derivation does not depend on the order
- * entrants happened to arrive — the same property `settle` needs, for the same
- * reason. Every entrant contributes entropy, so no single party (the operator
- * included) chooses the board alone.
+ * ── IT DOES NOT DEPEND ON WHO IS IN THE COHORT, AND THAT IS THE FIX ─────────
+ *
+ * The first version derived it from the server seed AND every client commitment
+ * hash. That looked like an entropy improvement — every entrant contributes, so
+ * no single party picks the board — and it opened a hole big enough to drive the
+ * whole game through.
+ *
+ * Because the board depended on WHICH entrants were present, and the operator
+ * knows the server seed from the moment the heat opens, the operator could
+ * compute the board each possible admission would produce and choose. Measured,
+ * with eight committed entrants and twelve waiting candidates, the achievable
+ * score for a target player across the twelve admissions was:
+ *
+ *     48  54  55  75  91  102  103  104  106  110  117  123
+ *
+ * A 75-point spread. The entire skill ladder, from a blind policy to the best
+ * learner, spans about 40. The operator could hand a chosen player a better
+ * board than skill is worth purely by deciding who got in.
+ *
+ * So cohort-dependence is gone. The board is fixed before anybody enters, and
+ * admission cannot move it. Player-contributed entropy is dropped with it: it
+ * was protecting against an operator-chosen board, which is now the beacon's job
+ * and was never really the client hashes' job anyway.
  */
 export function boardSeed(heat: HeatState): number {
-  if (heat.phase !== 'REVEALED' || heat.serverSeed === null) {
+  if (heat.serverSeed === null || (heat.phase !== 'REVEALED')) {
     throw new RangeError(`boardSeed: heat ${heat.id} is ${heat.phase} — the seed is not yet public`);
   }
-  const parts = [...heat.commitments.map((c) => c.clientSeedHash)].sort((a, b) => a - b);
-  return hashText(`board:${heat.serverSeed}:${parts.join('.')}`) >>> 0;
+  // With a beacon, the board is unknowable to EVERYONE until the cohort closes.
+  // Without one, the operator knows it from the start — which is exactly what
+  // `fairnessLevel` reports rather than hides.
+  return heat.beacon === null
+    ? hashText(`board:${heat.serverSeed}`) >>> 0
+    : hashText(`board:${heat.serverSeed}:${heat.beacon.value}`) >>> 0;
+}
+
+/**
+ * The heat's OWN account of how fair it is. Derived, never declared.
+ *
+ * A build with no beacon cannot report PROVABLY_FAIR, because this function has
+ * no branch that would let it.
+ */
+export function fairnessLevel(heat: HeatState): FairnessLevel {
+  if (heat.beacon === null) return 'OPERATOR_TRUSTED';
+  if (heat.beacon.source.trim() === '') return 'BEACON_UNVERIFIED';
+  return 'PROVABLY_FAIR';
 }
 
 /**
