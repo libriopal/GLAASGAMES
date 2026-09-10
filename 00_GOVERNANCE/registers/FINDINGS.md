@@ -415,3 +415,90 @@ MC-RETRACTION — the Monte Carlo balance result, withdrawn and replaced
                      play, so the shipped CHARGE_MAX of 3 is unreachable. Whether
                      that ranking is a real design finding or another artifact is
                      NOT resolved here and must not be acted on before the audit.
+
+────────────────────────────────────────────────────────────────────────────────
+BOOT-001 — master execution prompt, synthesized and independently audited
+────────────────────────────────────────────────────────────────────────────────
+
+  LANDED:            `original_prompt_baseline.md` (pristine, 98 lines, never
+                     edited); `MASTER_EXECUTION_PROMPT.md` v1.2.0 LOCKED.
+
+  RESEARCH WITNESS:  Tavily API, 2 advanced queries, 12 results. Four findings
+                     were load-bearing and each is cited at the clause it
+                     hardened:
+                       - arXiv 2509.18970 (hallucination survey): self-verification
+                         is "model-internal... without relying on external
+                         validators". Independently corroborates EINCOL rung 3.
+                       - Parallel.ai: per-step error rates compound
+                         multiplicatively across a 5-step chain -> §2.
+                       - Arthur.ai: a self-correction loop retries "until the
+                         response passes OR HITS A RETRY LIMIT" -> §5.1.
+                       - ReDeEP via mem0: hallucination arises when internal
+                         knowledge overpowers prompt-attention -> §1.
+
+  INDEPENDENT AUDIT: `@cf/google/gemma-4-26b-a4b-it` on Cloudflare Workers AI.
+                     Different vendor, different weights, no stake. This is a
+                     STRONGER witness than a subagent, which shares weights and
+                     priors with the executing model.
+
+  SEEN TO FAIL:      v1.0.0 was VETOED. The audit was not a formality and its two
+                     sharpest findings were ones the author had not considered:
+
+                     HOLLOWING — "An agent could 'optimize' §1 by refining the
+                     DEFINITION of a witness... to accept 'high-confidence
+                     internal reasoning' as a proxy for a 'measured number'. This
+                     is not 'removing a gate', but it is 'hollowing it out'."
+                     A redefinition leaves every gate textually intact while
+                     draining it, so a diff review sees nothing missing. Fixed by
+                     freezing the definitions (A6).
+
+                     SEMANTIC DRIFT — the v1.0.0 no-progress detector defined
+                     progress as "a file changed", which is satisfiable by
+                     "rephrasing documentation... changing variable names",
+                     producing "a zombie agent that consumes massive tokens while
+                     claiming to work." Progress is now defined by the WITNESS,
+                     not the diff (A2).
+
+                     Then v1.1.0 was found to contain a NEW defect v1.0.0 lacked:
+                     the five-phase pipeline had no post-Code execution of the
+                     harness, so nothing in the sequence ever checked the
+                     implementation. Fixed as A7.
+
+  SEEN TO PASS:      v1.2.0 — A1..A7 all OK, "NEW DEFECTS: none", "INFINITE LOOP
+                     POSSIBLE: no", VERDICT: APPROVED.
+
+  VACUOUS CHECK:     Guarded against directly. The auditor was NOT asked "is this
+                     good"; it was asked six adversarial questions with a forced
+                     APPROVED/VETOED line, and the first round returned VETOED —
+                     so the check demonstrably can fail. An audit that had
+                     approved v1.0.0 would have been the vacuous one.
+
+  DISAGREEMENT:      Two auditor revisions were adopted WITH DEVIATION, recorded
+                     at the clause rather than silently:
+
+                     A3 specified halting at "80% of allocated budget". No token
+                     meter is exposed to this core, so an 80% figure would be a
+                     number invented to look precise — which §1 forbids.
+                     Substituted: halt on the first hard rate-limit or
+                     session-limit response, or on exhausting the cycle budget
+                     agreed at the last HITL gate. All three are observable.
+
+                     A5 specified `git reset --hard <checkpoint>` on a failed
+                     verify. Adopted only where the checkpoint is a COMMIT already
+                     containing every piece of work in the tree; an unrelated
+                     uncommitted change is stashed first. A blind `--hard` against
+                     a dirty tree destroys work the loop never owned, and no audit
+                     finding licenses that.
+
+  CONSEQUENCE FOR    §3 as approved (A1) would have HALTED the previous cycle.
+  THE PRIOR CYCLE:   That cycle dispatched an evaluator, the evaluator terminated
+                     on a session rate limit, and execution CONTINUED to publish a
+                     headline that a later self-falsification retracted (see
+                     MC-RETRACTION above). Under A1 an unreachable witness is a
+                     missing phase artifact and the pipeline stops. The rule was
+                     derived from the research, then found to indict a specific
+                     failure already in this register.
+
+  STILL OPEN:        The MC-RETRACTION independent audit remains OWED. A second
+                     evaluator is running at the time of writing and has not
+                     returned. Under §3 that claim is not closed.
