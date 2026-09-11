@@ -1,0 +1,31 @@
+{
+  "name": "harness-smoke",
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "at": "2026-09-11T03:23:18.097Z",
+  "provenance": "emitted",
+  "attempts": [
+    {
+      "pass": 1,
+      "maxTokens": 2500,
+      "finish": "stop",
+      "contentChars": 1523,
+      "reasoningChars": 6144
+    }
+  ],
+  "questions": [
+    {
+      "id": "a",
+      "text": "Does requesting a JSON schema genuinely fix the empty-response problem, or does it just hide it?"
+    },
+    {
+      "id": "b",
+      "text": "Is keeping the trace-mining fallback defensible, or does it corrupt the evidence?"
+    }
+  ],
+  "result": {
+    "answer_a": "It does not fix the problem; it merely attempts to mitigate the symptoms through compression. The root cause is a structural mismatch between the reasoning budget and the total token limit. While a JSON schema might be more token-efficient than verbose prose, it does nothing to address the fact that the model's internal deliberation is consuming the headroom required for the final response. If the reasoning depth increases, the JSON output will still be truncated, and the failure will recur.",
+    "answer_b": "It corrupts the evidence. In an audit context, a 'verdict' must be the model's finalized, settled conclusion. The reasoning trace is a sequence of transient, iterative, and often self-correcting thoughts. By mining the trace, you are treating a 'thought in progress' as a 'formal decision.' Furthermore, because the `finish_reason` is `length`, you cannot distinguish between a model that finished its reasoning but ran out of space for the JSON, and a model that was **truncated mid-reasoning**. If the latter is true, you are mining a partial, incomplete, and potentially erroneous thought-fragment and presenting it as a stamped verdict. This introduces non-deterministic noise into your audit trail.",
+    "change_that_matters_most": "The harness must distinguish between 'Reasoning Truncated' and 'Output Truncated.' If the reasoning itself is incomplete, the entire audit must be discarded. Mining a truncated trace is an unacceptable risk for an audit pipeline.",
+    "verdict": "REVISE"
+  }
+}
