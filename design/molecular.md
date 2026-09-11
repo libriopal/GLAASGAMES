@@ -1,7 +1,20 @@
 # Tokens as atoms: 26 candidates for a bonding layer
 
-Status: **design only, nothing built.** This document exists to be argued with
-and to go to the independent auditor before any of it becomes code.
+Status: **audited to APPROVE over two rounds; no code yet.** The proposal below
+is the ORIGINAL, kept intact so the audit can be read against what it reviewed.
+Four of its entries did not survive. Read `design/audit-chem-r1.md` and
+`design/audit-chem-r2.md` with it, and where they disagree with this file, **they
+win.**
+
+Superseded here, in brief:
+
+| entry | was | now |
+|---|---|---|
+| **B5** hidden lattice = molecular geometry | 0.68 | **WITHDRAWN.** Teaches VSEPR wrongly. |
+| **B4** score = sum of bond energies | 0.74 | **revised** to enthalpy change: bonds broken minus bonds formed. |
+| **B3** bond order | 0.55, "probably not first build" | **REQUIRED.** Measured: single bonds alone leave 10/60 boards unplayable. |
+| **A1/A3** face-to-valence | hand-assigned | **derived from group number.** |
+| **faces 5-6** | valence 5-6 (P, S) | **noble gases**, valence 0. 34% of tiles were otherwise litter. |
 
 ---
 
@@ -138,17 +151,17 @@ chain does not simply fail — it leaves a reactive fragment that degrades over 
 turn or two. Real (radicals are genuinely short-lived and reactive) and it turns
 a failed move into a consequence instead of a no-op.
 
-**B3. Bond order as chain multiplicity (0.55).** Passing through the same pair
+**B3. Bond order as chain multiplicity (0.55 → REQUIRED, see §5a).** Passing through the same pair
 twice makes a double bond. Real and important, but the input gesture for "go back
 over that bond" is awkward on a phone and may not be worth it.
 
-**B4. Bond energy is the score (0.74).** A molecule pays the sum of its bond
+**B4. Bond energy is the score (0.74 → revised to enthalpy change).** A molecule pays the sum of its bond
 energies, in kJ/mol, shown as the real number. N≡N pays 945 and is nearly
 impossible to build; H–H pays 436 and is easy. **The score becomes a quantity
 that exists outside the game**, which is the strongest single argument in this
 document for the whole idea.
 
-**B5. The hidden lattice is molecular geometry (0.68).** The existing hidden link
+**B5. The hidden lattice is molecular geometry (0.68 → WITHDRAWN by audit).** The existing hidden link
 becomes "the neighbour this atom is predisposed to bond with". Inference is
 unchanged mechanically; its *meaning* becomes structure determination. Costs
 nothing and re-uses the belief widget exactly as built.
@@ -252,6 +265,9 @@ it decorates with it, and we would have to say so.
 ---
 
 ## 4. What I would build, and why
+
+> **Superseded.** The authorised build is in `design/audit-chem-r2.md`. B5 is out,
+> B3 is in, B4 is enthalpy change, and faces 5-6 are noble gases.
 
 **A1 + A5 + B1 + B2 + B4 + B5 + C3 + D1 + D4 + E1 + E4.**
 
