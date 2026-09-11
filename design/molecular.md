@@ -56,14 +56,21 @@ under different names.
 |---|---|
 | `OFFSET_FACE`, an integer **1–6** per cell | **valence** — how many bonds this atom forms |
 | `OFFSET_CHARGE`, an integer **0–3** | **formal charge / oxidation state** — an ion |
-| `OFFSET_LINK`, **hidden**, "the cell this one feeds" | **the bonding partner** — which neighbour it will actually bond with |
+| `OFFSET_LINK`, **hidden**, "the cell this one feeds" | **a reaction pathway** — which neighbour this one acts on. ~~the bonding partner~~ and emphatically NOT geometry (audit r1(d)) |
 | `advanceTurn` scoring the face of the *linked* cell | a reaction resolving along a bond |
 
-The third row is the one that makes this worth doing. The hidden lattice is
-already "which neighbour does this cell point at", and the player already infers
-it by watching charge move. Under a chemical reading, **the hidden lattice is
-molecular geometry, and inferring it is doing structure determination** — which
-is what chemists actually do and what the game already rewards.
+The third row is the one that makes this worth doing, and it is also the one the
+audit corrected. The hidden lattice is already "which neighbour does this cell
+point at", and the player already infers it by watching charge move.
+
+**The original text here read "the hidden lattice is molecular geometry, and
+inferring it is doing structure determination". That is withdrawn.** Molecular
+geometry — water bent at 104.5°, methane tetrahedral at 109.5° — is a consequence
+of electron-pair repulsion, not a property assigned to a cell in advance. A fixed
+lattice called "geometry" would teach VSEPR backwards to exactly the players this
+feature exists for. The hidden link is a REACTION PATHWAY and nothing else, which
+is all it ever was before chemistry was involved. `verify-chem` will enforce that
+no source file says otherwise.
 
 Nothing about the pari-mutuel settlement, the heat lifecycle, the commit–reveal
 fairness, the replay oracle or the belief widget needs to change. Those sit below
