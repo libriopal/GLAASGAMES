@@ -14,6 +14,7 @@
 // C12  valence is the COVALENT BOND COUNT, not the oxidation state (disputed)
 // C13  every die face has elements of its own — no fallback covering a gap
 // C14  the declared face weights are what the search produced, and they are sharper
+// C15  A KNOWN DEFECT, PINNED: energy tracks size, so the chemistry does not pay
 //
 // ─────────────────────────────────────────────────────────────────────────────
 // WHY THIS FILE IS THE POINT OF THE WHOLE FEATURE.
@@ -34,6 +35,7 @@ import {
   DECLARED_BOARDS, DECLARED_GENERATIONS, DECLARED_POPULATION, DECLARED_SEED,
   DECLARED_WEIGHTS, SHARP_RATIO, evolve, fitness, measure,
 } from '../../foundry/chem/weights.js';
+import { playRound } from '../../foundry/chem/learnable.js';
 import { FACE_WEIGHTS } from '../../lattice/round.js';
 import { makeRng } from '../sim/world-gen.js';
 import { type Bond, bondEnergy, formationEnergy, reactionEnergy } from '../../game/chem/bonds.js';
@@ -433,12 +435,58 @@ const atomsOf = (symbols: readonly string[]): Atom[] =>
     `diversity ${(100 * declared.diversity).toFixed(0)}%`);
 }
 
+// ── C15: the educational claim is NOT currently supported ──────────────────
+//
+// Measured, 400 paired rounds: a player who understands valence scores 1.43%
+// over one who just takes the biggest region, at t = 1.23 — not significant, and
+// losing or tying on 276 of 400 boards. Nearly all the skill available (8.37%,
+// t = 4.13) is the match-3 instinct, which is not chemistry.
+//
+// The cause is structural rather than incidental: building from FREE ATOMS
+// breaks nothing, so the score is the sum of the bonds formed, which grows with
+// the atom count. Measured correlation r = 0.843.
+//
+// THIS CHECK PINS THE DEFECT RATHER THAN THE FIX. It asserts the correlation is
+// still high, so the day reaction scoring decouples energy from size, THIS TEST
+// FAILS — and whoever makes that change is forced to re-run the learnability
+// measurement and update the record instead of quietly inheriting a claim that
+// was false when it was written down.
+{
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (let i = 0; i < 60; i += 1) {
+    const rng = makeRng(1000 + i * 31);
+    const { symbols } = drawPlayableBoard(rng, DECLARED_WEIGHTS);
+    for (const m of playableMoves(symbols)) { xs.push(m.cells.length); ys.push(m.energy); }
+  }
+  const mx = xs.reduce((a, v) => a + v, 0) / xs.length;
+  const my = ys.reduce((a, v) => a + v, 0) / ys.length;
+  let num = 0; let dx = 0; let dy = 0;
+  for (let i = 0; i < xs.length; i += 1) {
+    num += (xs[i]! - mx) * (ys[i]! - my); dx += (xs[i]! - mx) ** 2; dy += (ys[i]! - my) ** 2;
+  }
+  const r = num / Math.sqrt(dx * dy);
+  ok(r > 0.7,
+    `C15: correlation(atom count, energy) has fallen to ${r.toFixed(3)}. If that is because ` +
+      'reaction scoring landed, this is GOOD NEWS and the required action is to re-run ' +
+      'foundry/chem/learnable.ts, update design/learnable-falsified.md with the new numbers, and ' +
+      'rewrite this check to assert the claim rather than the defect. Do not simply delete it: the ' +
+      'educational claim was measured false once and must not be reinstated without evidence.');
+  // The claim must not be asserted anywhere while it is unsupported.
+  const claims = readFileSync(fileURLToPath(new URL('../../game/chem/library.ts', import.meta.url)), 'utf8');
+  ok(!/teaches you chemistry|learn chemistry|educational/i.test(claims),
+    'C15: a chemistry source file asserts the game teaches chemistry. Measured, it does not: ' +
+      'understanding valence is worth 1.43% at t = 1.23. Make the claim true or do not make it.');
+  console.log(`  C15 claim NOT supported (pinned): energy tracks atom count at r = ${r.toFixed(3)}, ` +
+    `so "biggest" is near-optimal and valence knowledge is worth 1.43% at t=1.23`);
+}
+
 if (failures.length > 0) {
   console.error(`verify-chem: ${failures.length} failure(s)`);
   for (const f of failures) console.error(`  ${f}`);
   process.exit(1);
 }
-console.log('verify-chem: C1-C14 pass. Valence is derived rather than assigned, every molecule and ' +
+console.log('verify-chem: C1-C15 pass. Valence is derived rather than assigned, every molecule and ' +
   'every bond energy is real, the solver recovers known structures and refuses plausible ' +
   'non-molecules, combustion comes out exothermic, and the hidden link is not named after ' +
   'chemistry it does not do.');

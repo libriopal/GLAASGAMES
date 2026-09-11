@@ -1,0 +1,13 @@
+import { DECLARED_WEIGHTS } from './weights.js';
+import { compare, uplift } from './learnable.js';
+const SEEDS = 200, TURNS = 12;
+const r = compare(SEEDS, DECLARED_WEIGHTS, TURNS);
+console.log(`${SEEDS} paired rounds of ${TURNS} turns, evolved weights\n`);
+for (const c of r) console.log(`  ${c.policy.padEnd(8)} ${c.mean.toFixed(0).padStart(6)} kJ/mol  +/- ${c.stderr.toFixed(0)}`);
+const [rand, big, val, en] = r as [any,any,any,any];
+console.log('');
+console.log(`  valence over biggest : ${uplift(val,big).toFixed(1)}%   <- the educational claim`);
+console.log(`  valence over random  : ${uplift(val,rand).toFixed(1)}%`);
+console.log(`  energy  over valence : ${uplift(en,val).toFixed(1)}%   <- value of memorising the table`);
+console.log(`  energy  over random  : ${uplift(en,rand).toFixed(1)}%`);
+console.log(`  biggest over random  : ${uplift(big,rand).toFixed(1)}%   <- the match-3 instinct alone`);
