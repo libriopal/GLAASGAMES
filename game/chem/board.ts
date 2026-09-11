@@ -24,7 +24,7 @@
 // `lattice/round.ts` and `net/heat-server.ts` both depend on a seed reproducing
 // a board exactly.
 
-import { ELEMENTS, BY_SYMBOL, faceOf, valenceOf } from './elements.js';
+import { BY_SYMBOL, poolForFace, valenceOf } from './elements.js';
 import { MOLECULES } from './library.js';
 import { type Atom, type Edge, formula, solve } from './lewis.js';
 import { formationEnergy } from './bonds.js';
@@ -84,15 +84,10 @@ export const REGION_COUNT = REGIONS.length;
 
 const LIBRARY_FORMULAE = new Set(MOLECULES.map((m) => m.formula));
 
-/** Elements available on each die face, grouped once. */
-const BY_FACE: ReadonlyMap<number, readonly string[]> = (() => {
-  const m = new Map<number, string[]>();
-  for (const e of ELEMENTS) {
-    const f = faceOf(e);
-    m.set(f, [...(m.get(f) ?? []), e.symbol]);
-  }
-  return m;
-})();
+/** Elements available on each die face, resolved once, with no fallback. */
+const BY_FACE: ReadonlyMap<number, readonly string[]> = new Map(
+  [1, 2, 3, 4, 5, 6].map((f) => [f, poolForFace(f).map((e) => e.symbol)]),
+);
 
 export interface Move {
   readonly cells: readonly number[];
@@ -173,7 +168,7 @@ export function drawPlayableBoard(
         pick -= faceWeights[f] ?? 0;
         if (pick < 0) { face = f; break; }
       }
-      const pool = BY_FACE.get(face) ?? BY_FACE.get(5)!;
+      const pool = BY_FACE.get(face)!;
       symbols.push(pool[Math.abs(rng()) % pool.length]!);
     }
     return symbols;

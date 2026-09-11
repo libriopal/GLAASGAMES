@@ -113,8 +113,40 @@ export function elementsWithValence(v: number): readonly Element[] {
  */
 export function faceOf(e: Element): number {
   const v = valenceOf(e.group);
-  return v === 0 ? 5 : v;
+  return v === 0 ? INERT_FACES[0]! : v;
 }
 
+/** The faces that carry no valence. Both of them: 5 and 6. */
+export const INERT_FACES: readonly number[] = [5, 6];
+
 /** Is this face one of the inert ones? */
-export const isInertFace = (face: number): boolean => face >= 5;
+export const isInertFace = (face: number): boolean => INERT_FACES.includes(face);
+
+/**
+ * The elements a given face can show.
+ *
+ * ── A GAP A FALLBACK WAS HIDING ─────────────────────────────────────────────
+ *
+ * The board drew its element with `byFace.get(face) ?? byFace.get(5)!`, and
+ * `faceOf` sent every noble gas to face 5. So face 6 had NO elements of its own
+ * and worked only because the `??` quietly redirected it. The board was correct
+ * by accident, and the accident was one edit away from becoming a crash or, far
+ * worse, a face that silently drew nothing.
+ *
+ * Both inert faces now resolve to the inert pool deliberately, and this function
+ * THROWS on a face with no elements rather than substituting another one.
+ * `verify-chem` C13 sweeps all six. A default that covers a hole is how the hole
+ * survives long enough to matter.
+ */
+export function poolForFace(face: number): readonly Element[] {
+  const pool = isInertFace(face)
+    ? ELEMENTS.filter((e) => valenceOf(e.group) === 0)
+    : ELEMENTS.filter((e) => valenceOf(e.group) === face);
+  if (pool.length === 0) {
+    throw new RangeError(
+      `poolForFace: face ${face} has no elements. A board that draws it would have nothing to ` +
+        'put there, and substituting another face\u2019s pool would hide that rather than report it.',
+    );
+  }
+  return pool;
+}

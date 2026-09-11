@@ -80,6 +80,7 @@
     "verify:heat": "tsx engine/verify/verify-heat.ts",
     "verify:staking": "tsx engine/verify/verify-staking.ts",
     "verify:net": "tsx engine/verify/verify-net.ts",
+    "search:weights": "tsx foundry/chem/search-weights.ts",
     "verify:chem": "tsx engine/verify/verify-chem.ts",
     "verify:belief": "tsx engine/verify/verify-belief.ts",
     "search:belief": "tsx foundry/visual/search.ts",

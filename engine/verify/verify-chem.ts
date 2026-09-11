@@ -12,6 +12,8 @@
 // C10  every element on the board appears in some buildable molecule
 // C11  NO DEAD BOARDS — the generator validates before the player sees anything
 // C12  valence is the COVALENT BOND COUNT, not the oxidation state (disputed)
+// C13  every die face has elements of its own — no fallback covering a gap
+// C14  the declared face weights are what the search produced, and they are sharper
 //
 // ─────────────────────────────────────────────────────────────────────────────
 // WHY THIS FILE IS THE POINT OF THE WHOLE FEATURE.
@@ -27,6 +29,11 @@ import { fileURLToPath } from 'node:url';
 
 import { ELEMENTS, BY_SYMBOL, faceOf, valenceOf } from '../../game/chem/elements.js';
 import { drawPlayableBoard, isPlayable, playableMoves } from '../../game/chem/board.js';
+import { INERT_FACES, poolForFace } from '../../game/chem/elements.js';
+import {
+  DECLARED_BOARDS, DECLARED_GENERATIONS, DECLARED_POPULATION, DECLARED_SEED,
+  DECLARED_WEIGHTS, SHARP_RATIO, evolve, fitness, measure,
+} from '../../foundry/chem/weights.js';
 import { FACE_WEIGHTS } from '../../lattice/round.js';
 import { makeRng } from '../sim/world-gen.js';
 import { type Bond, bondEnergy, formationEnergy, reactionEnergy } from '../../game/chem/bonds.js';
@@ -368,12 +375,70 @@ const atomsOf = (symbols: readonly string[]): Atom[] =>
     `molecule; phosphorus is excluded because the rule genuinely fails for it`);
 }
 
+// ── C13: every face has its own elements ───────────────────────────────────
+// Face 6 had NONE, and worked only because the board's lookup fell back to face
+// 5 with `??`. The board was correct by accident. A default that covers a hole
+// is how the hole survives long enough to matter.
+{
+  for (let f = 1; f <= 6; f += 1) {
+    let pool: readonly { symbol: string }[] = [];
+    let threw = false;
+    try { pool = poolForFace(f); } catch { threw = true; }
+    ok(!threw && pool.length > 0,
+      `C13: face ${f} has no elements of its own. It would draw nothing, or silently draw another ` +
+        'face\u2019s pool, and a board would be wrong in a way nobody could see.');
+  }
+  for (const f of INERT_FACES) {
+    ok(poolForFace(f).length > 0, `C13: inert face ${f} has an empty pool.`);
+  }
+  console.log(`  C13 face pools: all 6 faces resolve to a non-empty element pool; ` +
+    `inert faces ${INERT_FACES.join(' and ')} both carry noble gases`);
+}
+
+// ── C14: the declared weights are the search's, and they are sharper ────────
+//
+// Round 4 accepted the density and rejected the sharpness: "nearly half your
+// puzzles are 'flat,' offering no clear optimal solution." Flatness is a
+// consequence of the face distribution, so the distribution is searched rather
+// than argued about. This re-runs the search and asserts the published vector is
+// still what it produces — the M10 pattern, applied to the dice.
+{
+  const declared = measure(DECLARED_WEIGHTS, DECLARED_BOARDS, DECLARED_SEED);
+  const uniform = measure(FACE_WEIGHTS, DECLARED_BOARDS, DECLARED_SEED);
+
+  ok(declared.sharpness > uniform.sharpness,
+    `C14: the declared weights are no sharper than the uniform ones it replaced ` +
+      `(${(100 * declared.sharpness).toFixed(0)}% vs ${(100 * uniform.sharpness).toFixed(0)}%). ` +
+      'The whole reason for loading the dice was the audit finding on flat boards.');
+  ok(declared.sharpness >= 0.85,
+    `C14: only ${(100 * declared.sharpness).toFixed(0)}% of boards have a best move at least ` +
+      `${SHARP_RATIO}x the median. The finding this answers was raised at 55%; a marginal ` +
+      'improvement is not an answer to it.');
+  ok(fitness(declared) > fitness(uniform),
+    `C14: the declared weights score ${fitness(declared).toFixed(4)} against uniform ` +
+      `${fitness(uniform).toFixed(4)}. A search that does not beat the thing it replaced has ` +
+      'found nothing.');
+
+  const found = evolve(FACE_WEIGHTS, {
+    seed: DECLARED_SEED, boards: DECLARED_BOARDS,
+    population: DECLARED_POPULATION, generations: DECLARED_GENERATIONS,
+  });
+  ok(found.weights.join(',') === DECLARED_WEIGHTS.join(','),
+    `C14: the search now produces [${found.weights.slice(1).join(',')}] but the declared vector is ` +
+      `[${DECLARED_WEIGHTS.slice(1).join(',')}]. These must reproduce from the seed; if they do ` +
+      'not, the published constants were not the ones measured.');
+  console.log(`  C14 weights: [${DECLARED_WEIGHTS.slice(1).join(',')}] reproduces from the seed; ` +
+    `sharp ${(100 * declared.sharpness).toFixed(0)}% vs uniform ` +
+    `${(100 * uniform.sharpness).toFixed(0)}%, density ${declared.density.toFixed(1)}, ` +
+    `diversity ${(100 * declared.diversity).toFixed(0)}%`);
+}
+
 if (failures.length > 0) {
   console.error(`verify-chem: ${failures.length} failure(s)`);
   for (const f of failures) console.error(`  ${f}`);
   process.exit(1);
 }
-console.log('verify-chem: C1-C12 pass. Valence is derived rather than assigned, every molecule and ' +
+console.log('verify-chem: C1-C14 pass. Valence is derived rather than assigned, every molecule and ' +
   'every bond energy is real, the solver recovers known structures and refuses plausible ' +
   'non-molecules, combustion comes out exothermic, and the hidden link is not named after ' +
   'chemistry it does not do.');
