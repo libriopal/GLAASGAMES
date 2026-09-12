@@ -7,8 +7,10 @@
 //
 //   MATTER   the six die hues. What IS. The only band with six values, and the
 //            only band allowed to mutate state.
-//   IR       what MIGHT go wrong. The forecast strip, and the risk readout.
-//            Never a fact — a forecast rendered as a fact is a defect.
+//   IR       what MIGHT go wrong. The forecast strip ONLY. It used to frame the
+//            risk readout too, until calibration showed that readout was
+//            reporting a fact — see `chainsLeftRow`. A forecast rendered as a
+//            fact is a defect, and so is a fact rendered as a forecast.
 //   ENGINE   what the engine READS. The banked total: the number already
 //            recorded, which the player can no longer lose.
 //
@@ -53,7 +55,6 @@ import {
   ENGINE,
   IR_CORE,
   MATTER,
-  irAt,
   matterAt,
   matterBody,
   matterPip,
@@ -90,7 +91,8 @@ export interface ScreenState {
   readonly bank: number;
   readonly combo: string;
   readonly chainScore: number;
-  readonly risk: number;
+  /** How many more chains the hand can sustain. A FACT, not a forecast. */
+  readonly chainsLeft: number;
   readonly turn: number;
   readonly turns: number;
   readonly forecast: readonly number[];
@@ -175,25 +177,56 @@ function ribbon(chain: readonly number[], faces: readonly number[], ox: number, 
   );
 }
 
-const RISK_NAME = ['SAFE', 'THIN', 'EXPOSED', 'CRITICAL'];
-
 /**
- * The risk a chain would LEAVE. Countable ticks in IR, never a percentage.
+ * CHAINS LEFT — a fact about the hand, drawn as a fact.
  *
- * IR because this is the band for "what might go wrong". A reading that borrowed
- * a matter hue would be asserting a fact about something that has not happened.
- * No readout asks the player to compare two magnitudes.
+ * ── THIS REPLACES A READOUT THAT MEASUREMENT PROVED WAS A LIE ───────────────
+ *
+ * The screen used to show four levels of RISK, in IR, the band reserved for
+ * "what might go wrong". Calibrated against 16,400 real observations, that
+ * display was false twice over:
+ *
+ *     risk 0, 1, 2  ->    0.0% farkled next   (0 of 12,403)
+ *     risk 3        ->  100.0% farkled next   (3,997 of 3,997)
+ *
+ * It was BINARY — three of its four states meant the same thing — and it was
+ * never a risk at all. Inside a turn the hand is fully visible and nothing is
+ * drawn, so whether another chain exists is already settled. The screen was
+ * painting a FACT in the colour reserved for FORECASTS, which the corpus calls
+ * a defect rather than a preference: "a band whose color lies about its content
+ * is a defect".
+ *
+ * So the readout now reports how many more chains the hand can sustain, it is
+ * countable rather than comparable, and it is drawn in INK because it is neither
+ * a forecast nor matter — it is the engine stating something already true.
+ *
+ * The last block turns matter-red on the final chain. That is still a fact and
+ * still not IR: red here is the die-face-1 hue, part of the matter band, and the
+ * moment it marks has already happened rather than being predicted.
+ *
+ * ── AND IT WAS CHECKED FOR BEING TOO INFORMATIVE ────────────────────────────
+ *
+ * A perfectly informative readout would turn the game into a script. Re-running
+ * the harness with a rule thresholded on THIS signal instead of the old one, the
+ * best depth rule scores 4872 — exactly tying the best risk rule, because "stop
+ * when this is the last chain" is the same rule in both languages. The agency
+ * floor is unchanged at 40.6%, so the honest readout costs the game nothing.
  */
-function riskRow(risk: number, x: number, y: number): string {
+const DEPTH_CAP = 4;
+
+function chainsLeftRow(depth: number, x: number, y: number): string {
   const out: string[] = [];
-  for (let i = 0; i < 3; i += 1) {
-    const lit = i < risk;
+  const last = depth <= 1;
+  for (let i = 0; i < DEPTH_CAP; i += 1) {
+    const lit = i < depth;
+    const fill = lit ? (last ? MATTER[1]! : INK) : 'none';
     out.push(lit
-      ? `<rect x="${x + i * 17}" y="${y}" width="13" height="6" rx="1" fill="${irAt(risk / 3)}"/>`
-      : `<rect x="${x + i * 17 + 0.5}" y="${y + 0.5}" width="12" height="5" rx="1" fill="none" stroke="${GROUND_EDGE}"/>`);
+      ? `<rect x="${x + i * 15}" y="${y}" width="11" height="6" rx="1" fill="${fill}"/>`
+      : `<rect x="${x + i * 15 + 0.5}" y="${y + 0.5}" width="10" height="5" rx="1" fill="none" stroke="${GROUND_EDGE}"/>`);
   }
-  out.push(`<text x="${x + 58}" y="${y + 6}" font-family="${FONT_FIGURE}" font-size="9" ` +
-    `fill="${risk >= 2 ? irAt(risk / 3) : INK_DIM}" letter-spacing="1">${RISK_NAME[risk]}</text>`);
+  const label = depth <= 0 ? 'HAND DEAD' : last ? 'LAST CHAIN' : `${depth}${depth >= DEPTH_CAP ? '+' : ''} LEFT`;
+  out.push(`<text x="${x + 64}" y="${y + 6}" font-family="${FONT_FIGURE}" font-size="9" ` +
+    `fill="${last ? MATTER[1]! : INK_DIM}" letter-spacing="1">${label}</text>`);
   return out.join('');
 }
 
@@ -312,8 +345,8 @@ export function farkleScreenSvg(state: ScreenState): string {
     p.push(`<text x="${GUTTER}" y="${readoutY + 37}" font-size="10" fill="${INK_DIM}" font-family="${FONT_FIGURE}">up to six dice, orthogonally</text>`);
   }
 
-  p.push(`<text x="${SCREEN_W - GUTTER - 134}" y="${readoutY + 18}" font-size="9" fill="${INK_DIM}" font-family="${FONT_FIGURE}" letter-spacing="1">LEAVES THE HAND</text>`);
-  p.push(riskRow(state.risk, SCREEN_W - GUTTER - 134, readoutY + 27));
+  p.push(`<text x="${SCREEN_W - GUTTER - 134}" y="${readoutY + 18}" font-size="9" fill="${INK_DIM}" font-family="${FONT_FIGURE}" letter-spacing="1">CHAINS LEFT</text>`);
+  p.push(chainsLeftRow(state.chainsLeft, SCREEN_W - GUTTER - 134, readoutY + 27));
 
   // ── At risk (IR — it can still be lost) vs banked (ENGINE — already read). ─
   const barY = readoutY + 54;

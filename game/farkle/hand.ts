@@ -230,3 +230,58 @@ export function riskAfter(
   if (survivors <= 8) return RISK_THIN;
   return RISK_SAFE;
 }
+
+/**
+ * How many MORE chains this hand can sustain, under efficient continuation.
+ *
+ * ── THIS REPLACES A READOUT THAT WAS MEASURED TO BE A LIE ───────────────────
+ *
+ * `riskAfter` above returns four states and the interface drew them as four
+ * levels of danger, in IR — the band for "what might go wrong". Calibrated
+ * against 16,400 real observations, that display was false in two separate ways:
+ *
+ *     risk 0, 1, 2  ->    0.0% farkled next   (0 of 12,403)
+ *     risk 3        ->  100.0% farkled next   (3,997 of 3,997)
+ *
+ * FIRST, IT IS BINARY. Three of its four states mean the same thing, so a scale
+ * that advertised four levels delivered two. SECOND, AND WORSE, IT IS NOT A RISK
+ * AT ALL. Within a turn the hand is fully visible and nothing is drawn, so
+ * whether another chain exists is a FACT that has already been decided — and the
+ * screen was painting it in the colour reserved for forecasts. The corpus calls
+ * that a defect rather than a preference: "a band whose color lies about its
+ * content is a defect".
+ *
+ * The honest quantity is this one. It is a fact about the hand, it is countable
+ * rather than comparable, and under the run multiplier it is the number that
+ * actually decides the turn: how deep this hand can go is how large the
+ * multiplier can get.
+ *
+ * ── AND IT WAS CHECKED FOR BEING TOO STRONG ─────────────────────────────────
+ *
+ * A perfectly informative readout would turn the game into a script, which is
+ * the failure the dual constraint in the Monte Carlo harness exists to catch.
+ * Publishing depth is a real risk of exactly that, so the gate was re-run
+ * against a rule thresholded on THIS signal rather than on the old one, and the
+ * agency floor is reported with the result rather than assumed.
+ *
+ * Capped at `cap`, because the answer past a few chains is not a decision a
+ * player is making and the search cost grows with it.
+ */
+export function survivableDepth(
+  faces: readonly number[],
+  live: ReadonlySet<number>,
+  cap = 4,
+): number {
+  const remaining = new Set(live);
+  const board = [...faces];
+  let depth = 0;
+  while (depth < cap) {
+    const chains = scoringChains(board, remaining);
+    if (chains.length === 0) break;
+    const best = chains.reduce((a, b) =>
+      (b.score / b.cells.length > a.score / a.cells.length ? b : a));
+    for (const c of best.cells) { remaining.delete(c); board[c] = EMPTY; }
+    depth += 1;
+  }
+  return depth;
+}

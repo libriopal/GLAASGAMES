@@ -114,7 +114,7 @@ DUAL CONSTRAINT          PASSES
 
 **JUICE / POP / REWARD (32–41)** — all ⬜ **unbuilt**. 32 multiplier ticks visibly and audibly · 33 rising marimba, matter band 260–520 Hz · 34 only the multiplier escalates · 35 one note per die, pitched by face — a chain is a melody · 36 bank resolves to a chord, farkle drops an octave · 37 no screen shake; scale-punch on the banked total, 120 ms · 38 spent cells collapse, not fade · 39 combo name lands on the last die · 40 haptic per die, thud on bank, silence on farkle · 41 reduced-motion keeps the audio loop
 
-**HD POLISH (42–46)** — reclassified as **execution quality, not design**, on the auditor's finding that they are *"markers of professional execution rather than gameplay-driven necessities"*. 46 keeps a hard gate: p99 frame cost **3.20 ms** of 16.67 ms ✅
+**HD POLISH (42–46)** — reclassified as **execution quality, not design**, on the auditor's finding that they are *"markers of professional execution rather than gameplay-driven necessities"*. 46 keeps a hard gate: p99 frame cost **4.7 ms** of 16.67 ms, 1/299 frames dropped ✅
 
 **MODES (47–50)** — 47 solo ✅ · 48 VS ✅rules, ⬜clock · 49 coop shared board / separate banks ✅ · 50 pair-ranking ⬜ **unsimulated**
 
@@ -122,16 +122,31 @@ DUAL CONSTRAINT          PASSES
 
 ---
 
-## Open, and why each is open
+## Closed since the first draft
 
-1. **The risk readout still claims four states and still wears IR.** The fix is
-   not cosmetic. Either it becomes a *fact* (matter-coloured, "chains left") or
-   the game gains real hidden information within a turn. That is a design
-   decision, not a repair.
-2. **The search agent is still beaten by a stub.** Every balance number above is
-   computed with a top rung that is not actually the top.
-3. **Perceptual calibration is unsettled** — the auditor's blocker: *"you have
+**The readout is now honest.** It reports **CHAINS LEFT** — how many more chains
+the hand can sustain — drawn in ink as a fact, with the last block turning
+matter-red on the final chain. IR is gone from it entirely and now frames only
+the forecast strip, which is the one thing on screen that really is a forecast.
+
+That change was checked for being *too* informative, because a perfectly
+predictive readout is the Solved Game trap in another costume. Re-running the
+dual constraint with a rule thresholded on the new signal: the best depth rule
+scores **4872 — exactly tying** the best rule on the old signal, because "stop
+when this is the last chain" is the same rule in both languages. Agency floor
+unchanged at **40.6%**. The honest readout costs the game nothing.
+
+The forecast rows are also swapped: **certain now sits nearest the board**, so
+distance from the playfield means distance in the future.
+
+## Open, and why each is open
+1. **The search agent is still beaten by a stub.** Every balance number above is
+   computed with a top rung that is not actually the top. Fixing its EV model to
+   include the multiplier moved it 23894 → 24828 and did not close the gap to
+   HUMAN-CAL's 30730. The remaining cause is known: the agent treats the risk
+   states as probabilities 0/⅓/⅔/1 when calibration says they are 0/0/0/1.
+2. **Perceptual calibration is unsettled** — the auditor's blocker: *"you have
    not proven that a human player will perceive the risk signal as a reliable
    guide."* Needs playtest telemetry that does not exist.
-4. **Nothing in 32–41 exists.** No audio, no haptics, no animation.
-5. **Coop pair-ranking has never been simulated.**
+3. **Nothing in 32–41 exists.** No audio, no haptics, no animation.
+4. **Coop pair-ranking has never been simulated.**

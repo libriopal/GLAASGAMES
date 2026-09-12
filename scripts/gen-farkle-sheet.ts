@@ -5,7 +5,7 @@
 // a hand that has been burnt down to nothing.
 
 import { writeFileSync } from 'node:fs';
-import { CELL_COUNT, drawHand, riskAfter, scoringChains } from '../game/farkle/hand.js';
+import { CELL_COUNT, drawHand, riskAfter, scoringChains, survivableDepth } from '../game/farkle/hand.js';
 import { FACE_WEIGHTS, efficientChain, judgeChain } from '../game/farkle/round.js';
 import { faceAtOrdinal, forecast } from '../lattice/draw-stream.js';
 import { DEFAULT_ROUND, beginRound } from '../lattice/round.js';
@@ -24,7 +24,7 @@ const fc = forecast(SEED, CELL_COUNT, FACE_WEIGHTS, lat.board);
 function screen(over: Partial<ScreenState>): ScreenState {
   return {
     faces, live, chain: [], running: 0, bank: 0, combo: '', chainScore: 0,
-    risk: 0, turn: 0, turns: 10,
+    chainsLeft: survivableDepth(faces, live), turn: 0, turns: 10,
     forecast: fc.faces, forecastConfidence: fc.confidence,
     ...over,
   };
@@ -40,7 +40,7 @@ const judged = judgeChain(faces, live, traced.cells);
 const tracing = screen({
   chain: traced.cells, chainScore: judged.score, combo: judged.combo,
   running: judged.score, bank: 1250, turn: 2,
-  risk: riskAfter(faces, live, traced.cells),
+  chainsLeft: survivableDepth(faces, live),
 });
 
 // ── 3. A chain that would strand the hand ────────────────────────────────────
@@ -52,7 +52,7 @@ for (const c of scoringChains(faces, live)) {
 const wj = judgeChain(faces, live, worstCells);
 const stranding = screen({
   chain: worstCells, chainScore: wj.score, combo: wj.combo,
-  running: 850 + wj.score, bank: 1250, turn: 2, risk: worstRisk,
+  running: 850 + wj.score, bank: 1250, turn: 2, chainsLeft: 1,
 });
 
 // ── 4. Burnt down — four efficient chains taken, nothing left ────────────────
@@ -67,13 +67,13 @@ for (let i = 0; i < 4; i += 1) {
 }
 const spent = screen({
   faces: burnt, live: burntLive, running: burntRun, bank: 1250, turn: 2,
-  risk: riskAfter(burnt, burntLive, []),
+  chainsLeft: survivableDepth(burnt, burntLive),
 });
 
 const panels: [string, string, ScreenState][] = [
   ['the hand as dealt', 'Sixteen connected dice, contained. The twenty outside are visible and pushed into the deck.', dealt],
   ['a chain traced', 'The ribbon threads the dice. The combination is NAMED; the number is the footnote.', tracing],
-  ['a chain that would strand you', 'Same hand, a different chain. The instrument reports what this move LEAVES, not what the turn will do.', stranding],
+  ['the last chain', 'The readout is a FACT, not a forecast: how many more chains this hand can sustain. Measurement proved the old four-level risk display was binary.', stranding],
   ['burnt down', 'Four chains taken. Spent cells are holes, not dark dice — the hand shrinking is the whole risk mechanic.', spent],
 ];
 
@@ -91,10 +91,13 @@ const html = `<!doctype html><meta charset="utf-8"><title>Farkle — screen</tit
 </style>
 <h1>GLAASGAMES · <span>FARKLE</span></h1>
 <p class="sub">
- Trace up to six connected dice; the faces under them score as a Farkle hand. Cells leave the hand as they score and
- <b>nothing replaces them until the turn ends</b> &mdash; so the hand shrinks, connectivity dies, and the risk climbs.
- Hand size 16 is swept against the real tabletop farkle curve (2.3 / 7.8 / 15.8 / 27.8 / 44.3 / 66.8 % by dice remaining),
- landing RMS 4.7 under efficient play. Risk is endogenous: the same board at the same step is 28.1% lethal to one policy and 44.4% to another.
+ Trace up to six connected dice; the faces score as a Farkle hand. Cells leave the hand as they score and
+ <b>nothing replaces them until the turn ends</b>, so the hand shrinks and the next chain gets harder.
+ A <b>run multiplier of &times;1.35 per chain</b> is what makes continuing worth the risk &mdash; measured, a mindless
+ bank-after-one rule falls from 99.1% of optimal to 78.3% once it is in.<br>
+ The readout is <b>CHAINS LEFT</b>, a fact rather than a forecast: calibration over 16,400 observations showed the
+ old four-level risk display was <b>binary</b> (states 0,1,2 all farkled 0% of the time; state 3 farkled 100%).
+ Certain drops sit <b>nearest the board</b>; likely ones further away, so distance means distance in the future.
 </p>
 <div class="row">
 ${panels.map(([t, d, s]) => `<div class="panel"><h2>${t}</h2><p>${d}</p><div class="phone">${farkleScreenSvg(s)}</div></div>`).join('')}
@@ -103,6 +106,6 @@ ${panels.map(([t, d, s]) => `<div class="panel"><h2>${t}</h2><p>${d}</p><div cla
 const out = new URL('../design/farkle-sheet.html', import.meta.url);
 writeFileSync(out, html);
 console.log(`wrote ${out.pathname}`);
-console.log(`  traced: ${judged.combo} +${judged.score}, leaves risk ${tracing.risk}`);
-console.log(`  worst:  ${wj.combo} +${wj.score}, leaves risk ${worstRisk}`);
+console.log(`  traced: ${judged.combo} +${judged.score}, chains left ${tracing.chainsLeft}`);
+console.log(`  last:   ${wj.combo} +${wj.score}, chains left ${stranding.chainsLeft}`);
 console.log(`  burnt:  ${burntLive.size} cells left of 16, running ${burntRun}`);

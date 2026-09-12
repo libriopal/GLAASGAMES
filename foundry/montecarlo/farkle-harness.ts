@@ -43,6 +43,7 @@ import {
   drawHand,
   riskAfter,
   scoringChains,
+  survivableDepth,
 } from '../../game/farkle/hand.js';
 import { faceAtOrdinal } from '../../lattice/draw-stream.js';
 import {
@@ -394,14 +395,17 @@ export function dualConstraint(seeds = 2000): DualConstraint {
     live: new Set(drawHand(seed)),
   });
 
-  const play = (seed: number, stop: (risk: number, chains: number) => boolean): number => {
+  const play = (seed: number, stop: (signal: number, chains: number) => boolean, useDepth = false): number => {
     const { faces, live } = hand(seed);
     let run = 0; let chains = 0;
     for (;;) {
       const cs = scoringChains(faces, live);
       if (cs.length === 0) return 0;
       const b = cs.reduce((a, x) => (x.score / x.cells.length > a.score / a.cells.length ? x : a));
-      if (chains > 0 && stop(riskAfter(faces, live, b.cells), chains)) break;
+      const signal = useDepth
+        ? survivableDepth(faces, live) - 1   // how many MORE after this one
+        : riskAfter(faces, live, b.cells);
+      if (chains > 0 && stop(signal, chains)) break;
       run += b.score; chains += 1;
       for (const c of b.cells) live.delete(c);
     }
@@ -431,12 +435,21 @@ export function dualConstraint(seeds = 2000): DualConstraint {
     if (t > script) { script = t; scriptDepth = d; }
   }
 
+  // The readable tier is the BEST rule available on whichever signal the screen
+  // shows. Both are tried, because a stronger instrument must not be allowed to
+  // pass by being measured against a weaker rule.
   let readable = 0; let readableThreshold = 0;
   for (let th = 0; th <= 3; th += 1) {
     let t = 0;
     for (let s = 1; s <= seeds; s += 1) t += play(s, (r) => r >= th);
     t /= seeds;
     if (t > readable) { readable = t; readableThreshold = th; }
+  }
+  for (let th = 0; th <= 4; th += 1) {
+    let t = 0;
+    for (let s = 1; s <= seeds; s += 1) t += play(s, (d) => d <= th, true);
+    t /= seeds;
+    if (t > readable) { readable = t; readableThreshold = 100 + th; }
   }
 
   let ceiling = 0;
