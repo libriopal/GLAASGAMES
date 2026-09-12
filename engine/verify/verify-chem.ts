@@ -17,6 +17,7 @@
 // C15  the ASSEMBLY mode's known defect, pinned: its energy tracks size
 // C16  REACTION MODE: the coupling is broken and the chemistry now pays
 // C17  endothermic reactions are PRICED, not forbidden — photosynthesis included
+// C18  GIBBS: spontaneity is dH - T*dS, checked against the Haber process
 //
 // ─────────────────────────────────────────────────────────────────────────────
 // WHY THIS FILE IS THE POINT OF THE WHOLE FEATURE.
@@ -39,7 +40,10 @@ import {
 } from '../../foundry/chem/weights.js';
 import { playRound } from '../../foundry/chem/learnable.js';
 import { pairedCompare, runPolicies, sizeEnergyCorrelation } from '../../foundry/chem/react-learnable.js';
-import { bestReaction, bestRearrangement, equationOf, isEndothermic } from '../../game/chem/reaction.js';
+import {
+  TEMPERATURE_K, bestReaction, bestRearrangement, entropyChange, equationOf, gibbs,
+  isEndothermic, isSpontaneous,
+} from '../../game/chem/reaction.js';
 import { affordableMoves, drawReactiveBoard, rearrangementMoves } from '../../game/chem/board-react.js';
 import { FACE_WEIGHTS } from '../../lattice/round.js';
 import { makeRng } from '../sim/world-gen.js';
@@ -614,12 +618,76 @@ const atomsOf = (symbols: readonly string[]): Atom[] =>
     `sample board require driving, and an empty bank cannot afford them`);
 }
 
+// ── C18: spontaneity is Gibbs, not enthalpy ────────────────────────────────
+//
+// The round-7 finding, and the deepest one this design received: "The design
+// teaches that Enthalpy is the sole arbiter of spontaneity... It ignores
+// Entropy. A reaction can be endothermic but still occur spontaneously if the
+// entropy increase is large enough."
+//
+// THE CHECK IS A NUMBER THAT CANNOT BE FUDGED. The Haber process has a published
+// ΔG° of about −33 kJ/mol, and it is NOT its ΔH, which is −92. Landing near −33
+// requires the bond-enthalpy table, the standard-entropy table and the formula
+// all to be right at once; a wrong sign or a wrong unit conversion misses by
+// tens of kJ/mol and this fails.
+{
+  const byF = new Map(MOLECULES.map((m) => [m.formula, m]));
+  const haber = bestRearrangement([byF.get('N2')!, byF.get('H2')!, byF.get('H2')!, byF.get('H2')!])!;
+
+  ok(Math.abs(entropyChange(haber) - -198) < 5,
+    `C18: 3 H2 + N2 -> 2 NH3 gives dS = ${entropyChange(haber).toFixed(1)} J/(mol K); the tabulated ` +
+      'value is -198.1. Four molecules become two, so disorder MUST fall, and it is why the Haber ' +
+      'process is run under enormous pressure.');
+  ok(gibbs(haber) > -55 && gibbs(haber) < -20,
+    `C18: the Haber process computes dG = ${gibbs(haber).toFixed(0)} kJ/mol. The published value is ` +
+      'about -33, and note it is NOT dH (-92): getting close needs both measured tables and the ' +
+      'formula dG = dH - T*dS to be simultaneously correct. This is the check that cannot be fudged.');
+
+  // Entropy rises when a reaction makes more molecules. Peroxide is the clean case.
+  const peroxide = bestRearrangement([byF.get('H2O2')!, byF.get('H2O2')!])!;
+  ok(entropyChange(peroxide) > 0 && isSpontaneous(peroxide),
+    `C18: 2 H2O2 -> 2 H2O + O2 gives dS = ${entropyChange(peroxide).toFixed(0)}. Two molecules ` +
+      'become three, so disorder must rise, and peroxide does decompose on its own.');
+
+  // ── AND IT MUST ACTUALLY CHANGE ANSWERS, OR IT IS DECORATION ─────────────
+  //
+  // A correct model that never alters a verdict has bought nothing. Scanned over
+  // every distinct selection of two or three molecules: entropy flips the
+  // spontaneity verdict on about 5% of reactions, in BOTH directions.
+  const F = MOLECULES.map((m) => m.formula);
+  const seen = new Set<string>();
+  let total = 0; let flipped = 0;
+  for (let i = 0; i < F.length; i += 1) {
+    for (let j = i; j < F.length; j += 1) {
+      for (let k = j; k < F.length; k += 1) {
+        for (const sel of [[F[i]!, F[j]!], [F[i]!, F[j]!, F[k]!]]) {
+          const key = [...sel].sort().join('+');
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const r = bestRearrangement(sel.map((f) => byF.get(f)!));
+          if (r === null) continue;
+          total += 1;
+          if (isEndothermic(r) !== !isSpontaneous(r)) flipped += 1;
+        }
+      }
+    }
+  }
+  const pct = (100 * flipped) / total;
+  ok(pct > 1,
+    `C18: entropy changes the spontaneity verdict on only ${pct.toFixed(2)}% of ${total} reactions. ` +
+      'A thermodynamic term that never alters an answer is decoration — correct and inert — and ' +
+      'the claim that this game models spontaneity would not be worth making.');
+  console.log(`  C18 Gibbs: Haber dS ${entropyChange(haber).toFixed(0)} J/(mol K), ` +
+    `dG ${gibbs(haber).toFixed(0)} kJ/mol against a published -33 (its dH is -97); entropy flips ` +
+    `the verdict on ${pct.toFixed(1)}% of ${total} reactions at ${TEMPERATURE_K} K`);
+}
+
 if (failures.length > 0) {
   console.error(`verify-chem: ${failures.length} failure(s)`);
   for (const f of failures) console.error(`  ${f}`);
   process.exit(1);
 }
-console.log('verify-chem: C1-C17 pass. Valence is derived rather than assigned, every molecule and ' +
+console.log('verify-chem: C1-C18 pass. Valence is derived rather than assigned, every molecule and ' +
   'every bond energy is real, the solver recovers known structures and refuses plausible ' +
   'non-molecules, combustion comes out exothermic, and the hidden link is not named after ' +
   'chemistry it does not do.');

@@ -45,6 +45,27 @@ export interface Molecule {
   readonly atoms: readonly string[];
   /** Connectivity as [i, j, order] over `atoms`. */
   readonly skeleton: readonly (readonly [number, number, 1 | 2 | 3])[];
+  /**
+   * Standard molar entropy S° at 298 K, in J/(mol·K), gas phase.
+   *
+   * ── WHY A SECOND TABLE OF MEASURED NUMBERS ──────────────────────────────
+   *
+   * The round-7 audit's finding, and it is the deepest one this design
+   * received: "The design teaches that Enthalpy (ΔH) is the sole arbiter of
+   * spontaneity, provided energy is available. It ignores Entropy (ΔS)... A
+   * reaction can be endothermic but still occur spontaneously if the entropy
+   * increase is large enough."
+   *
+   * Correct, and it is the one place left where the game would mark a student
+   * wrong. Ice melts while absorbing heat; ammonium nitrate dissolves and gets
+   * cold. Enthalpy alone cannot express either.
+   *
+   * These are tabulated standard entropies, on the same footing as the bond
+   * enthalpies — measured values, not a model. Gas phase throughout, because
+   * every molecule the board holds is treated as a gas and mixing phases would
+   * quietly change what the numbers mean.
+   */
+  readonly entropy: number;
   /** One true thing a player is told when they build it. */
   readonly fact: string;
 }
@@ -52,72 +73,88 @@ export interface Molecule {
 export const MOLECULES: readonly Molecule[] = [
   {
     formula: 'H2', name: 'hydrogen', atoms: ['H', 'H'], skeleton: [[0, 1, 1]],
+    entropy: 130.7,
     fact: 'The simplest molecule there is: two atoms sharing one pair of electrons.',
   },
   {
     formula: 'HF', name: 'hydrogen fluoride', atoms: ['H', 'F'], skeleton: [[0, 1, 1]],
+    entropy: 173.8,
     fact: 'The H–F bond is 567 kJ/mol, the strongest single bond to hydrogen there is.',
   },
   {
     formula: 'HCl', name: 'hydrogen chloride', atoms: ['H', 'Cl'], skeleton: [[0, 1, 1]],
+    entropy: 186.9,
     fact: 'Dissolved in water this is hydrochloric acid — the acid in your stomach.',
   },
   {
     formula: 'O2', name: 'oxygen', atoms: ['O', 'O'], skeleton: [[0, 1, 2]],
+    entropy: 205.2,
     fact: 'A double bond. Oxygen is an oxidiser, not a fuel — it makes other things burn.',
   },
   {
     formula: 'N2', name: 'nitrogen', atoms: ['N', 'N'], skeleton: [[0, 1, 3]],
+    entropy: 191.6,
     fact: 'A triple bond of 941 kJ/mol. It is why 78% of the air does almost nothing.',
   },
   {
     formula: 'F2', name: 'fluorine', atoms: ['F', 'F'], skeleton: [[0, 1, 1]],
+    entropy: 202.8,
     fact: 'Only 155 kJ/mol — a weak bond, which is why fluorine is so ferociously reactive.',
   },
   {
     formula: 'Cl2', name: 'chlorine', atoms: ['Cl', 'Cl'], skeleton: [[0, 1, 1]],
+    entropy: 223.1,
     fact: 'A greenish gas. The Cl–Cl bond is weak enough that light alone can break it.',
   },
   {
     formula: 'H2O', name: 'water', atoms: ['O', 'H', 'H'], skeleton: [[0, 1, 1], [0, 2, 1]],
+    entropy: 188.8,
     fact: 'Oxygen forms two bonds, so it takes TWO hydrogens. That is where the 2 comes from.',
   },
   {
     formula: 'CO2', name: 'carbon dioxide', atoms: ['C', 'O', 'O'], skeleton: [[0, 1, 2], [0, 2, 2]],
+    entropy: 213.8,
     fact: 'Two double bonds. Carbon uses all four of its bonds, two to each oxygen.',
   },
   {
     formula: 'HCN', name: 'hydrogen cyanide', atoms: ['C', 'H', 'N'], skeleton: [[0, 1, 1], [0, 2, 3]],
+    entropy: 201.8,
     fact: 'Carbon holds one hydrogen and triple-bonds the nitrogen. Famously toxic.',
   },
   {
     formula: 'NH3', name: 'ammonia', atoms: ['N', 'H', 'H', 'H'],
     skeleton: [[0, 1, 1], [0, 2, 1], [0, 3, 1]],
+    entropy: 192.8,
     fact: 'Nitrogen forms three bonds. Making this from N2 feeds roughly half the world.',
   },
   {
     formula: 'H2O2', name: 'hydrogen peroxide', atoms: ['O', 'O', 'H', 'H'],
     skeleton: [[0, 1, 1], [0, 2, 1], [1, 3, 1]],
+    entropy: 232.9,
     fact: 'The O–O single bond is only 146 kJ/mol — so weak the molecule falls apart on its own.',
   },
   {
     formula: 'C2H2', name: 'acetylene', atoms: ['C', 'C', 'H', 'H'],
     skeleton: [[0, 1, 3], [0, 2, 1], [1, 3, 1]],
+    entropy: 200.9,
     fact: 'A carbon–carbon triple bond. Burns hot enough to cut steel.',
   },
   {
     formula: 'CH4', name: 'methane', atoms: ['C', 'H', 'H', 'H', 'H'],
     skeleton: [[0, 1, 1], [0, 2, 1], [0, 3, 1], [0, 4, 1]],
+    entropy: 186.3,
     fact: 'Carbon forms four bonds, so four hydrogens fit. Natural gas.',
   },
   {
     formula: 'CH3Cl', name: 'chloromethane', atoms: ['C', 'H', 'H', 'H', 'Cl'],
     skeleton: [[0, 1, 1], [0, 2, 1], [0, 3, 1], [0, 4, 1]],
+    entropy: 234.6,
     fact: 'Methane with one hydrogen swapped for chlorine — both form exactly one bond.',
   },
   {
     formula: 'CH2O', name: 'formaldehyde', atoms: ['C', 'O', 'H', 'H'],
     skeleton: [[0, 1, 2], [0, 2, 1], [0, 3, 1]],
+    entropy: 218.8,
     fact: 'A carbon–oxygen double bond plus two hydrogens: carbon’s four bonds, spent.',
   },
 ];

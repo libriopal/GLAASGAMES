@@ -61,6 +61,19 @@ const MOL_ATOMS: ReadonlyMap<string, ReadonlyMap<string, number>> = new Map(
 const MOL_ENERGY: ReadonlyMap<string, number> = new Map(
   MOLECULES.map((m) => [m.formula, formationEnergy(bondsOf(m))]),
 );
+const MOL_ENTROPY: ReadonlyMap<string, number> = new Map(
+  MOLECULES.map((m) => [m.formula, m.entropy]),
+);
+
+/**
+ * Room temperature, in kelvin. The one place a temperature appears.
+ *
+ * ΔG depends on T, so a single number here is a modelling choice and not a
+ * measurement: the game is played at 298 K. Making temperature a MECHANIC —
+ * heating the board to let entropy pay for an endothermic reaction — is the
+ * obvious next thing this enables, and it is deliberately not done yet.
+ */
+export const TEMPERATURE_K = 298;
 
 export interface ProductSet {
   /** The molecules produced, by formula, with repeats. */
@@ -145,8 +158,31 @@ export interface Reaction {
   readonly released: number;
 }
 
-/** Does this reaction have to be driven? */
+/** Does this reaction have to be driven? Absorbs heat. */
 export const isEndothermic = (r: Reaction): boolean => r.released < 0;
+
+/**
+ * Does it happen on its own? ΔG < 0.
+ *
+ * ── ENTHALPY IS NOT SPONTANEITY, AND SAYING SO WAS THE LAST REAL ERROR ──────
+ *
+ * The round-7 audit: "The design teaches that Enthalpy (ΔH) is the sole arbiter
+ * of spontaneity, provided energy is available. It ignores Entropy (ΔS). In real
+ * chemistry, a reaction's ability to proceed (Gibbs Free Energy, ΔG = ΔH − TΔS)
+ * depends on the change in disorder. A reaction can be endothermic but still
+ * occur spontaneously if the entropy increase is large enough."
+ *
+ * Exactly so, and it is the difference between a game that models chemistry and
+ * one that models heat. Ice melts while absorbing energy. Ammonium nitrate
+ * dissolves and gets cold. Both are endothermic and both happen unaided, because
+ * disorder increases enough to pay for the heat.
+ *
+ * The check on this is a number that cannot be fudged: the Haber process has a
+ * published ΔG° of about −33 kJ/mol, and it is NOT ΔH, which is −92. Getting −33
+ * out of tabulated bond enthalpies and tabulated entropies is only possible if
+ * both tables and the formula are right.
+ */
+export const isSpontaneous = (r: Reaction): boolean => gibbs(r) < 0;
 
 /**
  * The best rearrangement of these molecules, or null if nothing beats them.
@@ -205,6 +241,31 @@ export function bestRearrangement(reactants: readonly Molecule[]): Reaction | nu
     products: best.products,
     released: best.energy - before,
   };
+}
+
+/**
+ * Entropy change of a reaction, J/(mol·K). Positive means more disorder.
+ *
+ * The sign is usually readable from the molecule COUNT: 3 H₂ + N₂ → 2 NH₃ turns
+ * four molecules into two and its entropy falls, which is exactly why the Haber
+ * process is run under enormous pressure. A player who notices that has noticed
+ * Le Chatelier.
+ */
+export function entropyChange(r: Reaction): number {
+  const sum = (fs: readonly string[]): number => fs.reduce((a, f) => a + MOL_ENTROPY.get(f)!, 0);
+  return sum(r.products) - sum(r.reactants);
+}
+
+/**
+ * Gibbs free energy change, kJ/mol. NEGATIVE means it goes on its own.
+ *
+ *     ΔG = ΔH − TΔS
+ *
+ * `released` is −ΔH, so ΔH is `-released`, and the entropy term converts from
+ * J/(mol·K) to kJ/mol.
+ */
+export function gibbs(r: Reaction): number {
+  return -r.released - (TEMPERATURE_K * entropyChange(r)) / 1000;
 }
 
 /** The balanced equation, written the way a chemist writes one. */
