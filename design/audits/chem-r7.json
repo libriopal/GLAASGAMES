@@ -1,0 +1,53 @@
+{
+  "name": "chem-r7",
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "at": "2026-09-12T01:16:17.164Z",
+  "provenance": "emitted",
+  "attempts": [
+    {
+      "pass": 1,
+      "maxTokens": 2500,
+      "finish": "length",
+      "contentChars": 0,
+      "reasoningChars": 0
+    },
+    {
+      "pass": 1,
+      "maxTokens": 5000,
+      "finish": "stop",
+      "contentChars": 2837,
+      "reasoningChars": 6348
+    }
+  ],
+  "questions": [
+    {
+      "id": "a",
+      "text": "Is charging endothermic reactions against banked energy a faithful model of driving a reaction, or does it misrepresent where the energy actually comes from?"
+    },
+    {
+      "id": "b",
+      "text": "A +2.3% uplift at t=3.91 is significant but small. Is that enough to justify the added complexity of an energy bank and a spend decision, or should the mechanic be cut?"
+    },
+    {
+      "id": "c",
+      "text": "Do you accept the correction that N2 + O2 was refused for a missing product rather than for being endothermic?"
+    },
+    {
+      "id": "d",
+      "text": "Excluding NO, NO2, CO and ozone for having odd electron counts or resonance keeps the exact-valence rule honest but removes some of the most famous molecules in chemistry. Is that trade still right at this stage?"
+    },
+    {
+      "id": "e",
+      "text": "Name the most specific real chemistry this design still teaches wrongly."
+    }
+  ],
+  "result": {
+    "answer_a": "It is a faithful **abstraction**, but not a faithful **mechanism**. In thermodynamics, you do not 'spend' energy from a bank to drive a reaction; you couple a non-spontaneous reaction to a spontaneous one, or you provide continuous work (electrical, thermal, etc.) to shift the equilibrium. However, for a game mechanic, the 'banked energy' model is a highly effective proxy for 'available chemical potential' or 'external work capacity.' It correctly captures the fundamental law that endothermic processes require an input of energy to proceed, avoiding the 'magic' of spontaneous endothermic moves.",
+    "answer_b": "The 2.3% uplift is a red herring. The metric that matters is the **35.5% beat over match-3 instinct** and the fact that **match-3 instinct is now performing worse than random**. This indicates the game has successfully transitioned from a pattern-matching task to a resource-management task. The complexity of the energy bank is not 'added'—it is the foundation of the new strategic layer. If you cut the mechanic, you are left with a match-3 game that is mathematically broken (since the instinct is sub-random). The complexity is justified because it provides the only path to meaningful agency.",
+    "answer_c": "Yes. The correction is accepted. The failure was a library/data error (missing product), not a logic error (energy gate). This distinction is vital for debugging the engine's integrity.",
+    "answer_d": "Yes. In game design, **consistency is superior to completeness**. If you allow $CO$ or $NO$, you must allow radicals and odd-electron species. This would require a fundamental rewrite of the valence-checking logic and would introduce 'edge case' frustration where players cannot predict if a move is legal. By sticking to the exact-valence rule, you create a predictable, learnable, and computationally stable environment. The loss of 'famous' molecules is a fair price for a coherent rulebook.",
+    "answer_e": "The design teaches that **Enthalpy ($\\Delta H$) is the sole arbiter of spontaneity**, provided energy is available. It ignores **Entropy ($\\Delta S$)**. In real chemistry, a reaction's ability to proceed (Gibbs Free Energy, $\\Delta G = \\Delta H - T\\Delta S$) depends on the change in disorder. A reaction can be endothermic but still occur spontaneously if the entropy increase is large enough at high temperatures. Your engine treats 'energy' as a single currency, whereas real chemistry distinguishes between the heat required and the disorder required.",
+    "change_that_matters_most": "The transition from 'Energy as a Gate' to 'Energy as a Cost' is the single most important architectural shift in this version. It moves the game from a 'Search for Valid Moves' (Constraint Satisfaction) to a 'Search for Optimal Moves' (Optimization).",
+    "verdict": "APPROVE"
+  }
+}
