@@ -16,6 +16,7 @@
 // C14  the declared face weights are what the search produced, and they are sharper
 // C15  the ASSEMBLY mode's known defect, pinned: its energy tracks size
 // C16  REACTION MODE: the coupling is broken and the chemistry now pays
+// C17  endothermic reactions are PRICED, not forbidden — photosynthesis included
 //
 // ─────────────────────────────────────────────────────────────────────────────
 // WHY THIS FILE IS THE POINT OF THE WHOLE FEATURE.
@@ -38,7 +39,8 @@ import {
 } from '../../foundry/chem/weights.js';
 import { playRound } from '../../foundry/chem/learnable.js';
 import { pairedCompare, runPolicies, sizeEnergyCorrelation } from '../../foundry/chem/react-learnable.js';
-import { bestReaction, equationOf } from '../../game/chem/reaction.js';
+import { bestReaction, bestRearrangement, equationOf, isEndothermic } from '../../game/chem/reaction.js';
+import { affordableMoves, drawReactiveBoard, rearrangementMoves } from '../../game/chem/board-react.js';
 import { FACE_WEIGHTS } from '../../lattice/round.js';
 import { makeRng } from '../sim/world-gen.js';
 import { type Bond, bondEnergy, formationEnergy, reactionEnergy } from '../../game/chem/bonds.js';
@@ -561,12 +563,63 @@ const atomsOf = (symbols: readonly string[]): Atom[] =>
     `combustion 808, Haber ${haber?.released}, N2+O2 refused`);
 }
 
+// ── C17: endothermic is a price, not a prohibition ─────────────────────────
+//
+// Round 6's one remaining finding: refusing a reaction because it does not pay
+// "teaches that endothermic reactions are 'invalid' or 'impossible' moves rather
+// than simply 'energy-requiring' ones". Correct, and the kind of false that
+// sticks — photosynthesis is endothermic and happens everywhere there is light.
+//
+// A CORRECTION TO THE FINDING'S EXAMPLE. It cited N2 + O2 as the refused case.
+// That refusal was never about energy: there is no nitrogen-oxygen molecule in
+// the library at all, because NO and NO2 have odd electron counts and no
+// closed-shell structure, so they are excluded for the same reason CO and ozone
+// are. The general finding stands; the example does not demonstrate it.
+{
+  const byF = new Map(MOLECULES.map((m) => [m.formula, m]));
+
+  // Photosynthesis, per carbon. CO2 + H2O -> CH2O + O2 is the standard summary,
+  // and it is the clearest possible case of a reaction that must be driven.
+  const photo = bestRearrangement([byF.get('CO2')!, byF.get('H2O')!]);
+  ok(photo !== null && isEndothermic(photo),
+    `C17: CO2 + H2O resolves to ${photo ? equationOf(photo) : 'nothing'}. It must resolve to an ` +
+      'ENDOTHERMIC rearrangement — that reaction is photosynthesis, it runs on sunlight, and a ' +
+      'game that calls it impossible teaches that plants cannot work.');
+  ok(photo !== null && -photo.released > 300 && -photo.released < 550,
+    `C17: driving CO2 + H2O costs ${photo ? -photo.released : 0} kJ/mol. Photosynthesis needs ` +
+      'roughly 467 kJ per carbon; a value far outside that means the bond data or the search is ' +
+      'wrong, not that the chemistry is surprising.');
+
+  // N2 + O2 is still refused, and C17's header records WHY — no product exists.
+  ok(bestRearrangement([byF.get('N2')!, byF.get('O2')!]) === null,
+    'C17: N2 + O2 now rearranges to something. No nitrogen-oxygen molecule is in the library, so ' +
+      'if this produces one, an entry was added without the exclusion note being revisited.');
+
+  // The option must be REAL: present in quantity, and gated by the bank.
+  const { tiles } = drawReactiveBoard(makeRng(300));
+  const all = rearrangementMoves(tiles);
+  const endo = all.filter((m) => isEndothermic(m.reaction));
+  ok(endo.length > 0,
+    'C17: no endothermic rearrangement exists anywhere on a sample board, so the mechanic is ' +
+      'unreachable and this check proves nothing.');
+  ok(affordableMoves(tiles, 0).length < all.length,
+    'C17: with an empty bank every move is still affordable, so the cost is not being charged. ' +
+      'An endothermic reaction the player never has to pay for is the old refusal with a new label.');
+  const rich = affordableMoves(tiles, 100000).length;
+  ok(rich === all.length,
+    `C17: with a full bank only ${rich} of ${all.length} moves are available. Energy is the only ` +
+      'thing that should gate an endothermic move.');
+  console.log(`  C17 endothermic priced: photosynthesis CO2 + H2O -> CH2O + O2 costs ` +
+    `${photo ? -photo.released : 0} kJ/mol (real ~467); ${endo.length} of ${all.length} moves on a ` +
+    `sample board require driving, and an empty bank cannot afford them`);
+}
+
 if (failures.length > 0) {
   console.error(`verify-chem: ${failures.length} failure(s)`);
   for (const f of failures) console.error(`  ${f}`);
   process.exit(1);
 }
-console.log('verify-chem: C1-C16 pass. Valence is derived rather than assigned, every molecule and ' +
+console.log('verify-chem: C1-C17 pass. Valence is derived rather than assigned, every molecule and ' +
   'every bond energy is real, the solver recovers known structures and refuses plausible ' +
   'non-molecules, combustion comes out exothermic, and the hidden link is not named after ' +
   'chemistry it does not do.');

@@ -136,9 +136,17 @@ export function productSets(inventory: Inventory, limit = 4000): ProductSet[] {
 export interface Reaction {
   readonly reactants: readonly string[];
   readonly products: readonly string[];
-  /** Energy released, kJ/mol. Positive is exothermic. This is −ΔH. */
+  /**
+   * Energy released, kJ/mol. This is −ΔH.
+   *
+   * POSITIVE is exothermic and pays. NEGATIVE is endothermic and costs that much
+   * to drive — which is a price, not a prohibition. See `bestRearrangement`.
+   */
   readonly released: number;
 }
+
+/** Does this reaction have to be driven? */
+export const isEndothermic = (r: Reaction): boolean => r.released < 0;
 
 /**
  * The best rearrangement of these molecules, or null if nothing beats them.
@@ -151,6 +159,34 @@ export interface Reaction {
  * mixtures do not in fact spontaneously find their most stable arrangement.
  */
 export function bestReaction(reactants: readonly Molecule[]): Reaction | null {
+  const r = bestRearrangement(reactants);
+  return r !== null && r.released > 0 ? r : null;
+}
+
+/**
+ * The best rearrangement, WHETHER OR NOT IT RELEASES ENERGY.
+ *
+ * ── ENDOTHERMIC IS NOT IMPOSSIBLE, AND SAYING SO WAS A REAL ERROR ───────────
+ *
+ * `bestReaction` returned null for anything that did not pay, and the round-6
+ * audit named the consequence:
+ *
+ *   "The design teaches that endothermic reactions are 'invalid' or 'impossible'
+ *    moves rather than simply 'energy-requiring' ones. By 'refusing' the N₂ + O₂
+ *    reaction, the game treats endothermicity as a violation of the game's rules
+ *    rather than a fundamental thermodynamic reality where energy must be
+ *    supplied to drive the process."
+ *
+ * That is correct and it is the kind of false that sticks. Endothermic reactions
+ * are ordinary: photosynthesis runs on sunlight, the Haber process needs heat and
+ * pressure, electrolysis splits water by paying for it. Refusing them implies
+ * they cannot happen.
+ *
+ * So the sign is no longer a gate. A negative `released` means the reaction COSTS
+ * that much to drive, and whether a player can afford it is a question for the
+ * game rather than for chemistry.
+ */
+export function bestRearrangement(reactants: readonly Molecule[]): Reaction | null {
   if (reactants.length < 2) return null;
   const inventory = inventoryOf(reactants);
   const before = reactants.reduce((a, m) => a + MOL_ENERGY.get(m.formula)!, 0);
@@ -164,12 +200,10 @@ export function bestReaction(reactants: readonly Molecule[]): Reaction | null {
   }
   if (best === null) return null;
 
-  const released = best.energy - before;
-  if (released <= 0) return null;
   return {
     reactants: reactants.map((m) => m.formula),
     products: best.products,
-    released,
+    released: best.energy - before,
   };
 }
 
