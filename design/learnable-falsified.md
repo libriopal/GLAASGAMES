@@ -79,3 +79,68 @@ measurement decides, and it is now a standing instrument
 Until one of those happens, nothing shipped may claim this game teaches
 chemistry. `verify-chem` C15 pins the defect so it cannot quietly stop being
 recorded.
+
+---
+
+# RESOLVED — reaction scoring, measured with the same instrument
+
+Option 1 was built. The same experiment, so the before and after are comparable:
+
+| | assembly scoring | **reaction scoring** |
+|---|---|---|
+| correlation(size, score) | 0.843 | **0.122** |
+| a chemical concept vs the match-3 instinct | +1.43%, t = 1.23 | **+35.5%, t = 15.07** |
+| the match-3 instinct vs random | +8.37%, t = 4.13 | **−21.0%, t = −11.73** |
+
+**The bottom row is the result.** Under assembly scoring, "take the biggest
+blob" was the single most valuable thing a player could bring to the game. Under
+reaction scoring it is actively **harmful** — taking the largest selection loses
+to taking one at random, on 129 of 150 boards. Importing the wrong intuition now
+costs you, which is what it means for a game to be *about* something.
+
+The concept policy (`fuel`) prefers reactions whose reactants are weakly bonded —
+a player who has understood that a strongly-bonded molecule has little left to
+give. **It memorises no numbers at all** and is worth +35.5% at t = 15.07. Full
+knowledge of the bond table is worth +73.7% at t = 23.71.
+
+## Why it works, stated so it can be checked rather than believed
+
+A reaction's score is a DIFFERENCE — bonds formed minus bonds broken — and a
+difference is not monotone in size. Nitrogen is the whole argument in one
+molecule: N₂ carries 941 kJ/mol, more than almost anything on the board, and is
+nearly worthless as a reactant because breaking that triple bond costs more than
+most rearrangements repay. A big tile is a liability, and no amount of
+tile-counting reveals that.
+
+## The chemistry the engine derives, unprompted
+
+| selection | result | released |
+|---|---|---|
+| CH₄ + 2 O₂ | → CO₂ + 2 H₂O | **+808** (textbook ≈ 802–818) |
+| 3 H₂ + N₂ | → 2 NH₃ | **+97** (Haber, real ΔH ≈ −92) |
+| 2 H₂O₂ | → 2 H₂O + O₂ | **+203** (real ≈ 196) |
+| N₂ + O₂ | **refused** | making NO from air is endothermic — it needs lightning |
+
+That last row matters as much as the others. The engine declines a reaction that
+does not happen, for the right reason, without being told about it specifically.
+
+## The round-5 audit finding, measured
+
+It called conservation of mass a "Brittle Constraint" and demanded it be relaxed
+or the library expanded, on the grounds that a selection might have no valid
+partition. Measured over 1800 selections, **a valid partition exists 100% of the
+time** at every size — necessarily, since the reactants are themselves library
+molecules, so the arrangement you started with is always available. Conservation
+cannot be unsatisfiable, and relaxing it would have discarded a law to fix a
+problem that was not there.
+
+The instinct was right under a different mechanism. At two reactants, 83% of
+selections have no *exothermic* rearrangement — nothing happens. That is a dud
+move rather than a broken puzzle, and a player forced to guess which is which
+would feel exactly what the audit described. So the fix is to the INFORMATION,
+not the constraint: `reactiveMoves` enumerates every selection that actually
+reacts, and the player chooses among live options. Unearned failure is designed
+out rather than tuned down.
+
+`verify-chem` C16 now asserts the decoupling, the concept's uplift, the instinct's
+*negative* uplift, and all four reactions above.

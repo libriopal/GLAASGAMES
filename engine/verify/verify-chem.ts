@@ -14,7 +14,8 @@
 // C12  valence is the COVALENT BOND COUNT, not the oxidation state (disputed)
 // C13  every die face has elements of its own — no fallback covering a gap
 // C14  the declared face weights are what the search produced, and they are sharper
-// C15  A KNOWN DEFECT, PINNED: energy tracks size, so the chemistry does not pay
+// C15  the ASSEMBLY mode's known defect, pinned: its energy tracks size
+// C16  REACTION MODE: the coupling is broken and the chemistry now pays
 //
 // ─────────────────────────────────────────────────────────────────────────────
 // WHY THIS FILE IS THE POINT OF THE WHOLE FEATURE.
@@ -36,6 +37,8 @@ import {
   DECLARED_WEIGHTS, SHARP_RATIO, evolve, fitness, measure,
 } from '../../foundry/chem/weights.js';
 import { playRound } from '../../foundry/chem/learnable.js';
+import { pairedCompare, runPolicies, sizeEnergyCorrelation } from '../../foundry/chem/react-learnable.js';
+import { bestReaction, equationOf } from '../../game/chem/reaction.js';
 import { FACE_WEIGHTS } from '../../lattice/round.js';
 import { makeRng } from '../sim/world-gen.js';
 import { type Bond, bondEnergy, formationEnergy, reactionEnergy } from '../../game/chem/bonds.js';
@@ -481,12 +484,73 @@ const atomsOf = (symbols: readonly string[]): Atom[] =>
     `so "biggest" is near-optimal and valence knowledge is worth 1.43% at t=1.23`);
 }
 
+// ── C16: reaction mode breaks the coupling, and the chemistry pays ─────────
+//
+// The fix for the falsified claim, measured with the identical instrument so the
+// before and after are comparable.
+//
+//                          assembly          reaction
+//     corr(size, score)      0.843             0.122
+//     concept - biggest    +1.43%  t=1.23    +35.5%  t=15.07
+//     biggest - random     +8.37%  t=4.13    -21.0%  t=-11.73
+//
+// The last row is the one worth pausing on. Under assembly scoring the match-3
+// instinct was the single most valuable thing a player could bring. Under
+// reaction scoring it is actively HARMFUL — taking the biggest selection loses
+// to taking one at random. Importing the wrong intuition now costs you, which is
+// what it means for a game to be about something.
+{
+  const r = sizeEnergyCorrelation(14);
+  ok(Math.abs(r) < 0.4,
+    `C16: correlation(selection size, energy released) is ${r.toFixed(3)}. Reaction scoring exists ` +
+      'to decouple score from tile count; if the coupling is back, the educational claim is back ' +
+      'to being false and design/learnable-falsified.md must be re-opened, not quietly ignored.');
+
+  const SEEDS = 60;
+  const P = runPolicies(SEEDS, 8);
+  const conceptVsInstinct = pairedCompare(P.fuel, P.biggest);
+  const instinctVsRandom = pairedCompare(P.biggest, P.random);
+
+  ok(conceptVsInstinct.t > 3,
+    `C16: a player who understands that weakly-bonded reactants have more to give beats the ` +
+      `match-3 instinct by ${conceptVsInstinct.pct.toFixed(1)}% at t=${conceptVsInstinct.t.toFixed(2)}, ` +
+      'which is not significant. THE EDUCATIONAL CLAIM IS THE WHOLE JUSTIFICATION FOR THIS ' +
+      'FEATURE. If this fails, the honest response is to drop the claim, not to weaken the test.');
+  ok(instinctVsRandom.t < 0,
+    `C16: taking the biggest selection still beats taking one at random ` +
+      `(${instinctVsRandom.pct.toFixed(1)}%, t=${instinctVsRandom.t.toFixed(2)}). Under reaction ` +
+      'scoring size should be a poor guide; if it pays again, something has reintroduced the ' +
+      'coupling this mode exists to remove.');
+
+  // And the chemistry it produces must be the chemistry that happens.
+  const byF = new Map(MOLECULES.map((m) => [m.formula, m]));
+  const combustion = bestReaction([byF.get('CH4')!, byF.get('O2')!, byF.get('O2')!]);
+  ok(combustion !== null && combustion.released === 808,
+    `C16: methane combustion resolves to ${combustion ? equationOf(combustion) : 'nothing'}. It ` +
+      'must be CH4 + 2 O2 -> CO2 + 2 H2O at 808 kJ/mol; that is the reaction a gas hob performs.');
+  const haber = bestReaction([byF.get('N2')!, byF.get('H2')!, byF.get('H2')!, byF.get('H2')!]);
+  ok(haber !== null && haber.released > 80 && haber.released < 120,
+    `C16: 3 H2 + N2 resolves to ${haber ? `${equationOf(haber)} at ${haber.released}` : 'nothing'}. ` +
+      'The Haber process releases about 92 kJ/mol; a value far from that means the bond data or ' +
+      'the product search is wrong.');
+  const noReaction = bestReaction([byF.get('N2')!, byF.get('O2')!]);
+  ok(noReaction === null,
+    `C16: N2 + O2 resolves to ${noReaction ? equationOf(noReaction) : 'nothing'}, but it must ` +
+      'resolve to nothing. Making nitric oxide from the air is ENDOTHERMIC — it needs lightning ' +
+      'or an engine — and a game that pays for it teaches the opposite of what is true.');
+
+  console.log(`  C16 reaction mode: corr(size, score) ${r.toFixed(3)} (assembly was 0.843); ` +
+    `concept beats instinct by ${conceptVsInstinct.pct.toFixed(1)}% at t=${conceptVsInstinct.t.toFixed(2)}, ` +
+    `and the instinct now LOSES to random by ${(-instinctVsRandom.pct).toFixed(1)}%; ` +
+    `combustion 808, Haber ${haber?.released}, N2+O2 refused`);
+}
+
 if (failures.length > 0) {
   console.error(`verify-chem: ${failures.length} failure(s)`);
   for (const f of failures) console.error(`  ${f}`);
   process.exit(1);
 }
-console.log('verify-chem: C1-C15 pass. Valence is derived rather than assigned, every molecule and ' +
+console.log('verify-chem: C1-C16 pass. Valence is derived rather than assigned, every molecule and ' +
   'every bond energy is real, the solver recovers known structures and refuses plausible ' +
   'non-molecules, combustion comes out exothermic, and the hidden link is not named after ' +
   'chemistry it does not do.');
