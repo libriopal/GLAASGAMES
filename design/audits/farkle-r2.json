@@ -1,0 +1,46 @@
+{
+  "name": "farkle-r2",
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "at": "2026-09-12T11:39:02.638Z",
+  "provenance": "emitted",
+  "attempts": [
+    {
+      "pass": 1,
+      "maxTokens": 2500,
+      "finish": "stop",
+      "contentChars": 3227,
+      "reasoningChars": 0
+    }
+  ],
+  "questions": [
+    {
+      "id": "a",
+      "text": "Clearing without refill inside a turn produces a measured farkle curve of 0% for four steps then 5%, 20%, 47%, 63%, 92%. Is that the right shape for a push-your-luck game, or are the four risk-free steps at the start dead time that should be compressed?"
+    },
+    {
+      "id": "b",
+      "text": "Coop is now a shared board with separate banks, where clearing a chain can strand your partner. Is that genuine cooperation, or is it just competition over a common pool wearing a coop label?"
+    },
+    {
+      "id": "c",
+      "text": "Idea 55 repurposes the forecast strip's second row to show farkle RISK rather than upcoming faces. Does a forecast of your own probability of failure help a player decide, or does it remove the judgement that was the point?"
+    },
+    {
+      "id": "d",
+      "text": "I cut wildcards rather than weaken the preview/executor identity. Was that the right trade, or is there a formulation of a wildcard that keeps both?"
+    },
+    {
+      "id": "e",
+      "text": "Name the strongest remaining reason this design would fail playtest."
+    }
+  ],
+  "result": {
+    "answer_a": "The four risk-free steps are **padding**, not pacing. In a push-your-luck game, tension is the primary currency. If the player knows with 100% mathematical certainty that they cannot lose for the first four actions, they are not 'playing' during those steps; they are merely 'collecting.' They are performing a chore to reach the actual game. To fix this, you must increase the initial scarcity. The board should be 'tight' from step one. If the first roll is a guaranteed safety net, you haven't built a game; you've built a loading bar that eventually turns into a game.",
+    "answer_b": "It is **spatial cooperation**. It is a significant upgrade over the 'hostage' dynamic of the shared pot. By making the board the shared resource, you move the conflict from 'I am stealing your points' (resentment) to 'I am taking the path you needed' (strategic friction). This is a legitimate cooperative mechanic found in high-level board games (e.g., area control/tile placement). It creates a 'common enemy' in the dwindling connectivity of the board, which is a much healthier driver of cooperation than a shared bank.",
+    "answer_c": "It **changes the nature of the judgment**, but it does not remove it. You are moving the game from the 'Intuition/Gambling' quadrant to the 'Risk Management/EV' quadrant. In tabletop Farkle, the player asks: 'Do I feel lucky?' In your version, the player asks: 'Is the 12% risk worth the 40-point expected gain?' This is a more sophisticated form of agency. It prevents the player from feeling cheated by 'bad luck' because the risk was transparently quantified. However, you must ensure the UI doesn't make the decision *for* them; it must provide the data so they can make the decision themselves.",
+    "answer_d": "The cut was the **correct engineering decision**. To keep wildcards, you would have to introduce 'Probabilistic Previews' (e.g., 'This wildcard has a 16.6% chance of being a 5'), which creates massive UI cognitive load and breaks the 'certainty' of the preview/executor identity. A wildcard that is only revealed *after* the selection is made is a valid mechanic, but it would be a 'hidden' element, which contradicts your goal of transparency. Stick to the cut. A clean, predictable engine is better than a flashy, broken one.",
+    "answer_e": "The strongest reason this will fail is **The Calculator Problem**. If the risk curve is too smooth and the forecast strip is too accurate, the game ceases to be a game of 'pushing luck' and becomes a game of 'solving an equation.' If a player can look at the risk strip and realize that the EV of step 7 is always lower than step 6, the 'human' element of the game—the irrationality, the adrenaline, the 'just one more'—will be crushed by the mathematical optimization. You risk creating a game that is 'solved' by the player's own UI, leaving them feeling like a calculator rather than a gambler.",
+    "change_that_matters_most": "To prevent the 'Calculator Problem,' you must ensure the risk strip represents **probability**, not **certainty**. There must remain a gap between the 'mathematically correct' move and the 'human' move. If the game becomes too deterministic, the tension dies.",
+    "verdict": "REVISE"
+  }
+}

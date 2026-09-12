@@ -1,0 +1,51 @@
+{
+  "name": "farkle-r1",
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "at": "2026-09-12T11:36:56.707Z",
+  "provenance": "emitted",
+  "attempts": [
+    {
+      "pass": 1,
+      "maxTokens": 2500,
+      "error": "Error: HTTP 500 {\"errors\":[{\"message\":\"AiError: AiError: Internal server error (68165617-bdf8-44bb-a09f-84f706c44925)\",\"code\":8005}],\"success\":false,\"result\":{},\"messages\":[]}"
+    },
+    {
+      "pass": 1,
+      "maxTokens": 5000,
+      "finish": "stop",
+      "contentChars": 3187,
+      "reasoningChars": 11330
+    }
+  ],
+  "questions": [
+    {
+      "id": "a",
+      "text": "The core join is: trace a connected path of up to six cells, score the faces under it as a Farkle hand. Is that a real game, or does the adjacency constraint and the hand-scoring constraint fight each other in a way that makes most boards trivially solvable or trivially dead?"
+    },
+    {
+      "id": "b",
+      "text": "Idea 34 makes a coop farkle cost the shared unbanked pot. Does that produce cooperation, or does it produce one player refusing to ever push and the other resenting it?"
+    },
+    {
+      "id": "c",
+      "text": "Ideas 9 and 50 publish the pay table and name the combo. Does making the scoring fully transparent raise the skill ceiling, or does it just reveal that the optimal policy is a lookup?"
+    },
+    {
+      "id": "d",
+      "text": "Which of the 52 is most likely to be unimplementable as stated once it meets a 6x6 grid and a six-cell path — name the specific mechanical conflict."
+    },
+    {
+      "id": "e",
+      "text": "What is the dominant degenerate strategy you would expect a solver to find in this design, and what measurement would detect it?"
+    }
+  ],
+  "result": {
+    "answer_a": "It is a real game, but it is not a 'Farkle' game; it is a 'Path-finding Optimization' game. In standard Farkle, the dice are the constraint (you are stuck with what you roll). In your design, the dice are a resource (you select from a 36-cell pool). Because the density of scoring dice (1s and 5s) is so high, the adjacency constraint does not fight the scoring; it facilitates it too effectively. On a 6x6 grid, the probability of a player being unable to find a connected path of length $\\le 6$ that contains at least one 1 or 5 is statistically negligible. This transforms 'Farkle' from a game of 'managing risk' into a game of 'maximizing efficiency.'",
+    "answer_b": "It produces social friction and resentment. In game theory, this is a variation of the 'Stag Hunt' where the payoff for cooperation is high, but the penalty for a single player's 'greed' (pushing the turn) is a total loss of the shared progress. Without a mechanism to balance risk (e.g., different player roles or asymmetric goals), the 'safe' player will eventually feel held hostage by the 'risky' player, or the 'risky' player will feel stifled by the 'safe' player. It creates tension, but it is a corrosive tension.",
+    "answer_c": "It raises the skill ceiling. If the pay table were hidden, the game would be a slot machine (purely probabilistic). By publishing the table and naming the combos, you shift the skill from 'guessing' to 'calculating Expected Value (EV) per path.' The player is no longer asking 'Will I get lucky?' but 'Is the EV of this 5-cell path higher than the risk of a Farkle?' This is the hallmark of a high-skill optimization game.",
+    "answer_d": "The conflict between **Idea 30** and **Idea 21**. Idea 30 states that Wildcards are 'FALLIBLE claims' (the engine's guess until the chain closes). Idea 21 states that the 'preview uses the SAME lookupScore the executor will use, so a client can never show a number the server disagrees with.' These are mutually exclusive. If the wildcard is a fallible guess, the client *cannot* use the same lookupScore as the server's executor, because the executor uses the ground truth. You cannot have a 'certain' preview for an 'uncertain' wildcard.",
+    "answer_e": "The dominant degenerate strategy is **Greedy Path-based EV Maximization**. A solver will not look for the best hand; it will use a depth-limited search to find the path of length $\\le 6$ that yields the highest score with the lowest probability of a zero-score. To detect this, you must measure the **Farkle Frequency** (the percentage of turns that end in a 0-score). If the Farkle Frequency drops below a certain threshold (e.g., $< 5\\%$), the 'push-your-luck' tension has been solved and the game has become a trivial exercise in path-finding.",
+    "change_that_matters_most": "The transition from 'rolling 6 dice' to 'selecting 6 dice from 36' fundamentally breaks the risk/reward loop of Farkle. You have replaced 'luck' with 'search,' and in a 6x6 grid, the search space is so dense with scoring opportunities that the 'Farkle' (the loss condition) becomes an optional error rather than a natural consequence of the game state.",
+    "verdict": "REVISE"
+  }
+}
