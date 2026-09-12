@@ -18,6 +18,8 @@
 // C16  REACTION MODE: the coupling is broken and the chemistry now pays
 // C17  endothermic reactions are PRICED, not forbidden — photosynthesis included
 // C18  GIBBS: spontaneity is dH - T*dS, checked against the Haber process
+// C19  the round is DETERMINISTIC and replay REJECTS every forgery tried at it
+// C20  an illegal selection cannot score — the client never supplies a number
 //
 // ─────────────────────────────────────────────────────────────────────────────
 // WHY THIS FILE IS THE POINT OF THE WHOLE FEATURE.
@@ -45,6 +47,9 @@ import {
   isEndothermic, isSpontaneous,
 } from '../../game/chem/reaction.js';
 import { affordableMoves, drawReactiveBoard, rearrangementMoves } from '../../game/chem/board-react.js';
+import {
+  type ChemAction, DEFAULT_CHEM_ROUND, greedyChoice, judge, playChemRound, verifyChemRound,
+} from '../../game/chem/round.js';
 import { FACE_WEIGHTS } from '../../lattice/round.js';
 import { makeRng } from '../sim/world-gen.js';
 import { type Bond, bondEnergy, formationEnergy, reactionEnergy } from '../../game/chem/bonds.js';
@@ -682,12 +687,107 @@ const atomsOf = (symbols: readonly string[]): Atom[] =>
     `the verdict on ${pct.toFixed(1)}% of ${total} reactions at ${TEMPERATURE_K} K`);
 }
 
+// ── C19: determinism, and replay that refuses forgeries ────────────────────
+//
+// The chemistry mode is a second RULESET, not a second copy of the rules — it
+// has a different board, a different move and a different score. But the
+// architectural rule from `lattice/round.ts` transfers exactly: one executor per
+// ruleset, and the server verifies by RUNNING it rather than by re-implementing
+// scoring. `net/heat-server.ts` already works that way, and this is what makes
+// it able to serve this mode too.
+//
+// So the forgeries `verify-net` T1-T9 throws at the lattice round are thrown at
+// this one.
+{
+  const SEED = 77001;
+  const actions: ChemAction[] = [];
+  const honest = playChemRound(SEED, DEFAULT_CHEM_ROUND, (tiles) => {
+    const a = greedyChoice(tiles);
+    actions.push(a);
+    return a;
+  });
+
+  // Determinism first: the same seed and the same selections must reproduce.
+  const again = playChemRound(SEED, DEFAULT_CHEM_ROUND, (_t, _b, turn) => actions[turn] ?? []);
+  ok(again.score === honest.score && again.digest === honest.digest,
+    `C19: replaying the same seed and selections gave ${again.score}/${again.digest} instead of ` +
+      `${honest.score}/${honest.digest}. A round that does not reproduce cannot be verified by ` +
+      'anyone, and commit-reveal would be protecting nothing.');
+  ok(honest.score > 0,
+    `C19: the reference player banked ${honest.score}. A round that scores nothing exercises none ` +
+      'of the forgery checks below.');
+
+  ok(verifyChemRound(SEED, DEFAULT_CHEM_ROUND, actions, honest.score, honest.digest).ok,
+    'C19: the honest round fails its own verification, so every rejection below is meaningless.');
+
+  const forgeries: readonly (readonly [string, () => boolean])[] = [
+    ['an inflated score',
+      () => verifyChemRound(SEED, DEFAULT_CHEM_ROUND, actions, honest.score + 1, honest.digest).ok],
+    ['a doubled score',
+      () => verifyChemRound(SEED, DEFAULT_CHEM_ROUND, actions, honest.score * 2, honest.digest).ok],
+    ['a flipped digest',
+      () => verifyChemRound(SEED, DEFAULT_CHEM_ROUND, actions, honest.score, honest.digest ^ 1).ok],
+    ['a different seed',
+      () => verifyChemRound(SEED + 1, DEFAULT_CHEM_ROUND, actions, honest.score, honest.digest).ok],
+    ['reordered selections',
+      () => verifyChemRound(SEED, DEFAULT_CHEM_ROUND, [...actions].reverse(), honest.score, honest.digest).ok],
+    ['extra turns appended',
+      () => verifyChemRound(SEED, { turns: DEFAULT_CHEM_ROUND.turns + 4 }, actions, honest.score, honest.digest).ok],
+  ];
+  for (const [what, attempt] of forgeries) {
+    ok(!attempt(),
+      `C19: replay ACCEPTED ${what}. The server scores by re-running this executor, so anything it ` +
+        'accepts is a score a patched client can mint.');
+  }
+  console.log(`  C19 replay: ${honest.turnsPlayed} turns banked ${honest.score} kJ/mol, reproduces ` +
+    `exactly, and refuses all ${forgeries.length} forgeries`);
+}
+
+// ── C20: an illegal selection cannot score ─────────────────────────────────
+//
+// An action is a SELECTION, never a reaction, never a product list and never a
+// number. Each of those would be a value the client could lie about. The
+// executor derives everything from the selection itself, so a malformed one
+// resolves to nothing and passes the turn rather than inflating anything.
+{
+  const { tiles } = drawReactiveBoard(makeRng(4242));
+  const illegal: readonly (readonly [string, ChemAction])[] = [
+    ['a single cell', [0]],
+    ['no cells', []],
+    ['more cells than allowed', [0, 1, 2, 3, 4, 5]],
+    ['a cell off the board', [0, 9999]],
+    ['a negative index', [0, -1]],
+    ['the same cell twice', [3, 3]],
+    ['a fractional index', [0, 1.5]],
+  ];
+  for (const [what, action] of illegal) {
+    const verdict = judge(tiles, action, 0);
+    ok(verdict.reaction === null && verdict.rejected !== null,
+      `C20: ${what} was judged legal. Every rejection must name itself, so a client can grey out ` +
+        'the same selections the server would refuse rather than approximating them.');
+  }
+  // A legal one must still pass, or C20 is satisfied by refusing everything.
+  const legal = greedyChoice(tiles);
+  ok(judge(tiles, legal, 0).reaction !== null,
+    'C20 POSITIVE CONTROL FAILED: the reference player\u2019s own move is judged illegal.');
+  // And affordability is enforced: an endothermic move with an empty bank is refused.
+  const endo = rearrangementMoves(tiles).find((m) => m.reaction.released < 0);
+  ok(endo !== undefined && judge(tiles, endo.cells, 0).rejected === 'CANNOT_AFFORD',
+    'C20: an endothermic move is affordable with an empty bank. Energy is the one thing that ' +
+      'should gate it, and an unpaid-for reaction is the old refusal with the cost removed.');
+  ok(endo !== undefined && judge(tiles, endo.cells, 100000).reaction !== null,
+    'C20: the same endothermic move is refused even with a full bank, so the gate is not really ' +
+      'affordability.');
+  console.log(`  C20 illegal selections: ${illegal.length} malformed actions rejected by name, the ` +
+    `reference move accepted, and an endothermic move gated by the bank alone`);
+}
+
 if (failures.length > 0) {
   console.error(`verify-chem: ${failures.length} failure(s)`);
   for (const f of failures) console.error(`  ${f}`);
   process.exit(1);
 }
-console.log('verify-chem: C1-C18 pass. Valence is derived rather than assigned, every molecule and ' +
+console.log('verify-chem: C1-C20 pass. Valence is derived rather than assigned, every molecule and ' +
   'every bond energy is real, the solver recovers known structures and refuses plausible ' +
   'non-molecules, combustion comes out exothermic, and the hidden link is not named after ' +
   'chemistry it does not do.');

@@ -38,15 +38,54 @@ import {
 import { type Entry, settle } from '../game/economy/pari-mutuel.js';
 import { type Action, type RoundConfig, verifyRound } from '../lattice/round.js';
 
+/**
+ * A ruleset the server can verify a submission against.
+ *
+ * ── WHY THIS IS AN INTERFACE AND NOT A SECOND `if` ──────────────────────────
+ *
+ * The chemistry mode is a different game — different board, different move,
+ * different score — and the tempting shape is a discriminated union with a
+ * branch in `submit`. That branch would be the beginning of the server knowing
+ * what a molecule is, and the whole reason this file exists is that it knows
+ * nothing about how anything scores.
+ *
+ * So a ruleset is a VERIFIER, supplied by the caller. The server receives
+ * actions, hands them to the ruleset's own executor, and believes the number
+ * that comes back. Adding a third mode adds no code here at all, and nothing in
+ * this file ever imports a ruleset — the dependency points the other way, so a
+ * game cannot pull the server into itself.
+ */
+export interface Ruleset<C, A> {
+  /** Recorded on the receipt, so a third party knows which rules were run. */
+  readonly id: string;
+  /** The shipped executor for this mode. Never a re-implementation. */
+  readonly verify: (
+    seed: number,
+    config: C,
+    actions: readonly A[],
+    claimedScore: number,
+    claimedDigest: number,
+  ) => { readonly ok: boolean; readonly score: number; readonly digest: number };
+  /** Turn budget, so an unbounded action list is refused before any replay. */
+  readonly turnsOf: (config: C) => number;
+}
+
+/** The original dice ruleset. Its executor is `lattice/round.ts`, unchanged. */
+export const LATTICE_RULESET: Ruleset<RoundConfig, Action> = {
+  id: 'lattice',
+  verify: verifyRound,
+  turnsOf: (config) => config.turns,
+};
+
 /** What a client sends when it has finished playing. */
-export interface Submission {
+export interface Submission<C = RoundConfig, A = Action> {
   readonly playerId: string;
   readonly heatId: string;
   /** The seed the client believes it played. Checked against the heat's board. */
   readonly seed: number;
-  readonly config: RoundConfig;
+  readonly config: C;
   /** THE ACTIONS, not the score. The server replays these. */
-  readonly actions: readonly Action[];
+  readonly actions: readonly A[];
   readonly claimedScore: number;
   readonly claimedDigest: number;
 }
@@ -89,10 +128,11 @@ export type Ledger = ReadonlyMap<string, number>;
  * actions. A client that lies about its score is not merely rejected; the lie
  * cannot propagate, because the number it sent is never read as truth.
  */
-export function submit(
+export function submit<C, A>(
   heat: HeatState,
   ledger: Ledger,
-  s: Submission,
+  s: Submission<C, A>,
+  ruleset: Ruleset<C, A> = LATTICE_RULESET as unknown as Ruleset<C, A>,
 ): SubmissionResult {
   const no = (reason: RejectReason, detail: string): Rejected =>
     ({ ok: false, playerId: s.playerId, reason, detail });
@@ -121,11 +161,12 @@ export function submit(
   // A submission cannot contain more actions than the round has turns. Bounded
   // before replay, because an unbounded array is an unbounded amount of work for
   // whoever asks the server to check it.
-  if (s.actions.length > s.config.turns) {
-    return no('TOO_MANY_ACTIONS', `${s.actions.length} actions for a ${s.config.turns}-turn round`);
+  const turns = ruleset.turnsOf(s.config);
+  if (s.actions.length > turns) {
+    return no('TOO_MANY_ACTIONS', `${s.actions.length} actions for a ${turns}-turn round`);
   }
 
-  const replay = verifyRound(s.seed, s.config, s.actions, s.claimedScore, s.claimedDigest);
+  const replay = ruleset.verify(s.seed, s.config, s.actions, s.claimedScore, s.claimedDigest);
   if (!replay.ok) {
     return no(
       'REPLAY_MISMATCH',

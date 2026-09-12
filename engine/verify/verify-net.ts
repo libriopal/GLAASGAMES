@@ -10,12 +10,16 @@
 // T7  a no-show scores zero and keeps their stake in the pool
 // T8  the receipt lets a third party re-derive the outcome, fairness included
 // T9  THE SERVER CONTAINS NO SECOND COPY OF THE RULES        (textual, like L1x)
+// T10 a SECOND RULESET is served by the same code, and forged the same way
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { type Beacon, close, drawBeacon, enter, hashText, openHeat, reveal, boardSeed } from '../../game/economy/heat.js';
 import { type Submission, receipt, settleHeat, submit } from '../../net/heat-server.js';
+import {
+  type ChemAction, CHEM_RULESET, DEFAULT_CHEM_ROUND, greedyChoice, playChemRound,
+} from '../../game/chem/round.js';
 import { DEFAULT_ROUND, playRound } from '../../lattice/round.js';
 import { CELL_COUNT, EMPTY } from '../../lattice/board.js';
 
@@ -171,10 +175,99 @@ const good = honestPlay(heat, 'p0');
     `${banned.length} rule-implementing patterns; the scan fires on a planted one`);
 }
 
+// ── T10: a second ruleset, served by the same server ───────────────────────
+//
+// ── THE POINT IS THAT NOTHING IN heat-server.ts KNOWS WHAT A MOLECULE IS ────
+//
+// The chemistry mode is a different game: a board of molecules, a move that
+// selects a region and rearranges it, and a score in kilojoules per mole. The
+// tempting way to serve it is a branch in `submit`, and that branch would be the
+// first line of the server learning to score — the exact drift T9 exists to
+// prevent.
+//
+// Instead a ruleset is a VERIFIER supplied by the caller. `submit` hands the
+// actions to it and believes what comes back, and the dependency points from the
+// game to the server so a mode cannot pull the server into itself. T10 is the
+// evidence that this works: the same `submit`, the same heat lifecycle, the same
+// forgery rejections, on a game the server has never heard of.
+{
+  const heat = heatOf(8);
+  const seed = boardSeed(heat);
+
+  const actions: ChemAction[] = [];
+  const honest = playChemRound(seed, DEFAULT_CHEM_ROUND, (tiles) => {
+    const a = greedyChoice(tiles);
+    actions.push(a);
+    return a;
+  });
+
+  const chemSub: Submission<typeof DEFAULT_CHEM_ROUND, ChemAction> = {
+    playerId: 'p0',
+    heatId: heat.id,
+    seed,
+    config: DEFAULT_CHEM_ROUND,
+    actions,
+    claimedScore: honest.score,
+    claimedDigest: honest.digest,
+  };
+
+  const accepted = submit(heat, new Map(), chemSub, CHEM_RULESET);
+  ok(accepted.ok && accepted.score === honest.score,
+    `T10: the server rejected an honest chemistry submission (${JSON.stringify(accepted)}). If a ` +
+      'second ruleset cannot be served without changing heat-server.ts, the generalisation bought ' +
+      'nothing.');
+
+  // The score that enters the ledger is the SERVER's, never the claimed one.
+  const forged = submit(
+    heat, new Map(), { ...chemSub, claimedScore: honest.score * 3 }, CHEM_RULESET,
+  );
+  ok(!forged.ok && forged.reason === 'REPLAY_MISMATCH',
+    `T10: a tripled chemistry score was accepted (${JSON.stringify(forged)}). The rejections T1-T9 ` +
+      'prove for the dice game must hold for every mode, or the server is only trustworthy for one.');
+
+  const wrongSeed = submit(heat, new Map(), { ...chemSub, seed: seed + 1 }, CHEM_RULESET);
+  ok(!wrongSeed.ok && wrongSeed.reason === 'WRONG_BOARD',
+    'T10: a chemistry submission naming a different board was accepted.');
+
+  const tooMany = submit(
+    heat, new Map(),
+    { ...chemSub, actions: [...actions, ...actions] },
+    CHEM_RULESET,
+  );
+  ok(!tooMany.ok && tooMany.reason === 'TOO_MANY_ACTIONS',
+    'T10: an over-long chemistry action list was not bounded before replay. The turn budget comes ' +
+      'from the RULESET now, and if it is not consulted an unbounded list is unbounded work.');
+
+  // ── AND THE SERVER'S CODE STILL CONTAINS NO CHEMISTRY ───────────────────
+  //
+  // Comments are stripped first, for the same reason T9 strips them: a comment
+  // EXPLAINING that the server must not know what a molecule is would otherwise
+  // fail a check whose whole point is that it does not. This check caught
+  // exactly that on its first run, on a comment written two minutes earlier.
+  //
+  // The opposite convention is right in `verify-chem` C9, which scans comments
+  // too — but the terms there are CLAIMS about what something is, and a comment
+  // asserting a falsehood becomes the next author's understanding. Vocabulary in
+  // a rationale is not a claim, so here the code alone is what matters.
+  const serverCode = readFileSync(
+    fileURLToPath(new URL('../../net/heat-server.ts', import.meta.url)), 'utf8',
+  ).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  for (const term of ['molecule', 'valence', 'bondEnergy', 'kJ', 'formula']) {
+    ok(!new RegExp(term, 'i').test(serverCode),
+      `T10: heat-server.ts CODE uses "${term}". The server must not know what the game it settles ` +
+        'actually is; that knowledge belongs in the ruleset, on the other side of the dependency.');
+  }
+  ok(/molecule/i.test('const m = molecules[0];'),
+    'T10 NEGATIVE CONTROL FAILED: the scan cannot detect planted chemistry in code.');
+  console.log(`  T10 second ruleset: a ${honest.turnsPlayed}-turn chemistry round banking ` +
+    `${honest.score} is accepted, its forgeries refused, and heat-server.ts still contains no ` +
+    `chemistry vocabulary at all`);
+}
+
 if (failures.length > 0) {
   console.error(`verify-net: ${failures.length} failure(s)`);
   for (const f of failures) console.error(`  ${f}`);
   process.exit(1);
 }
-console.log('verify-net: T1-T9 pass. The server scores by replaying the shipped game, refuses every ' +
+console.log('verify-net: T1-T10 pass. The server scores by replaying the shipped game, refuses every ' +
   'forgery tried against it, and publishes a receipt that admits when it was merely operator-trusted.');
