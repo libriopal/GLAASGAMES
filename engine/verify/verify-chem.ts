@@ -475,11 +475,27 @@ const atomsOf = (symbols: readonly string[]): Atom[] =>
       'foundry/chem/learnable.ts, update design/learnable-falsified.md with the new numbers, and ' +
       'rewrite this check to assert the claim rather than the defect. Do not simply delete it: the ' +
       'educational claim was measured false once and must not be reinstated without evidence.');
-  // The claim must not be asserted anywhere while it is unsupported.
-  const claims = readFileSync(fileURLToPath(new URL('../../game/chem/library.ts', import.meta.url)), 'utf8');
-  ok(!/teaches you chemistry|learn chemistry|educational/i.test(claims),
-    'C15: a chemistry source file asserts the game teaches chemistry. Measured, it does not: ' +
-      'understanding valence is worth 1.43% at t = 1.23. Make the claim true or do not make it.');
+  // ── WHAT MAY NOW BE CLAIMED, AND WHAT STILL MAY NOT ─────────────────────
+  //
+  // Reaction scoring earned the claim back, and round 6 approved it. But the
+  // auditor's own reasoning overstated the result — it wrote that players "are
+  // successfully internalizing" the concept, and nothing here measured that. No
+  // human played anything. What was measured is that a POLICY embodying the
+  // concept outscores one that does not, which is a fact about the game's
+  // incentives rather than about cognition.
+  //
+  // So the supportable claim is that the game REWARDS a chemical concept, and
+  // the unsupportable one is that players LEARN it. The first is a necessary
+  // condition for the second and not a sufficient one, and the difference does
+  // not get to evaporate because the conclusion is flattering.
+  const sources = ['library.ts', 'reaction.ts', 'board-react.ts']
+    .map((f) => readFileSync(fileURLToPath(new URL(`../../game/chem/${f}`, import.meta.url)), 'utf8'))
+    .join('\n');
+  ok(!/players? (?:will )?learn|teaches (?:you|players)|proven to teach/i.test(sources),
+    'C15: a chemistry source file claims players LEARN chemistry. Measured: a policy embodying a ' +
+      'chemical concept outscores the match-3 instinct by 35.5% at t=15.07 — that is the game ' +
+      'rewarding the concept, not evidence that any human internalised it. No human has played ' +
+      'this. Claim what was measured.');
   console.log(`  C15 claim NOT supported (pinned): energy tracks atom count at r = ${r.toFixed(3)}, ` +
     `so "biggest" is near-optimal and valence knowledge is worth 1.43% at t=1.23`);
 }
