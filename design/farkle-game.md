@@ -80,6 +80,46 @@ fast you intend to burn your hand.
 
 ---
 
+## Colour is not decoration — every hue is a claim
+
+Taken from the CyanCode spectrum in your corpus, which puts it sharply: *"Each
+band is a claim about the epistemic status of what you're looking at. A band
+whose color lies about its content is a defect, not a style preference."*
+
+| band | means | on this screen |
+|---|---|---|
+| **matter** `#ff2244`→`#cc44ff` | what **IS** | the six die faces. The only band with six values. |
+| **IR** `#ff2d55` | what **might go wrong** | the forecast frame, the risk ticks, the at-risk total |
+| **engine** `#00e5ff` | what the engine **reads** | the banked total — already recorded, can't be lost |
+
+**A die's hue IS its value, redundant with its pip count.** Neither carries it
+alone: pips survive greyscale and colour-vision deficiency, hue survives distance
+and peripheral vision. Your corpus already ruled on this when an asset pipeline
+tried to cut the face colours to fit a palette cap — the ruling was raise the
+cap, because *"the six die-face colors are load-bearing game information, not
+styling."*
+
+The BANK button is green because banking is the act that **turns a forecast into
+matter**: a number at risk is IR, a number banked is a fact.
+
+### Three measured colour defects, found by rendering
+
+1. **The first screen was near-monochrome.** I reserved chroma on a rank
+   argument and then spent none of it. The argument forbids competing variables
+   sharing one channel; it does not forbid each band owning a reserved region.
+2. **Pips were the pure face hue** — a red pip on a dark red body at **APCA Lc
+   29**, against a palette calling Lc 15 invisible. Red and violet dice were hard
+   to count. Swept the ink-mix: 48 at k=0.45, 65 at 0.70, **72 at 0.78**. Ships
+   at 0.78.
+3. **Die bodies sat at Lc 0 against the deck** at every presence — they were the
+   background with rounded corners. Out-of-hand dice rendered as mud.
+
+And the fix for (3) created a fourth: brightening them to be legible made them
+compete with the live hand, undoing the audit's central directive. Brightness
+alone cannot do both jobs, so the hand is now separated on **two axes** —
+out-of-hand dice keep readable luminance and lose **saturation**. Still plainly
+dice, still their own colour, plainly not in play.
+
 ## The screen, element by element
 
 **INCOMING (top).** Two rows. Row 1 is certain — those faces are fixed by the
@@ -157,8 +197,8 @@ corrosive tension."* Nobody can lose anybody else's points now.
 - **K11** negative control — the real table farkles 253/400 at step 4, an
   all-scoring table farkles 0/400
 
-**Performance**, 393×852 @2x at 4× CPU throttle: frame cost p99 **2.20 ms**
-against a 16.67 ms budget (13.2%), **0/299 frames dropped**.
+**Performance**, 393×852 @2x at 4× CPU throttle: frame cost p99 **3.20 ms**
+against a 16.67 ms budget (19.2%), **0/299 frames dropped**.
 
 **Provenance**: the scorer is a genuine code port from
 `magentadice-cyancode@8db018e`, header naming exactly what changed (one type
