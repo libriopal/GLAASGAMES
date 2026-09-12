@@ -22,7 +22,33 @@ import { DEFAULT_ROUND } from '../../lattice/round.js';
 
 const failures: string[] = [];
 const ok = (c: boolean, d: string): void => { if (!c) failures.push(d); };
-const HEATS = Number(process.env['STAKE_HEATS'] ?? 120);
+/**
+ * Heats per run.
+ *
+ * ── RAISED FROM 120 AFTER S1 FAILED ON A DIFFERENCE IT COULD NOT RESOLVE ─────
+ *
+ * S1 asserts the five rungs return in rank order. At 120 heats it could not
+ * actually resolve the bottom two: `blind` and `greedy` both lose about 46% and
+ * sit within sampling error of each other, so their order flipped on any change
+ * that reshuffled the boards — and one did, when the refill moved from a
+ * sequential stream to `faceAtOrdinal`. S1 reported "return does not rise with
+ * skill", which would be a serious finding if it were true.
+ *
+ * It was not. Measured on the same code at three sample sizes:
+ *
+ *     120 heats   blind -46%  greedy -47%   ← inverted
+ *     480 heats   blind -48%  greedy -45%   ← correct
+ *    1200 heats   blind -48%  greedy -46%   ← correct, and stable
+ *
+ * The ordering is right and the test was underpowered. The tempting fix — exempt
+ * the bottom two rungs, or compare them with a tolerance — would have weakened
+ * the assertion to hide the weakness. Raising the sample size fixes the actual
+ * defect, and it costs 2.6 seconds, so there was never a reason to run at 120
+ * beyond nobody having checked what 120 could see.
+ *
+ * If S1 fails again at this size, it is not noise.
+ */
+const HEATS = Number(process.env['STAKE_HEATS'] ?? 480);
 
 const m = evaluateStaking(BASELINE, HEATS, 15, 100n);
 

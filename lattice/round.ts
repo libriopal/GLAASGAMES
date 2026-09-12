@@ -33,6 +33,7 @@ import {
 } from './board.js';
 import { DEFAULT_DEVIATION, generateLattice } from './lattice-gen.js';
 import { makeRng } from '../engine/sim/world-gen.js';
+import { RESHUFFLE_COST, faceAtOrdinal } from './draw-stream.js';
 import { hashState } from '../engine/sim/hash.js';
 
 /** Face weights. Read once per round; never re-read. */
@@ -177,6 +178,18 @@ export function isStagnant(board: Board): boolean {
 export interface RoundState {
   readonly board: Board;
   readonly rng: () => number;
+  /**
+   * The seed, kept so faces can be drawn BY ORDINAL rather than by walking a
+   * stream. See `lattice/draw-stream.ts` for why that distinction decides
+   * whether a forecast can be honest.
+   */
+  readonly seed: number;
+  /**
+   * How many faces this round has drawn. The position of the window, and the
+   * only part of the draw sequence that play can change — the sequence itself
+   * is fixed by the seed before turn 1.
+   */
+  draws: number;
   score: number;
   reshuffles: number;
   conceded: boolean;
@@ -211,12 +224,15 @@ export function beginRound(seed: number, config?: RoundConfig): RoundState {
   // distribution is resolved HERE, once, before the first roll — never later.
   const weights = config?.faceWeights ?? FACE_WEIGHTS;
 
+  // The opening board is the first CELL_COUNT ordinals. Drawn through the same
+  // indexed stream the refills use, so "the n-th face this round draws" means
+  // one thing from the first cell onward and the forecast can count from zero.
   for (let i = 0; i < CELL_COUNT; i += 1) {
-    board.set(i, OFFSET_FACE, drawFace(rng, weights));
+    board.set(i, OFFSET_FACE, faceAtOrdinal(seed, i, weights));
     board.set(i, OFFSET_STATE, STATE_IDLE);
   }
 
-  return { board, rng, score: 0, reshuffles: 0, conceded: false, observations: [], chained: 0x811c9dc5, turn: 0, weights, chargeMax: config?.chargeMax ?? CHARGE_MAX };
+  return { board, rng, seed, draws: CELL_COUNT, score: 0, reshuffles: 0, conceded: false, observations: [], chained: 0x811c9dc5, turn: 0, weights, chargeMax: config?.chargeMax ?? CHARGE_MAX };
 }
 
 /**
@@ -249,13 +265,19 @@ export function advanceTurn(
     // would hide it. The round concedes instead and reports how many attempts
     // it made, so an unplayable lattice shows up as a number rather than as a
     // freeze.
+    //
+    // A reshuffle costs RESHUFFLE_COST ordinals, consumed in one step. That is
+    // the whole reason row 2 of the forecast is fallible: the window jumps a
+    // full board's worth, and whether it jumps depends on a board state that
+    // does not exist yet.
     let attempts = 0;
     while (isStagnant(board) && attempts < MAX_RESHUFFLE_ATTEMPTS) {
       for (let i = 0; i < CELL_COUNT; i += 1) {
-        board.set(i, OFFSET_FACE, drawFace(rng, state.weights));
+        board.set(i, OFFSET_FACE, faceAtOrdinal(state.seed, state.draws + i, state.weights));
         board.set(i, OFFSET_STATE, STATE_IDLE);
         board.set(i, OFFSET_CHARGE, 0);
       }
+      state.draws += RESHUFFLE_COST;
       state.reshuffles += 1;
       attempts += 1;
     }
@@ -337,12 +359,15 @@ export function advanceTurn(
       }
     }
 
-    // Refill, from the same fixed weights.
+    // Refill, from the same fixed weights, taking the next ordinals in order.
+    // This is the consumption the forecast's row 1 predicts, and it predicts it
+    // by being the same expression: `faceAtOrdinal(seed, draws + k)`.
     let refilled = 0;
     for (let i = 0; i < CELL_COUNT && refilled < config.refill; i += 1) {
       if (board.get(i, OFFSET_FACE) === EMPTY) {
-        board.set(i, OFFSET_FACE, drawFace(rng, state.weights));
+        board.set(i, OFFSET_FACE, faceAtOrdinal(state.seed, state.draws, state.weights));
         board.set(i, OFFSET_STATE, STATE_IDLE);
+        state.draws += 1;
         refilled += 1;
       }
     }

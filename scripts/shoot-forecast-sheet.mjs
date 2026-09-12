@@ -1,0 +1,10 @@
+import { chromium } from 'playwright-core';
+import { fileURLToPath } from 'node:url';
+const url = new URL('../design/forecast-sheet.html', import.meta.url).href;
+const out = fileURLToPath(new URL('../design/forecast-sheet.png', import.meta.url));
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
+const p = await b.newPage({ viewport: { width: 820, height: 1100 }, deviceScaleFactor: 2 });
+await p.goto(url, { waitUntil: 'networkidle' });
+await p.screenshot({ path: out, fullPage: true });
+await b.close();
+console.log('shot', out);

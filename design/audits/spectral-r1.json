@@ -1,0 +1,52 @@
+{
+  "name": "spectral-r1",
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "at": "2026-09-12T04:31:20.218Z",
+  "provenance": "emitted-after-deliberation",
+  "attempts": [
+    {
+      "pass": 1,
+      "maxTokens": 2500,
+      "finish": "length",
+      "contentChars": 0,
+      "reasoningChars": 9326
+    },
+    {
+      "pass": 2,
+      "maxTokens": 3400,
+      "finish": "stop",
+      "contentChars": 2090
+    }
+  ],
+  "questions": [
+    {
+      "id": "a",
+      "text": "The forecast grid's row 2 is fallible because a stagnation reshuffle consumes 36 draws and slides the draw window. Is that a real epistemic uncertainty, or have I dressed up an implementation detail as a design virtue?"
+    },
+    {
+      "id": "b",
+      "text": "Spec 34's rank argument (six bands into a 3-vector has a 3-dimensional null space) is arithmetic. Does it actually support the design conclusion drawn from it, or does it only rule out a naive additive encoding that nobody proposed?"
+    },
+    {
+      "id": "c",
+      "text": "Set B proposes porting code from another repository. Which of B1-B10 is reuse in name only — where copying would import a decision that does not transfer to this codebase?"
+    },
+    {
+      "id": "d",
+      "text": "Showing a player the next 12 tokens raises the skill ceiling and also makes the board more solvable. Is a depth cap of 2 the right place to stop, and what evidence would settle it?"
+    },
+    {
+      "id": "e",
+      "text": "Name the single change in either set most likely to make the game WORSE, and say why."
+    }
+  ],
+  "result": {
+    "answer_a": "It is real epistemic uncertainty. The uncertainty is not in the RNG itself—which remains deterministic—but in the mapping of the RNG stream to the game state. Because the trigger for a reshuffle depends on a board state that does not yet exist, the player cannot predict the 'jump' in the draw ordinal. The uncertainty is a property of the player's knowledge, not a flaw in the engine's logic.",
+    "answer_b": "It supports the design conclusion. By proving that a 3-channel mapping (RGB) must result in a loss of information (the null space), it mathematically necessitates the move to non-chromatic perceptual axes to maintain the required information density. It does not merely rule out a naive approach; it defines the mathematical boundary of what is possible within a 3-vector display.",
+    "answer_c": "B1. You cannot 'port' a precomputed score table from a dice engine to a chemistry engine; the data is domain-specific and useless. While the architectural pattern (encode $\\to$ table $\\to$ read) is transferable, calling the porting of the `chainIndex` itself 'reuse' is a category error. It is a pattern port, not a code port.",
+    "answer_d": "A depth cap of 2 is a heuristic. The correct way to settle it is to measure the Solver-to-Human Delta. If an MCTS agent with a depth-3 lookahead achieves a win-rate significantly higher than a human player, the game has transitioned from a stochastic puzzle to a deterministic search problem. If the delta remains constant between depth 2 and depth 3, the cap is justified.",
+    "answer_e": "A10. Showing a strikethrough for wrong forecasts introduces visual 'ghosting' and cognitive noise. In a high-frequency interaction loop, a UI that preserves its errors as visual artifacts increases the mental load required to parse the current state. It turns a clean forecast into a messy historical record of failed predictions.",
+    "change_that_matters_most": "The 'Draw Ordinal' fix is the pivot point of the entire proposal. Without it, the forecast is a lie; with it, the fallibility is honest.",
+    "verdict": "APPROVE"
+  }
+}

@@ -66,12 +66,29 @@ const SEEDS = Number(process.env['MC_SEEDS'] ?? 120);
 const CHI_CRITICAL = 20.515;
 
 // ── M5: the shipped game did not move ──────────────────────────────────────
+//
+// ── RE-ANCHORED ONCE, DELIBERATELY, AND THE REASON IS RECORDED HERE ──────────
+//
+// This anchor guards ADDITIVITY: an optional config field — `faceWeights`,
+// `deviation`, `chargeMax` — must leave the default game byte-identical. It held
+// through all three.
+//
+// It moved when the refill stopped walking a sequential xorshift stream and
+// started reading `faceAtOrdinal(seed, ordinal)` instead. That is not a config
+// extension; it is a change of where faces come from, so every board differs and
+// the anchor was always going to move with it. The previous values were 32 /
+// 3740550746.
+//
+// The reason for writing that down rather than quietly editing the numbers: an
+// anchor whose value is updated whenever it fails guards nothing. This one is
+// re-pinned exactly once, against a named change, and the next time it moves
+// that will again need a reason in this comment or the change is a defect.
 {
   const r = playRound(90210, DEFAULT_ROUND, () => 0);
-  ok(r.score === 32 && (r.digest >>> 0) === 3740550746,
+  ok(r.score === 46 && (r.digest >>> 0) === 1915249688,
     `M5: the shipped config now scores ${r.score} / digest ${r.digest >>> 0}, but the game as ` +
-      'released scored 32 / 3740550746 — a config extension was not additive');
-  console.log('  M5 additive: shipped config still scores 32, digest 3740550746 — unchanged by ' +
+      'released scored 46 / 1915249688 — a config extension was not additive');
+  console.log('  M5 additive: shipped config still scores 46, digest 1915249688 — unchanged by ' +
     'faceWeights, deviation and chargeMax');
 }
 

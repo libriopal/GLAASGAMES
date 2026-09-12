@@ -68,6 +68,10 @@ export const RULE_SOURCES: readonly string[] = [
   'lattice/board.ts',
   'lattice/lattice-gen.ts',
   'lattice/round.ts',
+  // Every face the board ever shows comes from here. R1 caught its absence the
+  // same hour it was written, which is the point of R1 — a file that decides
+  // outcomes but sits outside the hash is a rule the commitment does not cover.
+  'lattice/draw-stream.ts',
   'lattice/commit.ts',
   'lattice/bond.ts',
   'engine/sim/world-gen.ts',
