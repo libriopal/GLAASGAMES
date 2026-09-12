@@ -51,6 +51,27 @@ export interface Element {
   /** Atomic number — identity, and the reason two isotopes are one element here. */
   readonly z: number;
   readonly group: Group;
+  /**
+   * Single-bond covalent radius, in picometres.
+   *
+   * ── ADDED BECAUSE A MEASUREMENT KILLED THE FIRST TILE DESIGN ──────────────
+   *
+   * The molecule tile drew each atom at a radius derived from its VALENCE. That
+   * seemed reasonable — carbon is the hub, so carbon is biggest — until the
+   * tiles were compared pairwise. Hydrogen, fluorine and chlorine all have
+   * valence 1, so H₂, HF, HCl, F₂ and Cl₂ rendered PIXEL-IDENTICALLY: ten pairs
+   * at an ink distance of exactly 0.0000, out of 120.
+   *
+   * A player could not have told hydrogen from chlorine, and their chemistry is
+   * nothing alike — 436 kJ/mol against 243.
+   *
+   * Covalent radius fixes it with a fact rather than a decoration: atoms really
+   * are different sizes, chlorine really is three times the radius of hydrogen,
+   * and drawing them that way is more truthful than drawing them the same. It is
+   * also the property a chemist would reach for, since these radii are what
+   * determine how molecules pack.
+   */
+  readonly radius: number;
 }
 
 /**
@@ -74,16 +95,16 @@ export function valenceOf(group: Group): number {
  * gases took faces 5 and 6.
  */
 export const ELEMENTS: readonly Element[] = [
-  { symbol: 'H', name: 'hydrogen', z: 1, group: 1 },
-  { symbol: 'C', name: 'carbon', z: 6, group: 14 },
-  { symbol: 'N', name: 'nitrogen', z: 7, group: 15 },
-  { symbol: 'O', name: 'oxygen', z: 8, group: 16 },
-  { symbol: 'F', name: 'fluorine', z: 9, group: 17 },
-  { symbol: 'Cl', name: 'chlorine', z: 17, group: 17 },
+  { symbol: 'H', radius: 31, name: 'hydrogen', z: 1, group: 1 },
+  { symbol: 'C', radius: 76, name: 'carbon', z: 6, group: 14 },
+  { symbol: 'N', radius: 71, name: 'nitrogen', z: 7, group: 15 },
+  { symbol: 'O', radius: 66, name: 'oxygen', z: 8, group: 16 },
+  { symbol: 'F', radius: 57, name: 'fluorine', z: 9, group: 17 },
+  { symbol: 'Cl', radius: 102, name: 'chlorine', z: 17, group: 17 },
   // Valence 0. Real, inert, and the reason faces 5 and 6 are not litter.
-  { symbol: 'He', name: 'helium', z: 2, group: 18 },
-  { symbol: 'Ne', name: 'neon', z: 10, group: 18 },
-  { symbol: 'Ar', name: 'argon', z: 18, group: 18 },
+  { symbol: 'He', radius: 28, name: 'helium', z: 2, group: 18 },
+  { symbol: 'Ne', radius: 58, name: 'neon', z: 10, group: 18 },
+  { symbol: 'Ar', radius: 106, name: 'argon', z: 18, group: 18 },
 ];
 
 export const BY_SYMBOL: ReadonlyMap<string, Element> =

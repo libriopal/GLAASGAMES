@@ -66,6 +66,31 @@ export interface Molecule {
    * quietly change what the numbers mean.
    */
   readonly entropy: number;
+  /**
+   * The angle at the central atom, in degrees, for molecules that have one.
+   *
+   * ── TABULATED, BECAUSE A SCHEMATIC ANGLE CANNOT BE RIGHT FOR BOTH ─────────
+   *
+   * The tile first spread substituents evenly around a circle, which drew water
+   * as a straight line of three atoms. Water is famously BENT, and a drawing
+   * that straightens it is not neutral about shape — it is wrong about it.
+   *
+   * Capping the spread fixed water and immediately broke carbon dioxide, which
+   * IS linear at 180 degrees. One schematic angle cannot serve both, and picking
+   * the one that flatters more molecules would be choosing which to misdraw.
+   *
+   * So these are measured values, on the same footing as the bond enthalpies and
+   * the entropies: 104.5 for water, 180 for CO₂ and the other linear species,
+   * about 95 across the O–O–H of hydrogen peroxide. Molecules with three or four
+   * substituents take the 2D conventions a chemist draws by hand — 120 and 90 —
+   * because a flat tile cannot show a tetrahedron and pretending otherwise would
+   * be a worse lie than the convention.
+   *
+   * This is the SHAPE OF A MOLECULE, which is a fact about that molecule. It is
+   * not the hidden lattice, and `verify-chem` C9 still forbids describing that
+   * as geometry anywhere in the rules.
+   */
+  readonly angle?: number;
   /** One true thing a player is told when they build it. */
   readonly fact: string;
 }
@@ -107,17 +132,17 @@ export const MOLECULES: readonly Molecule[] = [
     fact: 'A greenish gas. The Cl–Cl bond is weak enough that light alone can break it.',
   },
   {
-    formula: 'H2O', name: 'water', atoms: ['O', 'H', 'H'], skeleton: [[0, 1, 1], [0, 2, 1]],
+    angle: 104.5, formula: 'H2O', name: 'water', atoms: ['O', 'H', 'H'], skeleton: [[0, 1, 1], [0, 2, 1]],
     entropy: 188.8,
     fact: 'Oxygen forms two bonds, so it takes TWO hydrogens. That is where the 2 comes from.',
   },
   {
-    formula: 'CO2', name: 'carbon dioxide', atoms: ['C', 'O', 'O'], skeleton: [[0, 1, 2], [0, 2, 2]],
+    angle: 180, formula: 'CO2', name: 'carbon dioxide', atoms: ['C', 'O', 'O'], skeleton: [[0, 1, 2], [0, 2, 2]],
     entropy: 213.8,
     fact: 'Two double bonds. Carbon uses all four of its bonds, two to each oxygen.',
   },
   {
-    formula: 'HCN', name: 'hydrogen cyanide', atoms: ['C', 'H', 'N'], skeleton: [[0, 1, 1], [0, 2, 3]],
+    angle: 180, formula: 'HCN', name: 'hydrogen cyanide', atoms: ['C', 'H', 'N'], skeleton: [[0, 1, 1], [0, 2, 3]],
     entropy: 201.8,
     fact: 'Carbon holds one hydrogen and triple-bonds the nitrogen. Famously toxic.',
   },
@@ -128,13 +153,13 @@ export const MOLECULES: readonly Molecule[] = [
     fact: 'Nitrogen forms three bonds. Making this from N2 feeds roughly half the world.',
   },
   {
-    formula: 'H2O2', name: 'hydrogen peroxide', atoms: ['O', 'O', 'H', 'H'],
+    angle: 95, formula: 'H2O2', name: 'hydrogen peroxide', atoms: ['O', 'O', 'H', 'H'],
     skeleton: [[0, 1, 1], [0, 2, 1], [1, 3, 1]],
     entropy: 232.9,
     fact: 'The O–O single bond is only 146 kJ/mol — so weak the molecule falls apart on its own.',
   },
   {
-    formula: 'C2H2', name: 'acetylene', atoms: ['C', 'C', 'H', 'H'],
+    angle: 180, formula: 'C2H2', name: 'acetylene', atoms: ['C', 'C', 'H', 'H'],
     skeleton: [[0, 1, 3], [0, 2, 1], [1, 3, 1]],
     entropy: 200.9,
     fact: 'A carbon–carbon triple bond. Burns hot enough to cut steel.',
@@ -152,7 +177,7 @@ export const MOLECULES: readonly Molecule[] = [
     fact: 'Methane with one hydrogen swapped for chlorine — both form exactly one bond.',
   },
   {
-    formula: 'CH2O', name: 'formaldehyde', atoms: ['C', 'O', 'H', 'H'],
+    angle: 120, formula: 'CH2O', name: 'formaldehyde', atoms: ['C', 'O', 'H', 'H'],
     skeleton: [[0, 1, 2], [0, 2, 1], [0, 3, 1]],
     entropy: 218.8,
     fact: 'A carbon–oxygen double bond plus two hydrogens: carbon’s four bonds, spent.',
