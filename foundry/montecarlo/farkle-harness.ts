@@ -46,6 +46,7 @@ import {
   survivableDepth,
 } from '../../game/farkle/hand.js';
 import { faceAtOrdinal } from '../../lattice/draw-stream.js';
+import { type Persona, personas, simPlayer } from '../sim/personas.js';
 import {
   type FarkleAction,
   type FarkleConfig,
@@ -85,28 +86,74 @@ export function randomAgent(seed: number): Agent {
 }
 
 /**
- * Greedy plus a calibrated error rate. THE MEDIAN HUMAN — AND A NAMED BLOCKER.
+ * A persona from the pool, playing Farkle. REPLACES THE INVENTED STUB.
  *
- * The error rate and the risk threshold are NOT fitted to anything. No playtest
- * telemetry exists, so this agent is a stub with its blocker named rather than a
- * result: the corpus's own harness spec marks its human-calibrated tier
- * "uncalibrated until playtest data lands", and wiring it to a placeholder
- * distribution would be inventing the data the harness exists to avoid
- * inventing. Its output is reported and is not load-bearing.
+ * ── WHAT WAS WRONG WITH HUMAN-CAL* ─────────────────────────────────────────
+ *
+ * The agent this supersedes had an 18% error rate that I chose, with a comment
+ * saying so. It then BEAT EVERY OTHER AGENT ON THE LADDER, 30730 against
+ * SEARCH-MAX's 26609 — so a number I made up was setting the ceiling that every
+ * balance claim in this game was measured against. That is worse than a missing
+ * agent, because a missing agent is visibly missing.
+ *
+ * `foundry/sim/personas.ts` replaces it with fifteen behavioural profiles
+ * derived from 8,000 real conversations, each carrying OCEAN traits. The traits
+ * are external; the mapping from trait to game decision is mine and is the part
+ * still unvalidated — but that is a smaller and nameable gap where the stub's
+ * was an unnameable one.
+ *
+ * Three traits drive three separate decisions, which is the point of using
+ * traits rather than a skill slider: a cautious expert and a reckless expert are
+ * both experts, and a population that cannot represent both cannot tell a game
+ * that rewards judgement from one that rewards nerve.
  */
-export function humanCalAgent(seed: number, errorRate = 0.18): Agent {
-  const r = rng(seed);
+export function personaAgent(runSeed: number, p: Persona): Agent {
+  const { style, rng } = simPlayer(runSeed, p);
   return {
-    name: 'HUMAN-CAL*',
-    choose: (faces, live, running) => {
+    name: `P:${p.name}`,
+    choose: (faces, live, running, chains) => {
       const cs = scoringChains(faces, live);
       if (cs.length === 0) return [];
-      if (r() < errorRate) return cs[Math.floor(r() * cs.length)]!.cells;
-      const best = cs.reduce((a, b) => (b.score / b.cells.length > a.score / a.cells.length ? b : a));
-      if (running > 0 && riskAfter(faces, live, best.cells) >= RISK_CRITICAL) return [];
-      return best.cells;
+
+      // SEARCH DEPTH decides how much of the board this player actually
+      // considers. A low-skill persona evaluates a handful of chains and can
+      // simply fail to see the best one — which is a different failure from
+      // seeing it and slipping, and the two are separated deliberately.
+      const considered = Math.max(1, Math.round(cs.length * Math.max(0.08, style.searchDepth)));
+      const pool = cs.slice(0, considered);
+
+      // SLIP: found the best move, played another one.
+      const best = rng.next('slip') < style.slipRate
+        ? rng.pick(pool, 'slip-pick')
+        : pool.reduce((a, b) => (b.score / b.cells.length > a.score / a.cells.length ? b : a));
+
+      // EXPLORATION: occasionally prefer an unusual shape over the rated one.
+      // Distinct from risk — trying an odd chain is not the same decision as
+      // pushing a good one, and a game rewarding only one has a narrower
+      // audience than one rewarding both.
+      const move = rng.next('explore') < style.exploration * 0.15
+        ? rng.pick(pool, 'explore-pick')
+        : best;
+
+      // RISK APPETITE decides the bank. The population therefore produces a
+      // SPREAD of stop depths rather than converging on the optimum, which is
+      // what makes the run multiplier's effect visible at all.
+      if (running > 0) {
+        const left = survivableDepth(faces, live) - 1;
+        const pressure = left <= 0 ? 1 : left === 1 ? 0.6 : 0.2;
+        if (rng.next('bank') > style.riskAppetite * (1 - pressure) + (1 - pressure) * 0.15) {
+          if (left <= 0) return [];
+          if (rng.next('bank2') > style.riskAppetite) return [];
+        }
+      }
+      return move.cells;
     },
   };
+}
+
+/** The whole population as agents, at one run seed. */
+export function personaLadder(runSeed: number): Agent[] {
+  return personas().map((p) => personaAgent(runSeed, p));
 }
 
 export const GREEDY: Agent = { name: 'GREEDY', choose: (f, l) => greedyChain(f, l) };
@@ -150,12 +197,32 @@ export function searchAgent(budget: number): Agent {
       // Leaving the multiplier out made every continuation look worse than it
       // was, so the agent banked early and the escalation it was meant to
       // evaluate was invisible to it.
+      // ── AND THE SECOND DEFECT, WHICH THE PERSONA POPULATION EXPOSED ───────
+      //
+      // Fixing the multiplier was not enough: NINE OF FIFTEEN PERSONAS still
+      // outscored this agent, happy_path by 21% (32168 against 26474). When most
+      // of a simulated population beats the solver, the solver is the thing that
+      // is wrong.
+      //
+      // The cause was `riskAfter(...) / 3` — treating the four risk states as
+      // probabilities 0, 1/3, 2/3, 1. Calibration against 16,400 observations
+      // says they are nothing of the sort:
+      //
+      //     state 0, 1, 2  ->    0.0% farkled next  (0 of 12,403)
+      //     state 3        ->  100.0%               (3,997 of 3,997)
+      //
+      // So the agent was assigning a 33% and a 67% chance of ruin to situations
+      // that are perfectly safe, and banking out of them. It was not playing
+      // badly by accident; it was playing correctly against a world model that
+      // did not match the world. Using the MEASURED probability is the fix, and
+      // it is the same lesson as the readout: inside a turn the hand is visible,
+      // so this is not a probability at all — it is a fact with two values.
       const chainsTaken = chains;
       const stopValue = running * runMultiplier(chainsTaken);
       let bestVal = stopValue;
       let bestCells: FarkleAction = [];
       for (const c of pool) {
-        const pLoss = riskAfter(faces, live, c.cells) / 3;
+        const pLoss = riskAfter(faces, live, c.cells) >= RISK_CRITICAL ? 1 : 0;
         const takeValue = (1 - pLoss) * (running + c.score) * runMultiplier(chainsTaken + 1);
         if (takeValue > bestVal) { bestVal = takeValue; bestCells = c.cells; }
       }
@@ -234,12 +301,20 @@ export interface Ladder {
 }
 
 export function runLadder(seeds = 400, config: FarkleConfig = DEFAULT_FARKLE): Ladder {
+  // The reference rungs, plus the WHOLE PERSONA POPULATION. The ladder used to
+  // carry one invented "median human"; it now carries fifteen measured ones, so
+  // the median is a median of something rather than a number I picked.
   const agents: Agent[] = [
-    randomAgent(1), GREEDY, EFFICIENT, humanCalAgent(2), PRUDENT,
+    randomAgent(1), GREEDY, EFFICIENT, PRUDENT,
     searchAgent(24), searchAgent(Infinity),
+    ...personaLadder(1),
   ];
   const results = agents.map((a) => runAgent(a, seeds, config));
-  const byScore = [...results].sort((a, b) => a.meanScore - b.meanScore);
+  // The skill delta is measured across the PERSONA POPULATION only. Including
+  // the reference rungs would compare a solver against a uniform-random agent
+  // and report a spread that no population of players would ever produce.
+  const people = results.filter((r) => r.name.startsWith('P:'));
+  const byScore = [...people].sort((a, b) => a.meanScore - b.meanScore);
   const best = byScore[byScore.length - 1]!;
   const median = byScore[Math.floor(byScore.length / 2)]!;
   const bounded = results.find((r) => r.name === 'SEARCH-24')!;
