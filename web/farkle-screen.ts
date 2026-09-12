@@ -201,13 +201,27 @@ function riskRow(risk: number, x: number, y: number): string {
  * The forecast strip. Framed in IR, because it is foresight.
  *
  * Spatially above the board and never composited over it: a prediction drawn on
- * top of a fact reads as a fact. Row 1 is certain; row 2 washes toward the deck
- * as confidence falls, and at zero confidence it IS the deck, which is the
- * correct rendering of "no claim".
+ * top of a fact reads as a fact. The certain faces sit at full strength; the
+ * fallible ones wash toward the deck as confidence falls, and at zero confidence
+ * they ARE the deck, which is the correct rendering of "no claim".
+ *
+ * ── THE ROWS ARE FLIPPED: CERTAIN AT THE BOTTOM, NEAREST THE BOARD ──────────
+ *
+ * The first layout put the certain row on top and the fallible row below it,
+ * reading top-to-bottom like prose. That is backwards for an instrument. The
+ * strip sits ABOVE the board and its contents fall INTO the board, so the row
+ * physically adjacent to the playfield is the row that arrives next — and the
+ * one further away is the one further off in time. Distance from the board now
+ * means distance in the future, which is a spatial statement of the same fact
+ * the confidence washout makes chromatically.
+ *
+ * It also puts the certain row where the eye already is. A player's attention
+ * lives on the board; the certain faces are the ones they will act on first, and
+ * they are now the nearest thing to it rather than the furthest.
  *
  * The cells carry matter hue because the forecast is about WHICH FACE arrives —
- * but held down and fenced by an IR frame, so the region says "forecast" before
- * any individual cell says "six".
+ * held down, and fenced by an IR frame so the region says "forecast" before any
+ * individual cell says "six".
  */
 function strip(state: ScreenState, ox: number, oy: number): string {
   const P = 38;
@@ -218,7 +232,8 @@ function strip(state: ScreenState, ox: number, oy: number): string {
       const conf = state.forecastConfidence[i] ?? 0;
       const face = state.forecast[i] ?? 0;
       const x = ox + col * P;
-      const y = oy + row * P;
+      // Row 0 (certain) draws on the LOWER line, row 1 (fallible) on the upper.
+      const y = oy + (1 - row) * P;
       const t = (conf / 3) * (row === 0 ? 1 : 0.7);
       if (t <= 0) continue;
       out.push(`<rect x="${x + 1}" y="${y + 1}" width="${P - 2}" height="${P - 2}" rx="5" ` +
@@ -260,8 +275,8 @@ export function farkleScreenSvg(state: ScreenState): string {
 
   // ── The instrument ─────────────────────────────────────────────────────────
   p.push(`<text x="${GUTTER}" y="${stripY + 12}" font-size="9" fill="${IR_CORE}" font-family="${FONT_FIGURE}" letter-spacing="1">INCOMING</text>`);
-  p.push(`<text x="${GUTTER}" y="${stripY + 30}" font-size="8" fill="${INK_DIM}" font-family="${FONT_FIGURE}">certain</text>`);
-  p.push(`<text x="${GUTTER}" y="${stripY + 62}" font-size="8" fill="${INK_DIM}" font-family="${FONT_FIGURE}">likely</text>`);
+  p.push(`<text x="${GUTTER}" y="${stripY + 30}" font-size="8" fill="${INK_DIM}" font-family="${FONT_FIGURE}">likely</text>`);
+  p.push(`<text x="${GUTTER}" y="${stripY + 68}" font-size="8" fill="${INK}" font-family="${FONT_FIGURE}">certain</text>`);
   p.push(strip(state, GUTTER + 58, stripY));
   p.push(`<rect x="${GUTTER}" y="${stripY + stripH + 2}" width="${SCREEN_W - GUTTER * 2}" height="1" fill="${GROUND_EDGE}"/>`);
 
