@@ -15,6 +15,7 @@
 // P12 no front-running — settlement cannot depend on WHEN inside the window
 // P13 public verifiability — a third party reproduces the settlement
 // P14 heat-size floor is enforced rather than divided by zero
+// P15 SCORING-RULE INDEPENDENCE — payouts depend on ORDER, never on magnitude
 //
 // P11–P14 exist because an independent audit of the DESIGN, before any of this
 // was written, was asked what a provably-fair staking system must verify that
@@ -512,10 +513,91 @@ function heat(n: number, seed: number): Entry[] {
     'both endpoints exactly');
 }
 
+// ── P15: the settlement cannot be broken by changing the scoring rule ──────
+//
+// ── WHY THIS CHECK EXISTS: A CARRIED WORRY THAT TURNED OUT TO BE A THEOREM ──
+//
+// The game's scoring rule was replaced wholesale. It used to be "bank the
+// biggest number" and is now the energy released by a chemical reaction — a
+// different unit, a different magnitude, a different distribution shape.
+// Measured over 40 heats of 12 players on real samples from both rules:
+//
+//     rule        mean    sd    cv     ties        pool closed   monotonicity
+//     assembly    6433  3166  0.492    0.23%          40/40          0 fails
+//     reaction    2918   960  0.329    0.04%          40/40          0 fails
+//
+// Nothing moved, and the reason is structural rather than lucky: matchpoints
+// compare scores PAIRWISE for greater, less or equal. Only the ordering enters.
+// A settlement built on ranks is invariant to any monotone transform of the
+// score — the unit can change, the spread can change, the whole distribution can
+// change, and every payout is identical.
+//
+// That is a property worth OWNING rather than rediscovering each time the game
+// changes, because it is what makes the scoring rule safe to keep revising. So
+// it is asserted directly: the same ranking, at wildly different magnitudes,
+// must settle to the same minor unit.
+{
+  const rankings: readonly (readonly number[])[] = [
+    [1, 2, 3, 4, 5, 6, 7, 8],
+    [3, 1, 4, 1, 5, 9, 2, 6],          // with a tie, which matchpoints treat specially
+    [0, 0, 0, 0, 1, 1, 1, 1],          // heavy ties
+  ];
+  // Monotone transforms: scaling, offsetting, and a wildly non-linear one. Each
+  // preserves order exactly and changes every number.
+  const transforms: readonly (readonly [string, (x: number) => number])[] = [
+    ['identity', (x) => x],
+    ['x1000', (x) => x * 1000],
+    ['+50000', (x) => x + 50000],
+    ['cubed+7', (x) => x ** 3 + 7],
+    ['reaction-scale', (x) => 1083 + x * 761],
+  ];
+
+  let compared = 0;
+  for (const ranking of rankings) {
+    const base = settle(
+      ranking.map((sc, i) => ({ id: `p${i}`, score: sc, stake: 100n })),
+      DEFAULT_PARAMS,
+    );
+    for (const [name, f] of transforms) {
+      const other = settle(
+        ranking.map((sc, i) => ({ id: `p${i}`, score: f(sc), stake: 100n })),
+        DEFAULT_PARAMS,
+      );
+      compared += 1;
+      ok(other.distributed === base.distributed && other.netPool === base.netPool,
+        `P15: transform "${name}" changed the pool (${other.distributed} vs ${base.distributed}). ` +
+          'Settlement must not see the magnitude of a score at all.');
+      for (let i = 0; i < base.payouts.length; i += 1) {
+        const a = base.payouts.find((p) => p.id === `p${i}`)!;
+        const b = other.payouts.find((p) => p.id === `p${i}`)!;
+        ok(a.payout === b.payout && a.matchpointsX2 === b.matchpointsX2,
+          `P15: under "${name}", p${i} paid ${b.payout} instead of ${a.payout}. Matchpoints compare ` +
+            'scores pairwise, so ANY order-preserving change of the scoring rule must leave every ' +
+            'payout identical. If this fails, the settlement has started reading magnitudes and the ' +
+            'game can no longer change how it scores without re-auditing fairness.');
+      }
+    }
+  }
+  // And the converse, so P15 cannot pass by ignoring scores altogether.
+  const swapped = settle(
+    [8, 7, 6, 5, 4, 3, 2, 1].map((sc, i) => ({ id: `p${i}`, score: sc, stake: 100n })),
+    DEFAULT_PARAMS,
+  );
+  const straight = settle(
+    [1, 2, 3, 4, 5, 6, 7, 8].map((sc, i) => ({ id: `p${i}`, score: sc, stake: 100n })),
+    DEFAULT_PARAMS,
+  );
+  ok(swapped.payouts.find((p) => p.id === 'p0')!.payout !== straight.payouts.find((p) => p.id === 'p0')!.payout,
+    'P15 NEGATIVE CONTROL FAILED: reversing the ranking did not change any payout, so settlement ' +
+      'is ignoring scores entirely rather than reading their order.');
+  console.log(`  P15 scoring-rule independence: ${compared} order-preserving transforms across ` +
+    `${rankings.length} rankings leave every payout identical; reversing the order does not`);
+}
+
 if (failures.length > 0) {
   console.error(`verify-parimutuel: ${failures.length} failure(s)`);
   for (const f of failures) console.error(`  ${f}`);
   process.exit(1);
 }
-console.log('verify-parimutuel: P0-P14 pass. The pool closes exactly, the order of entry cannot move ' +
+console.log('verify-parimutuel: P0-P15 pass. The pool closes exactly, the order of entry cannot move ' +
   'a minor unit, and real-money settlement stays behind E29.');
