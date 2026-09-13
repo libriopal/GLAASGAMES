@@ -66,6 +66,62 @@ your own gate.* Two constraints can't be satisfied by degrading either.
 
 ---
 
+## Phase 2b · The Monte Carlo engineering run — a DESIGNED experiment
+
+Added after Chemical, because one-at-a-time probing failed four times in a row
+on the same gate. The factors interact by construction: a swap verb is
+unaffordable at 12 turns and may be decisive at 30. A sweep that moves one dial
+cannot see that.
+
+**The plan is audited BEFORE any compute is spent.** Chemical's took two rounds,
+Darkmatter's three. Both returned REVISE first.
+
+| stage | what |
+|---|---|
+| 0 | instrument validation — negative controls *watched failing*; a broken instrument **halts** |
+| 1 | screening at resolution V or better |
+| 2 | full factorial on the survivors |
+| 3 | confirmation on **disjoint** seeds |
+| 4 | exploit sweep |
+| 5 | population and dual constraint |
+
+### Pre-registration
+
+Thresholds and the stopping rule are declared before compute and **do not move**.
+If nothing clears the bar, that is the finding. Chemical's declared fallback was
+written down in advance: *chemistry is a recognition game with a ~4% planning
+margin, and it says so on the tin.*
+
+### What this added to the failure-mode list
+
+**The gate that measures the wrong thing.** Chemical's seed-share bar was
+imported from Farkle, which scores in thousands, into a game scoring 0–8 as
+integers. A permutation null — shuffle which seed each result belongs to,
+destroying the seed effect while keeping every marginal — showed a **floor of
+19.5%** manufactured by discreteness alone. Roughly 20 of the 52 observed points
+were the ruler, not the liquid.
+
+> **Before comparing a metric to a threshold, measure what that metric reads on a
+> null model at the same granularity.**
+
+**The dial that buys one gate by spending another.** PREVIEW raised the agency
+floor by 31.6 points and cost 47 points of solver margin; the planner went from
+63% to 88% of the ceiling. It created no skill — it converted unreachable
+ceiling into reachable skill. A single gate cannot see this; only the pair can.
+
+**Complexity without depth, separated from complexity with it.** SWAP measured
+−0.1 on agency and **+9.4 on decision density**, the largest effect on that
+response. Real decisions, worth nothing. Two metrics are needed because one
+cannot tell a trade-off from a chore.
+
+**A factor level that does not implement its own intent.** "Multistep orders"
+were impossible: 36 cells drawn uniformly from 16 molecules puts ~2.25 copies of
+*every* molecule on *every* board, so no order can be hard because of which
+molecule it names. That is an instrument defect, so it is fixed and re-run — not
+reported as a result.
+
+---
+
 ## Phase 3 · Run EINCOL on the result
 
 1. One specific question, against material you measured.

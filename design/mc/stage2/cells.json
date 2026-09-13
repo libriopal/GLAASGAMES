@@ -110,5 +110,61 @@
     "throughput": 4.625,
     "decisionDensityPct": 85.53459119496856,
     "signalUtilityPct": 428.57142857142856
+  },
+  {
+    "poolMode": "ADAPTIVE",
+    "topology": "SQUARE36",
+    "options": 1,
+    "readable": 29.425,
+    "plan": 31.925,
+    "ceiling": 42.4,
+    "greedy": 6,
+    "agencyFloorPct": 8.496176720475786,
+    "seedSharePct": 52.04130199325826,
+    "throughput": 29.425,
+    "decisionDensityPct": 81.05263157894737,
+    "signalUtilityPct": 390.4166666666667
+  },
+  {
+    "poolMode": "ADAPTIVE",
+    "topology": "SQUARE36",
+    "options": 3,
+    "readable": 38.225,
+    "plan": 37.575,
+    "ceiling": 44.65,
+    "greedy": 6,
+    "agencyFloorPct": -1.7004578155657253,
+    "seedSharePct": 42.75615130370914,
+    "throughput": 38.225,
+    "decisionDensityPct": 84.6938775510204,
+    "signalUtilityPct": 537.0833333333334
+  },
+  {
+    "poolMode": "ADAPTIVE",
+    "topology": "HEX37",
+    "options": 1,
+    "readable": 32.15,
+    "plan": 33.475,
+    "ceiling": 44.075,
+    "greedy": 6.375,
+    "agencyFloorPct": 4.121306376360818,
+    "seedSharePct": 44.72456137752548,
+    "throughput": 32.15,
+    "decisionDensityPct": 82.10526315789474,
+    "signalUtilityPct": 404.3137254901961
+  },
+  {
+    "poolMode": "ADAPTIVE",
+    "topology": "HEX37",
+    "options": 3,
+    "readable": 42,
+    "plan": 39.55,
+    "ceiling": 54.525,
+    "greedy": 6.375,
+    "agencyFloorPct": -5.83333333333334,
+    "seedSharePct": 38.982096777682486,
+    "throughput": 42,
+    "decisionDensityPct": 84.07960199004975,
+    "signalUtilityPct": 558.8235294117646
   }
 ]

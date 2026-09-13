@@ -1,0 +1,52 @@
+{
+  "name": "chem-mc-postrun-r2",
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "at": "2026-09-13T07:39:43.043Z",
+  "provenance": "emitted-after-deliberation",
+  "attempts": [
+    {
+      "pass": 1,
+      "maxTokens": 2500,
+      "finish": "length",
+      "contentChars": 316,
+      "reasoningChars": 9136
+    },
+    {
+      "pass": 2,
+      "maxTokens": 3400,
+      "finish": "stop",
+      "contentChars": 1936
+    }
+  ],
+  "questions": [
+    {
+      "id": "a",
+      "text": "The abandonment criterion said seed share under 45% by any pool or board-generation factor. ADAPTIVE reached 39% but only by making the game trivial (throughput 29-42 against a band of 2-8). Is the criterion met or not met, and does 'it got there degenerately' count as reaching it?"
+    },
+    {
+      "id": "b",
+      "text": "Preview converts solver margin into agency roughly one for one. Is that a property of THIS game, or have I discovered something that would be true of any game where the gate is defined as planner-over-readable-rule?"
+    },
+    {
+      "id": "c",
+      "text": "About 20 of the 52 points of seed share are the metric's own floor. Knowing that, what is the honest one-sentence statement to a non-technical stakeholder about whether the deal decides this game?"
+    },
+    {
+      "id": "d",
+      "text": "What should I actually ship: the square board with three product options, preview off, no swap verb — accepting a recognition game with modest planning depth? Or does the run say this design should not ship at all?"
+    },
+    {
+      "id": "e",
+      "text": "Judge the whole exercise. Was the Monte Carlo engineering run worth what it cost, and what did it establish that a smaller effort would not have?"
+    }
+  ],
+  "result": {
+    "answer_a": "The criterion was **not met**. In engineering, a solution that satisfies a single metric by violating the fundamental constraints of the system (in this case, the pre-registered throughput band) is a failure mode, not a valid configuration. 'Adaptive' did not solve seed share; it destroyed the game's pacing to bypass the problem.",
+    "answer_b": "It is a **universal property** of any game where the 'skill' is defined as navigating a deterministic but partially observable state space. However, the 1:1 exchange rate is a specific property of this game's math. It reveals that 'Agency' in this design is not the ability to make impactful choices, but simply the reduction of uncertainty.",
+    "answer_c": "Even after accounting for mathematical noise, the initial deal exerts a ~30% influence on the final score, which exceeds our threshold for a skill-based game.",
+    "answer_d": "Ship the **Square board with three product options, no swap, and no preview**, but only if the product vision is pivoted to a 'Recognition and Optimization' game. The run has proven this design cannot be a 'Deep Strategy' game; it is a game of maximizing efficiency within a set of visible constraints. If the requirement for deep strategy is non-negotiable, the design should not ship at all.",
+    "answer_e": "The run was **absolutely worth the cost**. A smaller effort would have failed to identify the 'Adaptive' degeneracy, would have missed the critical distinction between 'Decision Density' and 'Agency' (the Swap failure), and would have left the team chasing 'Complexity' (Hex/Swap) instead of 'Depth.' It successfully separated the signal from the noise.",
+    "change_that_matters_most": "The distinction between Agency and Solver Margin is the most vital finding: it proves that 'Preview' is not a skill-builder, but a transparency tool that converts the unreachable ceiling into a reachable floor.",
+    "verdict": "APPROVE"
+  }
+}
