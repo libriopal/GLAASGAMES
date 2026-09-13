@@ -116,30 +116,36 @@ export type SynthMode = 'SOLO' | 'VS' | 'COOP';
  * kind of invented constant that already set a scale ceiling once in this
  * project.
  */
-let MULTISTEP_POOL: readonly string[] | null = null;
-
-export function multistepPool(): readonly string[] {
-  if (MULTISTEP_POOL !== null) return MULTISTEP_POOL;
-  const produced = new Map<string, number>();
-  for (const m of MOLECULES) produced.set(m.formula, 0);
-  let h = 0x9e3779b9;
-  const nextIdx = (n: number): number => {
-    h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
-    h = Math.imul(h ^ (h >>> 12), 0x297a2d39);
-    return ((h ^ (h >>> 15)) >>> 0) % n;
-  };
-  for (let trial = 0; trial < 3000; trial += 1) {
-    const size = 2 + (nextIdx(3));
-    const picks: Molecule[] = [];
-    for (let i = 0; i < size; i += 1) picks.push(MOLECULES[nextIdx(MOLECULES.length)]!);
-    for (const r of rankedRearrangements(picks, OPTIONS_PER_SELECTION)) {
-      for (const f of r.products) produced.set(f, (produced.get(f) ?? 0) + 1);
-    }
-  }
-  const ranked = [...produced.entries()].sort((a, b) => a[1] - b[1] || (a[0] < b[0] ? -1 : 1));
-  MULTISTEP_POOL = ranked.slice(0, Math.max(3, Math.floor(ranked.length / 2))).map(([f]) => f);
-  return MULTISTEP_POOL;
-}
+/**
+ * ── "MULTISTEP ORDERS" ARE IMPOSSIBLE ON THIS BOARD, AND THAT IS A MEASUREMENT ─
+ *
+ * The factor was meant to supply orders that cannot be filled in one move, so
+ * that a plan has something to route toward. Two definitions were tried and both
+ * failed, the second in a way that named the reason:
+ *
+ *   by production frequency  put N2 and CH4 in the pool. Both are rarely
+ *                            PRODUCED -- breaking a 941 kJ/mol triple bond to
+ *                            make one almost never pays -- and both are on a
+ *                            uniformly dealt board constantly, so the order
+ *                            shipped from the opening deal.
+ *   by availability          F2 Cl2 C2H2 CH2O CH3Cl CH4 CO2 H2, measured
+ *                            available within one move on 88.4% of (board,
+ *                            order) pairs against RARE5's 81.0% -- MORE
+ *                            available than the level it was meant to beat.
+ *
+ * The cause is arithmetic rather than a bad list. Thirty-six cells drawn
+ * uniformly from sixteen molecules puts an expected 2.25 copies of EVERY
+ * molecule on every board, so each one is present with probability very close to
+ * one. NO ORDER CAN BE HARD BECAUSE OF WHICH MOLECULE IT NAMES.
+ *
+ * So order difficulty has to come from somewhere other than identity, and
+ * quantity is the honest place: an order for three simultaneous copies of a
+ * molecule that occurs 2.25 times on average cannot be filled from the deal and
+ * cannot be filled in one move. That is BULK below, and it replaces MULTISTEP as
+ * the factor's high level with the reason recorded rather than the name reused.
+ */
+export const MULTISTEP_IMPOSSIBLE =
+  'every molecule is present with probability ~1 on a 36-cell uniform board';
 
 /**
  * A pool drawn against THIS board's atoms, so every order is physically
@@ -170,7 +176,7 @@ export function adaptivePool(tiles: readonly string[]): readonly string[] {
 export function poolFor(config: SynthConfig, tiles: readonly string[]): readonly string[] {
   if (config.pool !== undefined) return config.pool;
   switch (config.poolMode ?? 'RARE5') {
-    case 'MULTISTEP': return multistepPool();
+    case 'BULK': return ORDER_POOL;
     case 'ADAPTIVE': return adaptivePool(tiles);
     default: return ORDER_POOL;
   }
@@ -211,7 +217,7 @@ export type SwapRule = 'NONE' | 'TURN' | 'FREE' | 'MODIFIER';
  *           every deal carries comparable reachable orders, the deal stops
  *           explaining half the outcome.
  */
-export type PoolMode = 'RARE5' | 'MULTISTEP' | 'ADAPTIVE';
+export type PoolMode = 'RARE5' | 'BULK' | 'ADAPTIVE';
 
 export interface SynthConfig {
   readonly turns: number;
@@ -311,7 +317,7 @@ export function previewOf(state: SynthState, config: SynthConfig): string[] {
   const depth = config.preview ?? 0;
   const out: string[] = [];
   for (let i = 0; i < depth; i += 1) {
-    out.push(orderAt(state.seed, state.issued + i, state.pool));
+    out.push(orderAt(state.seed, state.issued + i, state.pool, config.poolMode ?? 'RARE5'));
   }
   return out;
 }
@@ -486,7 +492,17 @@ export function judgeSynth(
  * `verify-synth` Y3 holds this by re-deriving the stream against a mutated board
  * and requiring it unchanged.
  */
-export function orderAt(seed: number, index: number, pool: readonly string[]): string {
+export function orderAt(
+  seed: number,
+  index: number,
+  pool: readonly string[],
+  mode: PoolMode = 'RARE5',
+): string {
+  // BULK issues the stream in blocks, so consecutive orders repeat and the book
+  // holds several copies of one molecule at once. With an expected 2.25 copies
+  // of each molecule on a 36-cell board, a block of three is a genuine
+  // construction problem rather than a wait.
+  if (mode === 'BULK') index = Math.floor(index / BOOK_SIZE);
   let h = (seed ^ Math.imul(index + 0x9e37, 0x85ebca6b)) | 0;
   h = Math.imul(h ^ (h >>> 15), 0xc2b2ae35);
   return pool[((h ^ (h >>> 16)) >>> 0) % pool.length]!;
@@ -602,9 +618,9 @@ function boardWords(tiles: readonly string[]): Int32Array {
   return words;
 }
 
-function topUpBook(state: SynthState, size: number): void {
+function topUpBook(state: SynthState, size: number, mode: PoolMode = 'RARE5'): void {
   while (state.book.length < size) {
-    state.book.push(orderAt(state.seed, state.issued, state.pool));
+    state.book.push(orderAt(state.seed, state.issued, state.pool, mode));
     state.issued += 1;
   }
 }
@@ -667,7 +683,7 @@ function shipReady(state: SynthState, config: SynthConfig): string[] {
     }
     // A replacement order may already be satisfied by the same board, so the
     // book settles rather than shipping at most once per turn.
-    topUpBook(state, size);
+    topUpBook(state, size, config.poolMode ?? 'RARE5');
     if (!any) break;
   }
   return shipped;
@@ -722,7 +738,7 @@ export function beginSynth(seed: number, config: SynthConfig): SynthState {
     digest: hashState(boardWords(tiles)),
     log: [],
   };
-  topUpBook(state, config.book ?? BOOK_SIZE);
+  topUpBook(state, config.book ?? BOOK_SIZE, config.poolMode ?? 'RARE5');
   // A board that already satisfies its opening book would hand out free ships
   // before anyone moved, so the book settles first and the count is then zeroed:
   // those were the deal, not the play.

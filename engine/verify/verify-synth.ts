@@ -13,11 +13,12 @@ import {
   type SynthAction,
   type SynthConfig,
   DEFAULT_SYNTH,
+  ORDER_POOL,
   PASS,
   beginSynth,
   cellsOf,
   judgeSynth,
-  multistepPool,
+  
   optionsFor,
   orderAt,
   playSynth,
@@ -262,16 +263,32 @@ export function verifySynthAll(): Check[] {
     });
   }
 
-  // ── Y12 · the multistep pool is computed, not hand-picked ────────────────
+  // ── Y12 · BULK orders really are scarcer than single ones ───────────────
   {
-    const pool = multistepPool();
-    const allInLibrary = pool.every((f) => BY.has(f));
-    const stable = multistepPool().join() === pool.join();
+    // Pins the finding that killed the MULTISTEP factor. On a 36-cell board
+    // drawn uniformly from 16 molecules every molecule is present with
+    // probability close to one, so NO ORDER CAN BE HARD BECAUSE OF WHICH
+    // MOLECULE IT NAMES. Two definitions of a multistep pool were tried and the
+    // second measured MORE available than the level it was meant to beat, 88.4%
+    // against 81.0%. Difficulty had to move from identity to quantity.
+    let singles = 0;
+    let triples = 0;
+    let total = 0;
+    for (let s2 = 1; s2 <= 30; s2 += 1) {
+      const st2 = beginSynth(s2 * 7919, cfg);
+      const counts = new Map<string, number>();
+      for (const f of st2.tiles) counts.set(f, (counts.get(f) ?? 0) + 1);
+      for (const f of ORDER_POOL) {
+        total += 1;
+        if ((counts.get(f) ?? 0) >= 1) singles += 1;
+        if ((counts.get(f) ?? 0) >= 3) triples += 1;
+      }
+    }
     out.push({
       id: 'Y12',
-      claim: 'the multistep order pool is derived from measured production frequency and is stable',
-      passed: pool.length >= 3 && allInLibrary && stable,
-      detail: `${pool.length} molecules: ${pool.join(' ')}`,
+      claim: 'a block of three copies is scarce where a single copy is not',
+      passed: singles > triples * 1.5 && total > 100,
+      detail: `present at all on ${((singles / total) * 100).toFixed(0)}% of (board, order) pairs, present three times on ${((triples / total) * 100).toFixed(0)}%`,
     });
   }
 

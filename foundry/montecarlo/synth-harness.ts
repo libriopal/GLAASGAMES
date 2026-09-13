@@ -388,7 +388,12 @@ interface BeamNode {
   readonly swapsLeft: number;
 }
 
-function beamShip(node: BeamNode, seed: number, config: SynthConfig): BeamNode {
+function beamShip(
+  node: BeamNode,
+  seed: number,
+  config: SynthConfig,
+  pool: readonly string[],
+): BeamNode {
   const tiles = [...node.tiles];
   const book = [...node.book];
   let issued = node.issued;
@@ -415,7 +420,14 @@ function beamShip(node: BeamNode, seed: number, config: SynthConfig): BeamNode {
       any = true;
     }
     while (book.length < size) {
-      book.push(orderAt(seed, issued, config.pool ?? ORDER_POOL));
+      // The pool comes from the STATE, not from config.pool. poolFor() resolves
+      // poolMode (MULTISTEP, ADAPTIVE) into a concrete list at begin, and
+      // config.pool is undefined in those modes -- so falling back to ORDER_POOL
+      // refilled the ceiling's book from the RARE5 default while every agent
+      // used the resolved pool. The ceiling was playing a different game, and
+      // the stage-1 instrument assertion halted the run on it: ceiling 7.633
+      // against a bounded agent's 8.433.
+      book.push(orderAt(seed, issued, pool, config.poolMode ?? 'RARE5'));
       issued += 1;
     }
     if (!any) break;
@@ -485,6 +497,7 @@ export function ceilingScore(
           },
           seed,
           config,
+          start.pool,
         );
         const key = `${advanced.filled}|${advanced.tiles.join(',')}`;
         if (seen.has(key)) continue;

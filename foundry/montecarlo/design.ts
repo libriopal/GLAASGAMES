@@ -127,9 +127,9 @@ export const FACTORS: readonly Factor[] = [
   {
     key: 'POOL',
     low: { poolMode: 'RARE5' },
-    high: { poolMode: 'MULTISTEP' },
+    high: { poolMode: 'BULK' },
     ruleCostHigh: 0,
-    note: 'orders that cannot be filled in one move, so a plan has to route',
+    note: 'orders issued in blocks, so a fill needs several simultaneous copies',
   },
   {
     key: 'OPTIONS',
