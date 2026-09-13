@@ -35,6 +35,7 @@ import {
 } from '../../game/chem/topology.js';
 import { ORDER_1, legalMoves, runAgent, runCeiling } from '../../foundry/montecarlo/synth-harness.js';
 import { designResolution, screeningDesign } from '../../foundry/montecarlo/design.js';
+import { DIVERGE, convergence } from '../../web/synth-juice.js';
 
 export interface Check {
   readonly id: string;
@@ -313,6 +314,46 @@ export function verifySynthAll(): Check[] {
       claim: 'atoms in equals atoms out, on every offered option',
       passed: bad === 0 && checked > 100,
       detail: `${checked} options checked, ${bad} violations`,
+    });
+  }
+
+  // ── Y14 · the two verbs are identical before the moment of truth ─────────
+  {
+    // The design claim is that both animations START THE SAME -- the game shows
+    // it trying, because the player's intent was legible and deserves to be
+    // honoured before it is answered. That is a claim about feel, and claims
+    // about feel are normally left unfalsifiable. This one is not.
+    let sameBefore = true;
+    for (let i = 0; i <= 20; i += 1) {
+      const p = (i / 20) * DIVERGE;
+      if (Math.abs(convergence(p, 'BOND') - convergence(p, 'REFUSE')) > 1e-9) sameBefore = false;
+    }
+    out.push({
+      id: 'Y14',
+      claim: 'bond and refusal are motion-identical before DIVERGE',
+      passed: sameBefore,
+      detail: `21 phases sampled up to p=${DIVERGE}`,
+    });
+  }
+
+  // ── Y15 · and they separate afterwards, in OPPOSITE directions ───────────
+  {
+    // Direction carries the sign: a bond completes its journey inward and holds;
+    // a refusal is thrown back toward where it started. If both merely faded,
+    // colour would be doing all the work and a colour-blind player would have
+    // nothing.
+    const bondEnd = convergence(1, 'BOND');
+    const refuseEnd = convergence(1, 'REFUSE');
+    let separated = true;
+    for (let i = 1; i <= 20; i += 1) {
+      const p = DIVERGE + (i / 20) * (1 - DIVERGE);
+      if (convergence(p, 'BOND') <= convergence(p, 'REFUSE')) separated = false;
+    }
+    out.push({
+      id: 'Y15',
+      claim: 'after DIVERGE the bond closes and the refusal retreats, at every phase',
+      passed: separated && bondEnd > 0.9 && refuseEnd < 0.15,
+      detail: `bond ends at ${bondEnd.toFixed(2)} (closed), refusal at ${refuseEnd.toFixed(2)} (returned)`,
     });
   }
 
