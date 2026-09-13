@@ -1,0 +1,52 @@
+{
+  "name": "chem-deep-postrun-r1",
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "at": "2026-09-13T18:24:02.465Z",
+  "provenance": "emitted-after-deliberation",
+  "attempts": [
+    {
+      "pass": 1,
+      "maxTokens": 2500,
+      "finish": "length",
+      "contentChars": 2551,
+      "reasoningChars": 7231
+    },
+    {
+      "pass": 2,
+      "maxTokens": 3400,
+      "finish": "stop",
+      "contentChars": 2353
+    }
+  ],
+  "questions": [
+    {
+      "id": "a",
+      "text": "The route is load-bearing at stake 300 but its consequence horizon is LOWER there (0.09-0.34) than where it is a trap (0.47-0.60). Is that anti-correlation a real property of commitment mechanics, or evidence my horizon metric is measuring something other than what I think?"
+    },
+    {
+      "id": "b",
+      "text": "Denial value is 0.0 — taking what the rival needs is slightly worse than ignoring them. Is that a fact about this chemistry, or about my denier agent being weak? How would I tell the difference without building a better denier and begging the question?"
+    },
+    {
+      "id": "c",
+      "text": "Both candidates failed their primary gates. Per the negative-selection framing you insisted on, what is the strongest conclusion I am entitled to draw now — about this game, and about whether deep strategy is reachable here at all?"
+    },
+    {
+      "id": "d",
+      "text": "Consequence horizon never exceeded 0.60 under any of the 8 route configurations, 5 refill/delivery configurations, or the baseline. At what point does a metric that never clears its bar under any tested condition become evidence about the metric rather than the game?"
+    },
+    {
+      "id": "e",
+      "text": "Given everything across both runs, what should I tell the user to ship — and is there any honest version of this game that is a deep-strategy game, or is the answer that chemistry with conservation is structurally a recognition game?"
+    }
+  ],
+  "result": {
+    "answer_a": "The anti-correlation is a real property of the mechanic. The 'route' acts as a convergence engine rather than a depth engine. At high stakes, the mechanic becomes load-bearing, meaning the player is forced to commit to a path to achieve scoring. This commitment collapses the available state space, thereby truncating the consequence horizon. The mechanic trades strategic breadth for scoring certainty; it is a stabilizer that forces the game toward a terminal state rather than an engine that expands the tree of meaningful choices.",
+    "answer_b": "It is a fact about the chemistry. The 'Shared Table' observation is the smoking gun: in this configuration, the cost of interference (the move required to deny) exceeds the utility of the denial. When taking what a rival needs is mathematically worse than ignoring them, the game has failed to create 'contested resources.' The agent is not weak; the math of interference in this specific chemistry is negative.",
+    "answer_c": "The strongest conclusion is that the 'Deep Strategy' hypothesis is falsified. The 'Route' is not an engine of depth; it is a mechanism of convergence. The game, as currently tuned, is a 'Tactical Optimization' game where players seek the most efficient path through a fixed environment, rather than a 'Strategic Planning' game where players shape the environment to create future advantages.",
+    "answer_d": "The metric is a valid thermometer. If the consequence horizon fails to clear the bar across all 40+ tested configurations (routes, refills, and baselines), the game is structurally incapable of producing long-range causal ripples. The metric is not failing the game; the game is failing the metric's requirement for non-linear, long-term impact.",
+    "answer_e": "Do not ship this as a 'Deep Strategy' game; that would be a false claim. Ship it as a 'Tactical Efficiency' or 'Resource Management' game. To reach 'Deep Strategy,' you must break the 'Shared Table' paradigm—moving from a system where moves change the environment to one where moves actively subtract from the opponent's potential—and introduce non-monotonicity, where a sub-optimal immediate move creates a disproportionate future advantage.",
+    "change_that_matters_most": "The 'Route' is currently a sink for complexity, not a source of it.",
+    "verdict": "REVISE"
+  }
+}
