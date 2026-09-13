@@ -1,0 +1,46 @@
+{
+  "name": "dark-mc-plan-r3",
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "at": "2026-09-13T06:35:45.895Z",
+  "provenance": "emitted",
+  "attempts": [
+    {
+      "pass": 1,
+      "maxTokens": 2500,
+      "finish": "stop",
+      "contentChars": 3075,
+      "reasoningChars": 0
+    }
+  ],
+  "questions": [
+    {
+      "id": "a",
+      "text": "N8 tests conserved quantities for DIRECTIONAL drift rather than magnitude, and round-to-nearest-even is adopted to make the rounding error zero-mean. Does that close the math-exploit gap, or is there a class of quantisation attractor that a zero-mean rounding rule still admits?"
+    },
+    {
+      "id": "b",
+      "text": "The glitch-hunter optimises total system energy rather than score. Is that the right objective for an arithmetic adversary, or would an agent optimising something else find the exploit a energy-maximiser misses?"
+    },
+    {
+      "id": "c",
+      "text": "N6 is now gated on the MEDIAN persona of a 15-profile population derived from 8,000 real conversations. Is the median the right rung, or does gating there build a game the bottom third cannot read?"
+    },
+    {
+      "id": "d",
+      "text": "The Lyapunov remedy order is horizon, then body count, then damping last. Is there a fourth remedy I have not considered that costs less than any of the three?"
+    },
+    {
+      "id": "e",
+      "text": "Ten revisions across three rounds. Is this plan now designed to function, and is there anything left that would make you withhold approval?"
+    }
+  ],
+  "result": {
+    "answer_a": "No, it does not close the gap entirely, but it transforms the problem from an impossible 'prevention' task into a solvable 'detection' task. Round-to-nearest-even ensures that the error is zero-mean *statistically*, but it does not prevent 'quantization attractors' where the error becomes locally correlated with the state (e.g., the error always has the same sign when a body is in a specific quadrant of its orbit). However, N8 (Directional Drift) is the exact correct counter-measure for this. By testing for a monotone trend in conserved quantities rather than just magnitude, you catch the attractor when it manifests as a systematic leak. The plan is sound because it accepts that arithmetic is imperfect and builds a gate to catch the imperfection.",
+    "answer_b": "Energy is the primary canary, but it is not the only one. An agent optimizing for energy might miss an exploit that pumps angular momentum or shifts the center of mass while leaving total energy relatively stable. To be truly adversarial, the Glitch-Hunter's objective should be defined as 'the maximization of the absolute directional drift in any conserved quantity (Energy, Linear Momentum, or Angular Momentum).' This ensures the agent is hunting for any violation of the system's fundamental symmetries.",
+    "answer_c": "The median is the correct rung. Gating on the 'mean' allows a small group of high-performing personas to mask a game that is unplayable for the majority. Gating on the 'minimum' (the bottom 1%) risks a 'race to the bottom' where the game is stripped of all complexity to satisfy the least capable agent. The median ensures that the game is 'human-readable' for the core of your target population, while still leaving the high-variance 'signal' available for the expert personas to exploit.",
+    "answer_d": "Yes. The fourth remedy is **Increasing the Softening Constant ($\\epsilon$)**. You have already included it in Revision 1(c) to prevent overflows, but it is also a powerful lever for Lyapunov control. Increasing $\\epsilon$ smooths the potential well, reducing the steepness of the force gradients. This directly lowers the Lyapunov exponent by reducing the system's sensitivity to small positional changes, and it is computationally free because the term is already being calculated.",
+    "answer_e": "The plan is designed to function. It has moved past the 'wishful thinking' phase of physics simulation and into the 'adversarial engineering' phase. It treats the three-way war (Determinism, Stability, Scale) not as a conflict to be won, but as a set of constraints to be measured. The inclusion of N8 and the Glitch-Hunter demonstrates a level of rigor that accounts for the specific failure modes of fixed-point N-body dynamics. I would stake my name on this being sound.",
+    "change_that_matters_most": "The transition from 'preventing error' to 'detecting drift' is the pivot point that makes this plan viable. Most developers fail here by trying to write 'perfect' math; you are instead writing 'perfect' monitoring.",
+    "verdict": "APPROVE"
+  }
+}

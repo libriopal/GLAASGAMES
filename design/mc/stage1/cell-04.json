@@ -1,0 +1,28 @@
+{
+  "i": 4,
+  "label": "..S..N",
+  "config": {
+    "turns": 30,
+    "mode": "SOLO",
+    "refill": "POOL",
+    "preview": 0,
+    "topology": "SQUARE36",
+    "swap": "FREE",
+    "bench": 0,
+    "poolMode": "RARE5",
+    "streak": 1,
+    "swapBudget": 3,
+    "options": 1
+  },
+  "random": 2.033333333333333,
+  "greedy": 1,
+  "readable": 3.8,
+  "plan": 2.4,
+  "ceiling": 4.333333333333333,
+  "agencyFloorPct": -36.84210526315789,
+  "signalUtilityPct": 280,
+  "seedSharePct": 62.90477437374531,
+  "decisionDensityPct": 95,
+  "throughput": 3.8,
+  "ruleCount": 1
+}

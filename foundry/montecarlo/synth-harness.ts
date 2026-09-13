@@ -372,6 +372,20 @@ interface BeamNode {
   /** Streak-weighted, so the ceiling is on the same scale as every agent. */
   readonly points: number;
   readonly streak: number;
+  /**
+   * The ceiling carries a bank and a swap budget because IT MUST HAVE THE SAME
+   * VERBS AS THE AGENTS IT BOUNDS.
+   *
+   * Without these the beam enumerates reactions only. On any configuration where
+   * the swap rule is on, the planner can transpose and the "ceiling" cannot, so
+   * the ceiling scores BELOW the agent it is supposed to bound — which is what a
+   * timing run showed at the all-factors-high cell: plan 5.83 against ceiling
+   * 5.27. That is the same defect that made the positional-delivery result
+   * unusable, found this time by the instrument assertion rather than by me
+   * reading a table.
+   */
+  readonly bank: number;
+  readonly swapsLeft: number;
 }
 
 function beamShip(node: BeamNode, seed: number, config: SynthConfig): BeamNode {
@@ -413,6 +427,8 @@ function beamShip(node: BeamNode, seed: number, config: SynthConfig): BeamNode {
     filled,
     points,
     streak: shippedHere > 0 ? node.streak + 1 : 0,
+    bank: node.bank,
+    swapsLeft: node.swapsLeft,
   };
 }
 
@@ -438,6 +454,8 @@ export function ceilingScore(
       filled: 0,
       points: 0,
       streak: 0,
+      bank: start.bank,
+      swapsLeft: start.swapsLeft,
     },
   ];
   let best = 0;
@@ -445,12 +463,29 @@ export function ceilingScore(
     const next: BeamNode[] = [];
     const seen = new Set<string>();
     for (const node of beam) {
-      const moves = legalMoves(node.tiles, config);
+      const moves = [
+        ...legalMoves(node.tiles, config),
+        ...transposeMoves(node.tiles, node.bank, config, node.swapsLeft),
+      ];
       const ranked = [...moves]
         .sort((a, b) => bookDelta(b, node.book, dockSet(config)) - bookDelta(a, node.book, dockSet(config)) || b.released - a.released)
         .slice(0, breadth);
       for (const m of ranked) {
-        const advanced = beamShip({ ...node, tiles: applyTo(node.tiles, m) }, seed, config);
+        // A transposition spends the budget or the bank exactly as the executor
+        // charges it; a reaction banks what it released. Getting this wrong
+        // would let the ceiling swap for free and bound nothing.
+        const isSwap = m.action.kind === 'TRANSPOSE';
+        const rule = config.swap ?? 'NONE';
+        const advanced = beamShip(
+          {
+            ...node,
+            tiles: applyTo(node.tiles, m),
+            bank: isSwap && rule !== 'FREE' ? node.bank - TRANSPOSE_COST : node.bank + m.released,
+            swapsLeft: isSwap && rule === 'FREE' ? node.swapsLeft - 1 : node.swapsLeft,
+          },
+          seed,
+          config,
+        );
         const key = `${advanced.filled}|${advanced.tiles.join(',')}`;
         if (seen.has(key)) continue;
         seen.add(key);
@@ -789,6 +824,43 @@ export function seedDominance(
     bySeed,
     byPolicy,
   };
+}
+
+/**
+ * The fraction of turns on which the best and second-best moves are close.
+ *
+ * The audit's warning about combining four insufficient fixes was that it
+ * "risks increasing cognitive load without increasing decision density... a game
+ * of managing chores, which is complexity, rather than navigating trade-offs,
+ * which is depth." That cannot be answered by asserting it will not happen, so
+ * it is measured: A TURN WITH AN OBVIOUS BEST MOVE IS NOT A DECISION.
+ *
+ * Close is within 10% on the agent's own value function, which is the same
+ * ranking the readable rule uses — so this measures the decision the PLAYER
+ * faces, not a spread in some abstract quantity they never see.
+ */
+export function decisionDensity(seeds: number, config: SynthConfig): number {
+  let close = 0;
+  let total = 0;
+  const dock = dockSet(config);
+  for (let s = 1; s <= seeds; s += 1) {
+    const st = beginSynth(s * 7919, config);
+    for (let t = 0; t < config.turns; t += 1) {
+      const moves = [...legalMoves(st.tiles, config), ...transposeMoves(st.tiles, st.bank, config, st.swapsLeft)];
+      if (moves.length === 0) break;
+      const vals = moves
+        .map((m) => bookDelta(m, st.book, dock) * 1e6 + m.released)
+        .sort((a, b) => b - a);
+      total += 1;
+      const top = vals[0]!;
+      const second = vals[1];
+      if (second !== undefined && Math.abs(top - second) <= Math.abs(top) * 0.1) close += 1;
+      advanceSynth(st, config, (tiles, book, queue, bank, turn) =>
+        ORDER_1.choose(tiles, book, queue, bank, turn, config),
+      );
+    }
+  }
+  return total > 0 ? (close / total) * 100 : 0;
 }
 
 export const SIGNAL_UTILITY_MIN_PCT = 50;

@@ -268,4 +268,22 @@ export function assertSameVerbs(config: SynthConfig): void {
   if (reactions === 0) {
     throw new InstrumentError('verb-parity', 'no reactions on a freshly drawn board');
   }
+
+  // The structural check above is necessary and was NOT sufficient: it asks
+  // whether the enumerator can produce transpositions, not whether the CEILING
+  // uses them. A timing run found plan 5.83 against ceiling 5.27 on the
+  // all-factors-high cell while this check was green. So the ceiling is
+  // compared against the strongest bounded agent on a short sample, which is
+  // the property that actually matters.
+  if (swapRule !== 'NONE') {
+    const bounded = Math.max(runAgent(ORDER_1, 12, config).score, runAgent(planAgent(3, 8, 20), 12, config).score);
+    const ceiling = runCeiling(12, config);
+    if (ceiling < bounded - 0.35) {
+      throw new InstrumentError(
+        'verb-parity',
+        `with swap rule ${swapRule}, ceiling ${ceiling.toFixed(2)} is below the best bounded ` +
+          `agent ${bounded.toFixed(2)}. The ceiling is not using the same verb set.`,
+      );
+    }
+  }
 }

@@ -1,0 +1,57 @@
+{
+  "name": "dark-mc-plan-r2",
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "at": "2026-09-13T06:34:37.051Z",
+  "provenance": "emitted-after-deliberation",
+  "attempts": [
+    {
+      "pass": 1,
+      "maxTokens": 2500,
+      "finish": "length",
+      "contentChars": 2706,
+      "reasoningChars": 7191
+    },
+    {
+      "pass": 2,
+      "maxTokens": 3900,
+      "finish": "stop",
+      "contentChars": 1798
+    }
+  ],
+  "questions": [
+    {
+      "id": "a",
+      "text": "Q32.32 positions with Q16.16 velocities plus a softened potential, and an energy-drift control that disqualifies an integrator before screening. Does that actually end the determinism/stability/scale war, or have I moved it somewhere it will surface later?"
+    },
+    {
+      "id": "b",
+      "text": "N6 requires a readout-limited agent to score strictly between a blind agent and a full-state one. Is 'strictly between' a sufficient definition of a readout that carries real information, or can a readout pass that test while still being unreadable by a human?"
+    },
+    {
+      "id": "c",
+      "text": "A do-nothing agent is now the floor, where game two's floor was a random legal move. Is do-nothing the right floor for a running system, or does it flatter the design by comparing against something no player would ever do?"
+    },
+    {
+      "id": "d",
+      "text": "DIVERSITY is the variance of the ceiling score across accepted seeds plus the count of distinct winning strategy classes. How would I detect that 'distinct strategy classes' is really just one strategy with different parameters?"
+    },
+    {
+      "id": "e",
+      "text": "N3 runs first and can end the project. If the Lyapunov exponent comes back too high, which of shorter horizons, heavier damping or fewer bodies costs the game the least, and what does each one take away?"
+    },
+    {
+      "id": "f",
+      "text": "With all six revisions in, is this plan now designed to function — and what is the thing that will still go wrong that none of N1 to N7 would catch?"
+    }
+  ],
+  "result": {
+    "answer_a": "The war is not ended; it is transmuted. It moves from a structural failure (unsolvable math) to a parameter-tuning problem (finding the sweet spot between $\\epsilon$, $\\Delta t$, and precision). This is the correct engineering outcome.",
+    "answer_b": "No. 'Strictly between' is a necessary but insufficient condition. It ensures the readout contains information, but it does not ensure that information is cognitively accessible to a human. N6 must be validated against the specific cognitive profiles of the 15 personas to ensure the signal is actually readable.",
+    "answer_c": "Yes. In a running system, the 'natural' state is the only honest baseline. Comparing against a random move is a category error; the do-nothing agent is the only way to measure true agency.",
+    "answer_d": "Through Topological Sensitivity Analysis. A strategy class is defined by the manifold of the intervention vector. If a change in intervention type (e.g., impulse vs. field) results in a non-continuous jump in the solution space, it is a new class. If it is a smooth gradient, it is the same class with different parameters.",
+    "answer_e": "Shorter Horizons is the least costly. It preserves the physics and the momentum (Revision 5) while limiting the window of predictability. Damping is the most expensive as it violates the momentum requirement.",
+    "answer_f": "Numerical Resonance (Quantization Exploits). N1-N7 check the game's fairness, but they do not check if the fixed-point arithmetic itself creates non-physical attractors. An agent may find a 'glitch' where rounding errors in the Q32.32/Q16.16 interaction create a localized, non-physical energy gain.",
+    "change_that_matters_most": "The distinction between a 'physics exploit' and a 'math exploit.'",
+    "verdict": "REVISE"
+  }
+}

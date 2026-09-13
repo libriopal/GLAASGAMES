@@ -1,0 +1,51 @@
+{
+  "name": "dark-mc-plan-r1",
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "at": "2026-09-13T06:30:42.400Z",
+  "provenance": "emitted",
+  "attempts": [
+    {
+      "pass": 1,
+      "maxTokens": 2500,
+      "finish": "stop",
+      "contentChars": 4338,
+      "reasoningChars": 5267
+    }
+  ],
+  "questions": [
+    {
+      "id": "a",
+      "text": "The distinguishing verb is 'intervene in a running system' against Farkle's 'push or bank' and Chemical's 'rearrange and route'. Is that a real third question, or is a physics sandbox with a turn structure just a board game with extra steps?"
+    },
+    {
+      "id": "b",
+      "text": "N3 measures a Lyapunov exponent and I claim a large positive one makes the game UNFAIR rather than merely hard, because outcomes stop being attributable to decisions. Is that right, or is sensitivity to initial conditions exactly what makes a sandbox worth replaying?"
+    },
+    {
+      "id": "c",
+      "text": "Determinism and physics are in direct tension: I require bitwise-identical replay, which forces Fx Q16.16 fixed point through the integrator. What does fixed-point physics cost me that I am likely to discover too late?"
+    },
+    {
+      "id": "d",
+      "text": "The viability oracle is gated at 1-20% rejection: below 1% the generator is timid, above 20% defective. What is the strongest argument that rejection rate is the WRONG measure of generator health entirely?"
+    },
+    {
+      "id": "e",
+      "text": "Game two's plan promised a fold-over that its own design self-check disproved, and I corrected to a resolution-V design. What OTHER claim in this game-three plan am I most likely to be similarly wrong about, and how would I find out before spending the compute?"
+    },
+    {
+      "id": "f",
+      "text": "Name the single most likely way this game ends up as a tech demo — impressive to look at, procedurally novel every run, and not a game."
+    }
+  ],
+  "result": {
+    "answer_a": "It is a real third question, but only if the 'running' is non-trivial. If the system's state evolution between player interventions is merely a linear progression or a simple timer, it is a board game with a 'wait' mechanic. To be a true third verb, the system must possess **momentum**—the state must evolve according to its own internal logic during the intervals of player inactivity. In Farkle, the dice are static until rolled. In Chemical, the molecules are static until placed. In Darkmatter, the 'board' must be a vector field in motion. If the player's intervention is a perturbation of a trajectory rather than a placement on a grid, the verb is distinct.",
+    "answer_b": "You are correct. In a game, a high Lyapunov exponent is a failure of the feedback loop. A game requires a 'predictive model'—the player's ability to form a mental hypothesis ('If I nudge this, that will happen') and test it. If the system is so chaotic that the prediction horizon is shorter than the turn horizon, the player is not 'playing physics'; they are gambling on noise. A sandbox is for exploration; a game is for mastery. Mastery requires that the player's agency produces a discernible, repeatable signal. If $\\lambda$ is too high, the signal-to-noise ratio of human intent drops to zero.",
+    "answer_c": "The cost is **Dynamic Range**. Q16.16 provides a fixed precision of $1/65536$, but it limits your integer range to $\\pm32767$. In a physics simulation, you will inevitably encounter the 'Scale Problem': you need to represent the distance between two stars (large integer) and the gravitational influence of a small mass (tiny fraction) simultaneously. In fixed-point, you cannot have both. You will likely discover that you cannot simulate a 'universe' with a single integrator; you will be forced to implement hierarchical coordinate systems or 'floating-point-like' integer scaling, which threatens your N1 Determinism requirement. You are trading 'smoothness' for 'predictability,' but you may find you have traded away 'scale' as well.",
+    "answer_d": "The strongest argument is that rejection rate measures **solvability, not diversity**. A generator could be 'healthy' by your metric while producing 100% of its seeds within a narrow, boring band of stability. Conversely, a generator could produce 50% 'unsolvable' seeds that are actually the most interesting, high-tension 'survival' scenarios, but your oracle kills them because they don't meet a 'score floor.' The rejection rate tells you if the generator is broken; it does *not* tell you if the generator is interesting. A better measure of health is the **variance of the solution space** across the accepted seeds.",
+    "answer_e": "You are most likely wrong about **G7 (Observability)**. You assume that providing a 'forecast cone' or 'spectral readout' will bridge the gap between the 4D/3D simulation and human cognition. However, in a high-dimensional physics system, the 'state' is often too complex for a human to parse through a readout. You may find that players are 'playing blind,' making interventions based on intuition rather than the data you provide. You will find this out during **Stage 0/1 via 'Blind Pilot' testing**: give a tester the raw data (no graphics) and ask them to predict the state of the system after $X$ steps. If they cannot, your observability factor is a failure, regardless of how 'cool' the GPU rendering looks.",
+    "answer_f": "The single most likely way this becomes a tech demo is through **The Spectacle of Emergence**. If the 'Objective' (G8) is too loosely coupled to the 'Intervention' (G5), the player will spend the entire game watching beautiful, complex, procedurally generated collisions and orbital decays that they did not cause and cannot control. If the player's role is merely to 'watch the chaos unfold' rather than 'steer the chaos toward a goal,' you have built a screensaver, not a game.",
+    "change_that_matters_most": "The tension between N1 (Determinism) and G2 (Integrator) is your primary technical debt. If you use a semi-implicit Euler to save on fixed-point complexity, your energy conservation will be terrible, leading to 'explosive' orbits that trigger your N2 Rejection Gate. You are fighting a three-way war between Determinism, Stability, and Scale.",
+    "verdict": "REVISE"
+  }
+}
