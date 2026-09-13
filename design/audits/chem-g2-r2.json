@@ -1,0 +1,52 @@
+{
+  "name": "chem-g2-r2",
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "at": "2026-09-13T04:50:26.496Z",
+  "provenance": "emitted-after-deliberation",
+  "attempts": [
+    {
+      "pass": 1,
+      "maxTokens": 2500,
+      "finish": "length",
+      "contentChars": 3373,
+      "reasoningChars": 6703
+    },
+    {
+      "pass": 2,
+      "maxTokens": 3400,
+      "finish": "stop",
+      "contentChars": 1997
+    }
+  ],
+  "questions": [
+    {
+      "id": "a",
+      "text": "The core claim is that the game was never missing a mechanic — the engine already computed every legal partition and deleted all but the most exothermic, and exposing three of them is what opened 30-33% headroom where the energy objective had 5.7%. Is that a genuine mechanic or have I just widened the action space until a search had somewhere to go?"
+    },
+    {
+      "id": "b",
+      "text": "I capped the menu at three because ORDER-2 scores 5.37 at three options and 5.37 with all of them, so past three only the beam search improves. Is 'the naive player stops gaining' the right place to cut, or does that cap the skill ceiling exactly where the interesting play would start?"
+    },
+    {
+      "id": "c",
+      "text": "Two of this round's four negative results were defects in MY instrument, not in the design — a hostage-target scoring rule and a beam search scored on high-water while players were scored on their final board. Both were found by building the ladder rather than by review. What else in this measurement set should I distrust?"
+    },
+    {
+      "id": "d",
+      "text": "Delivering an order removes the molecule and refills the cell. That is the rule that rescued the objective from saturation in one direction and from decay in the other. What does it cost me — what does a player learn from it that is not true of chemistry?"
+    },
+    {
+      "id": "e",
+      "text": "Farkle's question is 'again?'. This game's is 'what do I make from these four?'. Name the strongest reason a player would find that a worse question rather than a different one."
+    }
+  ],
+  "result": {
+    "answer_a": "It is a genuine mechanic. Widening the action space is the *means*, but the mechanic is the *introduction of opportunity cost*. By presenting the runner-up, you force a trade-off between immediate energy (Greedy) and long-term throughput (Strategic). Without the choice, the player is a spectator to a decay; with the choice, they are an optimizer of a process.",
+    "answer_b": "It is the right place to cut for the *player*, though it may cap the *solver*. In game design, 'menu bloat' and cognitive overload are greater sins than a slightly lowered skill ceiling. The depth of the game should be driven by the complexity of the *orders* (the 'what'), not the quantity of the *options* (the 'how many').",
+    "answer_c": "You should distrust the **Order Stream** (is it truly decoupled from the board state, or is there a hidden feedback loop?) and the **ORDER-2 Proxy** (a 2-ply search is a mathematical abstraction that does not account for human pattern recognition or the ability to plan 5+ moves ahead via intuition).",
+    "answer_d": "It transforms the game from a **Closed System** (where mass is finite and space is a scarce resource) to a **Steady State/Conveyor System** (where the board is a flow-through medium). The cost is the loss of 'spatial tension'—the player no longer fears running out of atoms or room, only running out of efficiency.",
+    "answer_e": "The strongest reason is that 'What do I make?' is a **combinatorial optimization problem**, whereas Farkle's 'Again?' is a **risk-management problem**. The former is cerebral and additive; the latter is visceral and subtractive. A player may find the former 'work-like' because it lacks the 'Bust' mechanic—the terrifying possibility of losing everything.",
+    "change_that_matters_most": "The transition from a 5.7% margin to a 30% headroom is the most significant delta in the history of this design. You have successfully moved from a broken simulation to a functional game loop.",
+    "verdict": "APPROVE"
+  }
+}
