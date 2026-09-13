@@ -58,26 +58,49 @@ function run(seed: number, ops: readonly [Op, number][], horizon = 360): number[
   return outcome(u);
 }
 
-console.log('── CLAIM 1 · do non-commuting pairs reach what neither reaches alone? ──');
-console.log('pair                      | novel distance beyond the singles');
-for (const [label, a, b] of [
-  ['IMP_A then IMP_A (commuting)', 'IMP_A', 'IMP_A2'],
-  ['IMP_A then MASS (bracket!=0)', 'IMP_A', 'MASS_FAR'],
-] as [string, Op, Op][]) {
-  let novel = 0, n = 0;
-  for (const seed of [11,22,33]) {
-    // The set each single verb can reach, swept over its own parameter.
-    const singles: number[][] = [];
-    for (let i=0;i<7;i++) { singles.push(run(seed, [[a, i/6]])); singles.push(run(seed, [[b, i/6]])); }
-    // The pair, swept over both parameters.
-    let worst = 0;
-    for (let i=0;i<4;i++) for (let j=0;j<4;j++) {
-      const p = run(seed, [[a, i/3],[b, j/3]]);
-      worst = Math.max(worst, Math.min(...singles.map((s) => dist(p, s))));
+// ── CLAIM 1, SECOND ATTEMPT. THE FIRST TEST WAS CONFOUNDED BY RANGE. ───────
+//
+// It reported the COMMUTING pair reaching 2.3109 of novel distance against the
+// non-commuting pair's 0.2127 -- ten times larger, and exactly backwards from
+// the prediction. The cause was not physics. IMP_A and IMP_A2 are the SAME
+// operator, so sweeping both parameters reaches a total impulse of 2.4 where a
+// single verb swept over its own range reaches only 1.2. The "pair" was simply a
+// wider sweep of one dial, and the extra distance was range, not composition.
+//
+// So the budget is held CONSTANT and only the composition varies: every line
+// below spends the same total parameter, split differently in time and across
+// operators. That is the only way the Lie-bracket question can be asked.
+console.log('── CLAIM 1 (budget held constant) · does composition reach new states? ──');
+console.log('composition                        | novel distance beyond single-verb set');
+{
+  const BUDGET = 1;
+  for (const [label, ops] of [
+    ['all at once, one operator', 'SINGLE'],
+    ['split in time, SAME operator', 'SAME'],
+    ['split in time, DIFFERENT operators', 'MIXED'],
+  ] as [string, 'SINGLE' | 'SAME' | 'MIXED'][]) {
+    let novel = 0, n = 0;
+    for (const seed of [11, 22, 33]) {
+      // The reference set: what either verb alone reaches at full budget.
+      const singles: number[][] = [];
+      for (let i = 0; i <= 6; i += 1) {
+        singles.push(run(seed, [['IMP_A', (i / 6) * BUDGET]]));
+        singles.push(run(seed, [['MASS_FAR', (i / 6) * BUDGET]]));
+      }
+      let worst = 0;
+      for (let k = 1; k < 6; k += 1) {
+        const t = (k / 6) * BUDGET;
+        const rest = BUDGET - t;
+        let p: number[];
+        if (ops === 'SINGLE') p = run(seed, [['IMP_A', BUDGET]]);
+        else if (ops === 'SAME') p = run(seed, [['IMP_A', t], ['IMP_A2', rest]]);
+        else p = run(seed, [['IMP_A', t], ['MASS_FAR', rest]]);
+        worst = Math.max(worst, Math.min(...singles.map((sg) => dist(p, sg))));
+      }
+      novel += worst; n += 1;
     }
-    novel += worst; n++;
+    console.log(`${label.padEnd(34)} | ${(novel / n).toFixed(4)}`);
   }
-  console.log(`${label.padEnd(25)} | ${(novel/n).toFixed(4)}`);
 }
 
 console.log('');

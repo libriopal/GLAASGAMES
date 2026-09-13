@@ -171,3 +171,45 @@ is the only reason to trust the rows where it did not.
    reaches alone.
 4. **"Hold it together" is probably the wrong objective**, because the verbs and
    doing-nothing-well push the same way.
+
+---
+
+## Addendum · the two claims, tested
+
+### Claim 2 — CONFIRMED, decisively
+
+The evaluator's pivot was *"a game where every verb stabilizes is a Janitor
+Sim... the objective must shift from SURVIVAL to EQUILIBRIUM."* Measured, best of
+7 parameter levels, 3 seeds, 360-step horizon:
+
+| objective | do-nothing | best mass | best impulse |
+|---|---|---|---|
+| SURVIVAL — bound fraction | **0.889** | 1.000 | 0.917 |
+| EQUILIBRIUM — inertia inside a band | **0.000** | 0.667 | 0.000 |
+
+Under survival, **doing nothing scores 89% of the best verb** — the Janitor Sim,
+exactly as described. Under equilibrium, doing nothing scores **zero**. The
+objective is what creates the tension, not the verb.
+
+One caution that is not good news: **only mass injection can reach the band at
+all.** Impulse scores zero too. A game with one working verb is a button, so the
+equilibrium objective needs a wider verb set before it is a win rather than a
+narrower failure.
+
+### Claim 1 — NOT TESTED. The experiment was confounded.
+
+First run reported the **commuting** pair reaching 2.3109 of novel distance
+against the non-commuting pair's 0.2127 — ten times larger, and exactly backwards
+from the Lie-algebra prediction.
+
+The cause was not physics. `IMP_A` and `IMP_A2` are the **same operator**, so
+sweeping both parameters reaches a total impulse of 2.4 where either verb alone
+reaches 1.2. The "pair" was a **wider sweep of one dial**, and every unit of that
+extra distance was range rather than composition.
+
+This is the same failure shape as the DRAG result earlier in the round and as the
+five vacuous controls before it: *a statistic answering a different question from
+the one asked.* Recorded, not quietly rerun — the corrected test holds the total
+budget constant and varies only how it is split in time and across operators.
+
+**Neither the prediction nor its negation has evidence yet.**
