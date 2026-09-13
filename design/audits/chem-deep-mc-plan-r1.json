@@ -1,0 +1,52 @@
+{
+  "name": "chem-deep-mc-plan-r1",
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "at": "2026-09-13T18:10:02.791Z",
+  "provenance": "emitted-after-deliberation",
+  "attempts": [
+    {
+      "pass": 1,
+      "maxTokens": 2500,
+      "finish": "length",
+      "contentChars": 265,
+      "reasoningChars": 9443
+    },
+    {
+      "pass": 2,
+      "maxTokens": 3400,
+      "finish": "stop",
+      "contentChars": 2360
+    }
+  ],
+  "questions": [
+    {
+      "id": "a",
+      "text": "Every gate this project uses assumes a solitaire ceiling and versus has none. I propose a head-to-head ladder, exploitability, and denial value instead. Is that the right instrument, and what does it miss that agency floor and solver margin were catching?"
+    },
+    {
+      "id": "b",
+      "text": "CONSEQUENCE HORIZON becomes the primary response, with a bar of 1.0 — one move worth at least one delivery. Is that bar defensible, or is it arbitrary in the same way the imported 35% seed-share bar turned out to be?"
+    },
+    {
+      "id": "c",
+      "text": "The declared route's claim is that a sunk stake cannot be recovered by later optimal play. What is the strongest argument that a good player simply never declares unless it is already safe, making the mechanic a formality rather than a commitment?"
+    },
+    {
+      "id": "d",
+      "text": "I ruled out 48 of 50 mechanics on two measurements — the preview/solver-margin trade and the consequence-horizon test of no-refill. Is that a legitimate narrowing, or am I generalising from two data points to a whole design space?"
+    },
+    {
+      "id": "e",
+      "text": "Name the failure mode that neither the stages, the new controls N1-N4, nor the pre-registered acceptance would catch in THIS run."
+    }
+  ],
+  "result": {
+    "answer_a": "The proposed instrument is the correct way to measure **interaction**, but it misses the **Complexity Floor**. High interaction (Denial Value) and high skill-gap (H2H) can exist in a trivial state space. You can have a high-stakes, high-conflict game that is still mathematically shallow (e.g., a high-stakes version of Nim). The 'Versus' metrics measure the *clash*, but they do not inherently measure the *terrain*.",
+    "answer_b": "The 1.0 bar is **defensible**. Unlike the previous 35% seed-share bar, which was an arbitrary absolute, 1.0 is a relative ratio of volatility to reward. It establishes a threshold where a mistake is no longer 'noise' to be smoothed over by optimal play, but 'signal' that fundamentally alters the game state. It is a measure of meaningful error.",
+    "answer_c": "The strongest argument is the **Risk-Aversion Trap**. If the 'Declared Route' is treated as a bonus or an optional multiplier, a rational agent will only declare when the outcome is already mathematically certain, turning the mechanic into a formality. To avoid this, the mechanic must be the exclusive engine for reaching the game's ceiling; the 'non-declared' path must have a ceiling significantly lower than the 'declared' path.",
+    "answer_d": "It is a **legitimate narrowing**, but it is **Negative Selection**, not positive selection. You are not proving these two are 'good'; you are proving they are the only two that are not 'demonstrably broken' according to the first run's failure modes. It is a valid reduction of the search space, provided you accept that you are looking for the 'least-broken' survivors.",
+    "answer_e": "The failure mode is **High-Stakes Triviality**. Your metrics measure the *weight* of decisions (Consequence) and the *conflict* between players (Denial), but they do not measure the *breadth* or *complexity* of the decision tree. You could pass every gate with a game that has massive consequences and high denial, but only two or three meaningful moves available in the entire state space.",
+    "change_that_matters_most": "The plan lacks a gate to ensure the 'Versus' metrics are being measured against a sufficiently complex 'Solitaire Ceiling.' Without a measure of state-space complexity or decision branching, you risk a false positive: a game that is 'intense' but 'shallow.'",
+    "verdict": "REVISE"
+  }
+}

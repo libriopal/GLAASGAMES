@@ -291,6 +291,33 @@ export interface SynthConfig {
    * downstream of a different pay table.
    */
   readonly streak?: number;
+  /**
+   * THE DECLARED ROUTE. Commit to a target before you can deliver it for full
+   * value.
+   *
+   * ── WHY THIS IS NOT A BONUS, WHICH THE AUDIT INSISTED ON ────────────────────
+   *
+   * As an optional multiplier it is dead on arrival: "a rational agent will only
+   * declare when the outcome is already mathematically certain, turning the
+   * mechanic into a formality." So it is the EXCLUSIVE engine to the ceiling --
+   * an undeclared delivery pays `undeclaredPay` of a declared one. Declining to
+   * declare is choosing a capped game rather than a safe one, which inverts the
+   * risk-aversion trap: the safe play stops being "wait for certainty" and
+   * becomes "declare early enough to matter, and be right".
+   *
+   * It is the only mechanic in this design a greedy policy cannot recover from,
+   * because the stake is sunk at declaration and no later optimal play refunds
+   * it. That is exactly what the consequence-horizon measurement said was
+   * missing: one move was worth 0.38 of a 4.94 score because the readable rule
+   * could recover from every mistake.
+   */
+  readonly route?: boolean;
+  /** Energy forfeited when a declaration expires unmet. */
+  readonly routeStake?: number;
+  /** Turns allowed between declaring and delivering. */
+  readonly routeWindow?: number;
+  /** What an UNDECLARED delivery pays, as a fraction of a declared one. */
+  readonly undeclaredPay?: number;
   /** Players sharing the board. 1 for solo, 2 for coop and vs. */
   readonly players?: number;
 }
@@ -305,6 +332,10 @@ export const DEFAULT_SYNTH: SynthConfig = {
   bench: 0,
   poolMode: 'RARE5',
   streak: 1,
+  route: false,
+  routeStake: 150,
+  routeWindow: 4,
+  undeclaredPay: 0.4,
 };
 
 /** Cells in the configured board. Not a constant any more. */
@@ -348,7 +379,7 @@ export function previewOf(state: SynthState, config: SynthConfig): string[] {
  * The payload is what differs: you are not lining up colours, you are bringing
  * reagents together, and it costs energy because moving a reagent is work.
  */
-export type SynthActionKind = 'REACT' | 'TRANSPOSE';
+export type SynthActionKind = 'REACT' | 'TRANSPOSE' | 'DECLARE';
 
 export interface SynthAction {
   readonly cells: readonly number[];
@@ -369,6 +400,9 @@ export const TRANSPOSE_COST = 120;
 export const PASS: SynthAction = { cells: [], option: -1 };
 
 export type SynthRejection =
+  | 'NOTHING_TO_DECLARE'
+  | 'ALREADY_DECLARED'
+  | 'ROUTE_DISABLED'
   | 'NOT_ADJACENT'
   | 'CANNOT_AFFORD_MOVE'
   | 'TOO_FEW_CELLS'
@@ -420,6 +454,16 @@ export function judgeSynth(
   bankSwapsLeft = Number.POSITIVE_INFINITY,
 ): { reaction: Reaction | null; rejected: SynthRejection | null } {
   const { cells, option } = action;
+  if ((action.kind ?? 'REACT') === 'DECLARE') {
+    if (!(config.route ?? false)) return { reaction: null, rejected: 'ROUTE_DISABLED' };
+    // `option` indexes the OPEN BOOK, so a client can only declare something the
+    // executor is already offering. Declaring a free-text molecule would let it
+    // name a target the board happens to hold.
+    if (!Number.isInteger(option) || option < 0) {
+      return { reaction: null, rejected: 'NOTHING_TO_DECLARE' };
+    }
+    return { reaction: null, rejected: null };
+  }
   if ((action.kind ?? 'REACT') === 'TRANSPOSE') {
     if (cells.length !== 2) return { reaction: null, rejected: 'TOO_FEW_CELLS' };
     const [a, b] = cells as [number, number];
@@ -592,6 +636,11 @@ export interface SynthState {
   readonly bench: string[];
   /** Free swaps remaining this round, under SwapRule FREE. */
   swapsLeft: number;
+  /** The live declaration, or null. The stake is already sunk when this is set. */
+  declared: { formula: string; dueTurn: number } | null;
+  /** Declarations made, kept and met — reported, because a dead button still passes gates. */
+  declaresMade: number;
+  declaresMet: number;
   bank: number;
   turn: number;
   digest: number;
@@ -599,6 +648,9 @@ export interface SynthState {
 }
 
 export interface SynthResult {
+  /** Declarations made and met — a dead button can still pass a score gate. */
+  readonly declaresMade: number;
+  readonly declaresMet: number;
   /** The score: streak-weighted deliveries. Equals `shipped` when streak is 1. */
   readonly score: number;
   /** Orders shipped, unweighted. Throughput. */
@@ -677,7 +729,20 @@ function shipReady(state: SynthState, config: SynthConfig): string[] {
       // never accumulated, the way Farkle floors its run multiplier once at
       // banking rather than carrying a growing float through the round.
       const mult = config.streak ?? 1;
-      state.points += mult <= 1 ? 1 : Math.pow(mult, state.streak);
+      const streakMult = mult <= 1 ? 1 : Math.pow(mult, state.streak);
+      // A declared delivery pays in full; an undeclared one pays a fraction.
+      // The declaration is how scoring WORKS rather than a bonus on top of it.
+      let routePay = 1;
+      if (config.route ?? false) {
+        const d = state.declared;
+        if (d !== null && d.formula === want && state.turn <= d.dueTurn) {
+          state.declared = null;
+          state.declaresMet += 1;
+        } else {
+          routePay = config.undeclaredPay ?? 0.4;
+        }
+      }
+      state.points += streakMult * routePay;
       shipped.push(want);
       any = true;
     }
@@ -728,6 +793,9 @@ export function beginSynth(seed: number, config: SynthConfig): SynthState {
     pool: poolFor(config, tiles),
     bench: Array.from({ length: config.bench ?? 0 }, () => VOID_CELL),
     swapsLeft: (config.swap ?? 'NONE') === 'FREE' ? (config.swapBudget ?? 3) : 0,
+    declared: null,
+    declaresMade: 0,
+    declaresMet: 0,
     streak: 0,
     points: 0,
     book: [],
@@ -782,7 +850,17 @@ export function advanceSynth(
   );
 
   let shipped: string[] = [];
-  if (rejected === null && (action.kind ?? 'REACT') === 'TRANSPOSE') {
+  if (rejected === null && (action.kind ?? 'REACT') === 'DECLARE') {
+    // The stake is sunk HERE, at declaration, before anything is delivered.
+    // That is the whole mechanic: no later optimal play refunds it, which is
+    // what makes this the one decision a greedy policy cannot recover from.
+    const want = state.book[action.option];
+    if (want !== undefined && state.declared === null) {
+      state.bank -= config.routeStake ?? 150;
+      state.declared = { formula: want, dueTurn: state.turn + (config.routeWindow ?? 4) };
+      state.declaresMade += 1;
+    }
+  } else if (rejected === null && (action.kind ?? 'REACT') === 'TRANSPOSE') {
     const [a, b] = action.cells as [number, number];
     const tmp = state.tiles[a]!;
     state.tiles[a] = state.tiles[b]!;
@@ -807,6 +885,13 @@ export function advanceSynth(
       state.tiles[cell] = next ?? fillAt(state.seed, state.turn, cell, state.weights);
     }
     shipped = shipReady(state, config);
+  }
+
+  // An expired declaration is cleared and the stake stays spent. Clearing it
+  // silently without the forfeit would make declaring free, which is the
+  // formality the audit warned the mechanic would collapse into.
+  if (state.declared !== null && state.turn >= state.declared.dueTurn) {
+    state.declared = null;
   }
 
   // The streak counts consecutive DELIVERING turns and a dry turn breaks it.
@@ -843,6 +928,8 @@ export function playSynth(
   while (advanceSynth(state, config, chooseAction));
   const last = state.log[state.log.length - 1];
   return {
+    declaresMade: state.declaresMade,
+    declaresMet: state.declaresMet,
     score: state.points,
     shipped: state.filled,
     bank: Math.max(0, Math.round(state.bank)),

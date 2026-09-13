@@ -1,0 +1,26 @@
+══ RUN A · the declared route, in solitaire ══════════════════
+route stake window opt |  best  never  ceil | horizon  branch  entropy  decl
+false   150      4   1 |  3.42   3.42   4.32 |    0.30    12.8     4.96     0
+false   150      4   3 |  4.88   4.88   6.66 |    0.16    14.2     5.23     0
+ true    75      2   1 |  1.01   1.37   4.32 |    0.14    12.8     4.96     0
+ true    75      2   3 |  1.40   1.95   6.66 |    0.47    14.2     5.23     0
+ true    75      6   1 |  0.98   1.37   4.32 |    0.16    12.8     4.96     0
+ true    75      6   3 |  1.33   1.95   6.66 |    0.60    14.2     5.23     0
+ true   300      2   1 |  1.65   1.37   4.32 |    0.09    12.8     4.96     2
+ true   300      2   3 |  2.55   1.95   6.66 |    0.34    14.2     5.23     2
+ true   300      6   1 |  1.52   1.37   4.32 |    0.24    12.8     4.96     2
+ true   300      6   3 |  2.32   1.95   6.66 |    0.34    14.2     5.23     2
+
+══ RUN B · the shared board ══════════════════════════════════
+matchup                 | win rate | draws | mean scores
+ORDER-2 vs ORDER-1      |    46.0% |    8% | 3.68 / 3.76
+PLAN-3  vs ORDER-1      |    32.0% |   12% | 2.32 / 3.92
+ORDER-1 vs RANDOM-ish   |    48.0% |    4% | 3.84 / 3.84
+
+DENIAL VALUE   denier vs ORDER-1: 48.0% win rate, means 3.84 / 3.84
+  (the denier sees an EMPTY rival book here — see the note in the report)
+
+══ pre-registered acceptance ═════════════════════════════════
+  CONSEQUENCE HORIZON  best 0.60   bar >= 1.0   FAIL
+  EFFECTIVE BRANCHING  best 14.2   bar >= 4     PASS
+  NEVER-DECLARE        136% 139% 140% 147% 83% 77% 90% 84%   bar < 90%   PASS

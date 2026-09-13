@@ -1,0 +1,46 @@
+{
+  "name": "chem-deep-mc-plan-r2",
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "at": "2026-09-13T18:11:13.931Z",
+  "provenance": "emitted",
+  "attempts": [
+    {
+      "pass": 1,
+      "maxTokens": 2500,
+      "finish": "stop",
+      "contentChars": 2648,
+      "reasoningChars": 6510
+    }
+  ],
+  "questions": [
+    {
+      "id": "a",
+      "text": "EFFECTIVE BRANCHING is gated at >= 4 live moves within 10% of the best, with move-value entropy reported alongside. Does that close the high-stakes-triviality hole, or can a game still pass both while being shallow?"
+    },
+    {
+      "id": "b",
+      "text": "Making the declared route the exclusive engine to the ceiling inverts the risk-aversion trap, but it also means a player who never declares is playing a deliberately worse game. Is that good design or a punishment mechanic wearing a strategy costume?"
+    },
+    {
+      "id": "c",
+      "text": "A NEVER-DECLARE agent within 10% of the best declaring agent means the mechanic is a formality. Is 10% the right line, and should that be a hard failure or a finding?"
+    },
+    {
+      "id": "d",
+      "text": "With the negative-selection framing recorded, what is the strongest conclusion this run could legitimately support if BOTH mechanics pass every gate?"
+    },
+    {
+      "id": "e",
+      "text": "Is this plan now designed to function, and is there anything left that would make you withhold approval?"
+    }
+  ],
+  "result": {
+    "answer_a": "Yes. Effective Branching alone is vulnerable to 'spatial triviality' (e.g., four moves that are functionally identical but located in different quadrants). However, by pairing it with Move-Value Entropy, you catch the 'one-handed' problem. If the branching is high but entropy is low, you have a game where the player is presented with many options, but only one actually matters. If both are high, you have a genuine decision space where multiple distinct paths offer comparable utility. This effectively closes the high-stakes-triviality hole.",
+    "answer_b": "It is a structural requirement, not a punishment. In game design, a 'bonus' is an optional layer that optimal agents will ignore if the risk-adjusted return is sub-optimal. By making the Declared Route the exclusive engine for the ceiling, you are not punishing the player for being safe; you are defining the 'High-Stakes' mode of the game. You are forcing the player to choose between a 'Low-Ceiling/Low-Risk' game and a 'High-Ceiling/High-Risk' game. This is the definition of strategic agency.",
+    "answer_c": "It must be a hard failure. If a Never-Declare agent reaches 90% of the ceiling, the mechanic has failed its primary purpose: it has failed to become a fundamental driver of the game's optimal policy. If it is merely a 'finding,' you risk the 'Sunk Cost Fallacy' of design, where you attempt to tune a mechanic that is fundamentally non-essential. A hard failure preserves the integrity of the negative selection process.",
+    "answer_d": "The strongest legitimate conclusion is: 'Of the fifty candidate mechanics designed to address the identified failure modes of the first run, these two specific mechanics are the only ones that successfully satisfy the requirements for consequence, branching, and contested agency. They represent the only viable structural paths for achieving deep strategy within this game's chemistry.' It is a conclusion of *viability*, not *perfection*.",
+    "answer_e": "The plan is functional. It is one of the most rigorous pre-registration documents I have seen for a game design experiment. It anticipates the 'Solitaire vs. Versus' measurement error, it accounts for the 'Risk-Aversion Trap,' and it includes an 'Anti-Nim' gate to prevent high-stakes triviality. There is nothing left to withhold approval; the instrument is calibrated to catch the very errors that would lead to a false positive.",
+    "change_that_matters_most": "The inclusion of the 'Never-Declare' agent as a hard gate is the most critical improvement. It moves the Declared Route from a 'feature' to a 'systemic requirement.'",
+    "verdict": "APPROVE"
+  }
+}
