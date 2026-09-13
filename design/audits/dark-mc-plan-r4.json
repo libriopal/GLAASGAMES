@@ -1,0 +1,46 @@
+{
+  "name": "dark-mc-plan-r4",
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "at": "2026-09-13T18:41:00.353Z",
+  "provenance": "emitted",
+  "attempts": [
+    {
+      "pass": 1,
+      "maxTokens": 2500,
+      "finish": "stop",
+      "contentChars": 3359,
+      "reasoningChars": 5531
+    }
+  ],
+  "questions": [
+    {
+      "id": "a",
+      "text": "Nine instrument defects against four design findings across two runs. Is that ratio evidence my process is working (it caught them) or that my instruments are built too carelessly in the first place — and what would distinguish those two readings?"
+    },
+    {
+      "id": "b",
+      "text": "Revision E says observability is the same dial as order preview and must be reported against solver margin. Does that make G7 not worth screening at all, since we already know what it trades?"
+    },
+    {
+      "id": "c",
+      "text": "Revision F warns that an intervention verb which constrains the system is a convergence engine. For a physics sandbox, is there any intervention verb that EXPANDS the reachable state space rather than narrowing it?"
+    },
+    {
+      "id": "d",
+      "text": "Revision H moves rendering before stage 1. What is the risk of looking at a universe before it is balanced — does seeing it bias which factors I then choose to screen?"
+    },
+    {
+      "id": "e",
+      "text": "With all eleven revisions, is this plan now better than the one you approved at r3, or have I added ceremony that will slow the run without catching anything new?"
+    }
+  ],
+  "result": {
+    "answer_a": "The ratio is evidence of a **calibrating instrument**, not a careless one. In a failed process, instrument defects are silent; they masquerade as 'perfect' design data, leading to high-confidence, wrong conclusions. The fact that your process caught nine defects in the ruler before they could pollute the measurement of the object proves the validation pipeline is functioning. A 'careless' process would have reported a 0% rejection rate and a 1.0 correlation, blissfully unaware that the ruler was broken. You are not building a game; you are building a laboratory. In a laboratory, the first phase is always the calibration of the sensors.",
+    "answer_b": "G7 is not being screened to see *if* it is a trade-off, but to find the **Pareto optimal point** on that trade-off curve. If you do not screen G7, you are guessing where the 'Signal Utility' meets the 'Solver Margin.' Screening allows you to identify the specific configuration where the readout provides the maximum possible agency floor for the minimum possible reduction in solver margin. It is the difference between knowing a dial exists and knowing where to set it.",
+    "answer_c": "Yes. While most interventions in a closed system act as 'entropy sinks' or 'stabilizers' (narrowing the reachable state space), **Energy Injection** (Impulse/Mass) and **Mass Injection** (adding degrees of freedom) can expand the reachable phase space. A system in a low-energy, highly ordered state (e.g., a stable, circularized cluster) has a small reachable volume. An intervention that injects kinetic energy or adds a body can transition the system into a high-entropy, high-velocity dispersion state, vastly increasing the manifold of possible future trajectories. The screening must distinguish between 'expanding the space' and 'creating chaos' (N3).",
+    "answer_d": "The risk is **Aesthetic Bias**—the tendency to favor factors that produce 'pretty' results. However, you have mitigated this by defining the purpose of the render: it is a **sanity check for rule-visual parity**, not a design tool. You are looking for 'unreachable brightest states' or 'visual clipping of physics events.' As long as the rendering is used to detect *defects* (e.g., 'the physics says it's here, but the pixels say it's there') rather than to *select* factors, the bias is contained. The factors are selected by the 8-factor matrix, which is blind to the render.",
+    "answer_e": "This plan is significantly better than R3. R3 was a plan for a game; this is a plan for a **verifiable physical simulation**. R3 lacked the mathematical and procedural safeguards to prevent the 'false positives' that plague complex systems (quantization exploits, vacuous controls, and the screensaver effect). The 'ceremony' you have added is actually the **structural integrity** required to ensure that when the Monte Carlo run returns a result, that result is a measurement of a game, not an artifact of the math. You have moved from 'designing by intuition' to 'designing by measurement.'",
+    "change_that_matters_most": "The promotion of N3 (Lyapunov) to the absolute first step and the addition of N8 (Quantization Conservation) are the most critical upgrades. They transform the project from a 'physics experiment that might be a game' into a 'game built on a verified physics engine.'",
+    "verdict": "APPROVE"
+  }
+}
