@@ -1,0 +1,28 @@
+{
+  "i": 14,
+  "label": ".PSM.N",
+  "config": {
+    "turns": 30,
+    "mode": "SOLO",
+    "refill": "POOL",
+    "preview": 5,
+    "topology": "SQUARE36",
+    "swap": "FREE",
+    "bench": 0,
+    "poolMode": "BULK",
+    "streak": 1,
+    "swapBudget": 3,
+    "options": 1
+  },
+  "random": 1.6666666666666667,
+  "greedy": 1.2666666666666666,
+  "readable": 3.066666666666667,
+  "plan": 3.2333333333333334,
+  "ceiling": 4.166666666666667,
+  "agencyFloorPct": 5.434782608695647,
+  "signalUtilityPct": 142.10526315789477,
+  "seedSharePct": 71.8372962117658,
+  "decisionDensityPct": 94.83333333333334,
+  "throughput": 3.066666666666667,
+  "ruleCount": 2
+}

@@ -1,0 +1,75 @@
+stage 1: 32 cells, resolution 6, 30 seeds/cell
+X=TOPOLOGY P=PREVIEW S=SWAP M=POOL O=OPTIONS N=TURNS
+
+── AGENCY FLOOR % (higher better) · noise floor ±1.4 ──
+   PREVIEW   +   31.6  SIGNIFICANT
+   OPTIONS   +    4.6  SIGNIFICANT
+   POOL      +    4.2  SIGNIFICANT
+   TOPOLOGY  +    1.4
+   TURNS     +    1.0
+   SWAP         -0.1
+   interactions past the noise floor:
+     TOPOLOGYxOPTIONS         -10.2
+     TOPOLOGYxPREVIEW         -5.9
+     POOLxOPTIONS             -4.9
+     TOPOLOGYxPOOL            +3.6
+     PREVIEWxOPTIONS          -3.2
+     SWAPxTURNS               -2.6
+
+── SEED SHARE % (lower better) · noise floor ±0.0 ──
+   OPTIONS      -7.5  SIGNIFICANT
+   TOPOLOGY     -3.9  SIGNIFICANT
+   TURNS     +    3.9  SIGNIFICANT
+   POOL      +    2.9  SIGNIFICANT
+   PREVIEW      -0.0
+   SWAP         -0.0
+   interactions past the noise floor:
+     POOLxTURNS               +2.8
+     TOPOLOGYxOPTIONS         +2.0
+     POOLxOPTIONS             -1.0
+     OPTIONSxTURNS            +0.3
+     TOPOLOGYxPOOL            +0.2
+     PREVIEWxSWAP             -0.1
+     TOPOLOGYxTURNS           -0.0
+
+── DECISION DENSITY % (higher better) · noise floor ±0.6 ──
+   SWAP      +    9.4  SIGNIFICANT
+   TURNS     +    3.2  SIGNIFICANT
+   OPTIONS   +    2.9  SIGNIFICANT
+   POOL      +    1.1  SIGNIFICANT
+   TOPOLOGY     -0.4
+   PREVIEW   +    0.1
+   interactions past the noise floor:
+     SWAPxTURNS               +3.2
+     SWAPxOPTIONS             -1.3
+     TOPOLOGYxOPTIONS         -1.2
+     TOPOLOGYxPOOL            +0.9
+     SWAPxPOOL                -0.7
+
+── THROUGHPUT (higher better) · noise floor ±0.0 ──
+   OPTIONS   +    1.2  SIGNIFICANT
+   POOL         -0.6  SIGNIFICANT
+   TOPOLOGY  +    0.5  SIGNIFICANT
+   TURNS        -0.0  SIGNIFICANT
+   PREVIEW   +    0.0
+   SWAP      +    0.0
+   interactions past the noise floor:
+     TOPOLOGYxOPTIONS         +0.3
+     POOLxOPTIONS             +0.1
+     TOPOLOGYxPOOL            -0.1
+     TOPOLOGYxPREVIEW         -0.0
+     TOPOLOGYxSWAP            -0.0
+     PREVIEWxTURNS            +0.0
+     SWAPxTURNS               +0.0
+     POOLxTURNS               +0.0
+
+── pre-registered acceptance ──────────────────────────
+   cells clearing every threshold: 0 of 32
+
+── NOTHING CLEARED THE PRE-REGISTERED BAR ─────────────
+   best agency floor reached: 25.5% at XP.M.N
+   The pre-registration says this is reported as a finding, not fixed by lowering the bar.
+
+── falsification: does the product choice do anything? ─
+   throughput with 3 options 4.78 · with 1 option 3.54
+   (the plan declared: a winner requiring OPTIONS=1 falsifies the design this game rests on)

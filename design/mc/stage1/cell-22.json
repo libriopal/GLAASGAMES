@@ -1,0 +1,28 @@
+{
+  "i": 22,
+  "label": ".PS.ON",
+  "config": {
+    "turns": 30,
+    "mode": "SOLO",
+    "refill": "POOL",
+    "preview": 5,
+    "topology": "SQUARE36",
+    "swap": "FREE",
+    "bench": 0,
+    "poolMode": "RARE5",
+    "streak": 1,
+    "swapBudget": 3,
+    "options": 3
+  },
+  "random": 2.2,
+  "greedy": 1,
+  "readable": 4.5,
+  "plan": 5.633333333333334,
+  "ceiling": 6.1,
+  "agencyFloorPct": 25.185185185185194,
+  "signalUtilityPct": 350,
+  "seedSharePct": 54.08464655023241,
+  "decisionDensityPct": 96.33333333333334,
+  "throughput": 4.5,
+  "ruleCount": 3
+}

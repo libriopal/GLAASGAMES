@@ -1,0 +1,28 @@
+{
+  "i": 21,
+  "label": "X.S.ON",
+  "config": {
+    "turns": 30,
+    "mode": "SOLO",
+    "refill": "POOL",
+    "preview": 0,
+    "topology": "HEX37",
+    "swap": "FREE",
+    "bench": 0,
+    "poolMode": "RARE5",
+    "streak": 1,
+    "swapBudget": 3,
+    "options": 3
+  },
+  "random": 3.1333333333333333,
+  "greedy": 0.9666666666666667,
+  "readable": 5.566666666666666,
+  "plan": 4.5,
+  "ceiling": 5.9,
+  "agencyFloorPct": -19.16167664670658,
+  "signalUtilityPct": 475.86206896551715,
+  "seedSharePct": 56.26947702419402,
+  "decisionDensityPct": 95.66666666666667,
+  "throughput": 5.566666666666666,
+  "ruleCount": 2
+}

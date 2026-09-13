@@ -1,0 +1,28 @@
+{
+  "i": 28,
+  "label": "..SMON",
+  "config": {
+    "turns": 30,
+    "mode": "SOLO",
+    "refill": "POOL",
+    "preview": 0,
+    "topology": "SQUARE36",
+    "swap": "FREE",
+    "bench": 0,
+    "poolMode": "BULK",
+    "streak": 1,
+    "swapBudget": 3,
+    "options": 3
+  },
+  "random": 2.1333333333333333,
+  "greedy": 1.2666666666666666,
+  "readable": 4.233333333333333,
+  "plan": 3.466666666666667,
+  "ceiling": 5.4,
+  "agencyFloorPct": -18.11023622047244,
+  "signalUtilityPct": 234.2105263157895,
+  "seedSharePct": 63.75199935851714,
+  "decisionDensityPct": 96.5,
+  "throughput": 4.233333333333333,
+  "ruleCount": 2
+}

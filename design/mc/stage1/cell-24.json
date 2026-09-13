@@ -1,0 +1,27 @@
+{
+  "i": 24,
+  "label": "...MO.",
+  "config": {
+    "turns": 12,
+    "mode": "SOLO",
+    "refill": "POOL",
+    "preview": 0,
+    "topology": "SQUARE36",
+    "swap": "NONE",
+    "bench": 0,
+    "poolMode": "BULK",
+    "streak": 1,
+    "options": 3
+  },
+  "random": 1.1,
+  "greedy": 1.2666666666666666,
+  "readable": 4.233333333333333,
+  "plan": 3.4,
+  "ceiling": 5.4,
+  "agencyFloorPct": -19.685039370078744,
+  "signalUtilityPct": 234.2105263157895,
+  "seedSharePct": 51.93694621883371,
+  "decisionDensityPct": 86.36363636363636,
+  "throughput": 4.233333333333333,
+  "ruleCount": 1
+}

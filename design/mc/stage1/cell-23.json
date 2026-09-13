@@ -1,0 +1,28 @@
+{
+  "i": 23,
+  "label": "XPS.O.",
+  "config": {
+    "turns": 12,
+    "mode": "SOLO",
+    "refill": "POOL",
+    "preview": 5,
+    "topology": "HEX37",
+    "swap": "FREE",
+    "bench": 0,
+    "poolMode": "RARE5",
+    "streak": 1,
+    "swapBudget": 3,
+    "options": 3
+  },
+  "random": 2.6666666666666665,
+  "greedy": 0.9666666666666667,
+  "readable": 5.566666666666666,
+  "plan": 5.533333333333333,
+  "ceiling": 5.9,
+  "agencyFloorPct": -0.5988023952095787,
+  "signalUtilityPct": 475.86206896551715,
+  "seedSharePct": 51.77084007784918,
+  "decisionDensityPct": 89.16666666666667,
+  "throughput": 5.566666666666666,
+  "ruleCount": 3
+}

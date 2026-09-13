@@ -1,0 +1,27 @@
+{
+  "i": 11,
+  "label": "XP.M.N",
+  "config": {
+    "turns": 30,
+    "mode": "SOLO",
+    "refill": "POOL",
+    "preview": 5,
+    "topology": "HEX37",
+    "swap": "NONE",
+    "bench": 0,
+    "poolMode": "BULK",
+    "streak": 1,
+    "options": 1
+  },
+  "random": 1.7,
+  "greedy": 1.0666666666666667,
+  "readable": 3.2666666666666666,
+  "plan": 4.1,
+  "ceiling": 4.7,
+  "agencyFloorPct": 25.510204081632644,
+  "signalUtilityPct": 206.25,
+  "seedSharePct": 64.2123806115989,
+  "decisionDensityPct": 83.33333333333334,
+  "throughput": 3.2666666666666666,
+  "ruleCount": 1
+}

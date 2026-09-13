@@ -1,0 +1,28 @@
+{
+  "i": 13,
+  "label": "X.SM.N",
+  "config": {
+    "turns": 30,
+    "mode": "SOLO",
+    "refill": "POOL",
+    "preview": 0,
+    "topology": "HEX37",
+    "swap": "FREE",
+    "bench": 0,
+    "poolMode": "BULK",
+    "streak": 1,
+    "swapBudget": 3,
+    "options": 1
+  },
+  "random": 1.7,
+  "greedy": 1.0666666666666667,
+  "readable": 3.2666666666666666,
+  "plan": 2.7,
+  "ceiling": 4.666666666666667,
+  "agencyFloorPct": -17.3469387755102,
+  "signalUtilityPct": 206.25,
+  "seedSharePct": 64.2123806115989,
+  "decisionDensityPct": 95.66666666666667,
+  "throughput": 3.2666666666666666,
+  "ruleCount": 1
+}

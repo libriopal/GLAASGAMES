@@ -1,0 +1,28 @@
+{
+  "i": 30,
+  "label": ".PSMO.",
+  "config": {
+    "turns": 12,
+    "mode": "SOLO",
+    "refill": "POOL",
+    "preview": 5,
+    "topology": "SQUARE36",
+    "swap": "FREE",
+    "bench": 0,
+    "poolMode": "BULK",
+    "streak": 1,
+    "swapBudget": 3,
+    "options": 3
+  },
+  "random": 1.1,
+  "greedy": 1.2666666666666666,
+  "readable": 4.233333333333333,
+  "plan": 4.8,
+  "ceiling": 5.4,
+  "agencyFloorPct": 13.385826771653536,
+  "signalUtilityPct": 234.2105263157895,
+  "seedSharePct": 51.93694621883371,
+  "decisionDensityPct": 91.25,
+  "throughput": 4.233333333333333,
+  "ruleCount": 3
+}

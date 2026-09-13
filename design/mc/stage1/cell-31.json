@@ -1,0 +1,28 @@
+{
+  "i": 31,
+  "label": "XPSMON",
+  "config": {
+    "turns": 30,
+    "mode": "SOLO",
+    "refill": "POOL",
+    "preview": 5,
+    "topology": "HEX37",
+    "swap": "FREE",
+    "bench": 0,
+    "poolMode": "BULK",
+    "streak": 1,
+    "swapBudget": 3,
+    "options": 3
+  },
+  "random": 1.9333333333333333,
+  "greedy": 1.0666666666666667,
+  "readable": 4.833333333333333,
+  "plan": 5,
+  "ceiling": 5.933333333333334,
+  "agencyFloorPct": 3.4482758620689715,
+  "signalUtilityPct": 353.125,
+  "seedSharePct": 56.25043220749213,
+  "decisionDensityPct": 96,
+  "throughput": 4.833333333333333,
+  "ruleCount": 3
+}
