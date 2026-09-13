@@ -39,45 +39,24 @@ import {
   playSynth,
   refillAt,
 } from '../../game/chem/synth.js';
-import { TRANSPOSE_COST, adjacent } from '../../game/chem/synth.js';
+import { TRANSPOSE_COST, cellsOf } from '../../game/chem/synth.js';
+import { adjacentIn, dockCells, neighbours, regions as topoRegions } from '../../game/chem/topology.js';
 import { CELL_COUNT, MAX_SELECT } from '../../game/chem/board-react.js';
 import { BOARD_W, BOARD_H } from '../../game/chem/board.js';
 import { type Persona, type SimPlayer, personas, simPlayer } from '../sim/personas.js';
 import { createRng, seedFrom } from '../sim/prng.js';
 
-/** Connected selections of 2..MAX_SELECT cells. The interface's geometry, once. */
-export const REGIONS: readonly (readonly number[])[] = (() => {
-  const nb: number[][] = [];
-  for (let i = 0; i < CELL_COUNT; i += 1) {
-    const c = i % BOARD_W;
-    const r = (i / BOARD_W) | 0;
-    const a: number[] = [];
-    if (r > 0) a.push(i - BOARD_W);
-    if (r < BOARD_H - 1) a.push(i + BOARD_W);
-    if (c > 0) a.push(i - 1);
-    if (c < BOARD_W - 1) a.push(i + 1);
-    nb.push(a);
-  }
-  const out: number[][] = [];
-  const seen = new Set<string>();
-  const grow = (cur: number[]): void => {
-    if (cur.length >= 2) {
-      const k = cur.join(',');
-      if (!seen.has(k)) { seen.add(k); out.push([...cur]); }
-    }
-    if (cur.length === MAX_SELECT) return;
-    const cand = new Set<number>();
-    for (const c of cur) for (const n of nb[c]!) if (!cur.includes(n) && n > cur[0]!) cand.add(n);
-    for (const n of cand) {
-      cur.push(n);
-      cur.sort((a, b) => a - b);
-      grow(cur);
-      cur.splice(cur.indexOf(n), 1);
-    }
-  };
-  for (let s = 0; s < CELL_COUNT; s += 1) grow([s]);
-  return out;
-})();
+/**
+ * Connected selections for the configured board.
+ *
+ * Was a module-level constant built for the square board. Topology is now a
+ * factor, so a constant here would have silently kept every agent playing the
+ * square board's geometry while the executor played a hex — the kind of split
+ * where the harness measures a different program from the one that ships.
+ */
+export function regionsFor(config: SynthConfig): readonly (readonly number[])[] {
+  return topoRegions(config.topology ?? 'SQUARE36', MAX_SELECT);
+}
 
 export interface Move {
   readonly action: SynthAction;
@@ -89,7 +68,7 @@ export interface Move {
 /** Every action available on this board, at the configured option breadth. */
 export function legalMoves(tiles: readonly string[], config: SynthConfig): Move[] {
   const out: Move[] = [];
-  for (const cells of REGIONS) {
+  for (const cells of regionsFor(config)) {
     const opts = optionsFor(tiles, cells, config.options);
     for (let i = 0; i < opts.length; i += 1) {
       const r = opts[i]!;
@@ -114,12 +93,23 @@ export function legalMoves(tiles: readonly string[], config: SynthConfig): Move[
  * swapping two identical tiles is a no-op that costs energy, and offering it
  * would be offering a way to lose.
  */
-export function transposeMoves(tiles: readonly string[], bank: number): Move[] {
-  if (bank < TRANSPOSE_COST) return [];
+export function transposeMoves(
+  tiles: readonly string[],
+  bank: number,
+  config: SynthConfig,
+  swapsLeft = 0,
+): Move[] {
+  const rule = config.swap ?? 'NONE';
+  if (rule === 'NONE') return [];
+  if (rule === 'FREE' ? swapsLeft <= 0 : bank < TRANSPOSE_COST) return [];
+  const topo = config.topology ?? 'SQUARE36';
+  const nb = neighbours(topo);
   const out: Move[] = [];
-  for (let a = 0; a < CELL_COUNT; a += 1) {
-    for (const b of [a + 1, a + BOARD_W]) {
-      if (b >= CELL_COUNT || !adjacent(a, b)) continue;
+  for (let a = 0; a < cellsOf(config); a += 1) {
+    for (const b of nb[a]!) {
+      // Each unordered pair once. Enumerating both directions would double the
+      // move list and bias any agent that slices a ranked candidate set.
+      if (b <= a) continue;
       if (tiles[a] === tiles[b]) continue;
       out.push({
         action: { cells: [a, b], option: -1, kind: 'TRANSPOSE' },
@@ -136,8 +126,10 @@ export function transposeMoves(tiles: readonly string[], bank: number): Move[] {
 }
 
 /** Where a delivery has to happen, given the rule. */
-export function dockStart(config: SynthConfig): number {
-  return (config.deliver ?? 'ANYWHERE') === 'DOCK' ? CELL_COUNT - BOARD_W : 0;
+export function dockSet(config: SynthConfig): ReadonlySet<number> | null {
+  return (config.deliver ?? 'ANYWHERE') === 'DOCK'
+    ? new Set(dockCells(config.topology ?? 'SQUARE36'))
+    : null;
 }
 
 /**
@@ -148,7 +140,11 @@ export function dockStart(config: SynthConfig): number {
  * That is the whole point of the positional rule and it has to be in the agents'
  * scoring or they will rate every move as if position were free.
  */
-export function bookDelta(m: Move, book: readonly string[], dockFrom = 0): number {
+export function bookDelta(
+  m: Move,
+  book: readonly string[],
+  dock: ReadonlySet<number> | null = null,
+): number {
   const open = [...book];
   let ships = 0;
   const cells = m.action.cells;
@@ -158,7 +154,8 @@ export function bookDelta(m: Move, book: readonly string[], dockFrom = 0): numbe
     // cell this index maps to. Getting that mapping wrong would score
     // deliveries in cells they never reach.
     const landsAt = cells[m.products.length - 1 - i];
-    if (landsAt === undefined || landsAt < dockFrom) continue;
+    if (landsAt === undefined) continue;
+    if (dock !== null && !dock.has(landsAt)) continue;
     const at = open.indexOf(p);
     if (at !== -1) { open.splice(at, 1); ships += 1; }
   }
@@ -219,12 +216,12 @@ export const ORDER_1: Agent = {
     // A one-ply rule takes a transposition only when the swap itself ships,
     // because one ply cannot see the reaction the swap was setting up. That is
     // the honest version of a readable rule and it is what leaves room above it.
-    const moves = [...legalMoves(tiles, config), ...transposeMoves(tiles, bank)];
+    const moves = [...legalMoves(tiles, config), ...transposeMoves(tiles, bank, config)];
     if (moves.length === 0) return PASS;
     let best = moves[0]!;
     let bestScore = -Infinity;
     for (const m of moves) {
-      const s = bookDelta(m, book, dockStart(config)) * 1e6 + m.released;
+      const s = bookDelta(m, book, dockSet(config)) * 1e6 + m.released;
       if (s > bestScore) { bestScore = s; best = m; }
     }
     return best.action;
@@ -244,7 +241,7 @@ export const ORDER_2: Agent = {
     const moves = legalMoves(tiles, config);
     if (moves.length === 0) return PASS;
     const ranked = [...moves]
-      .sort((a, b) => bookDelta(b, book, dockStart(config)) - bookDelta(a, book, dockStart(config)) || b.released - a.released)
+      .sort((a, b) => bookDelta(b, book, dockSet(config)) - bookDelta(a, book, dockSet(config)) || b.released - a.released)
       .slice(0, 20);
     let best = ranked[0]!;
     let bestScore = -Infinity;
@@ -255,10 +252,10 @@ export const ORDER_2: Agent = {
       // plies against the opening book counts the same order twice and was
       // measured making an unbounded search score BELOW this agent.
       const remaining = [...book];
-      const shipped = rolloutShip(after, remaining, dockStart(config));
+      const shipped = rolloutShip(after, remaining, dockSet(config));
       let bestFollow = 0;
       for (const f of follow(after, remaining, config)) {
-        const d = bookDelta(f, remaining, dockStart(config));
+        const d = bookDelta(f, remaining, dockSet(config));
         if (d > bestFollow) bestFollow = d;
       }
       const s = (shipped + bestFollow) * 1e6 + m.released;
@@ -289,7 +286,7 @@ export const ORDER_2: Agent = {
  */
 function follow(tiles: readonly string[], book: readonly string[], config: SynthConfig): Move[] {
   return [...legalMoves(tiles, config)]
-    .sort((a, b) => bookDelta(b, book, dockStart(config)) - bookDelta(a, book, dockStart(config)) || b.released - a.released)
+    .sort((a, b) => bookDelta(b, book, dockSet(config)) - bookDelta(a, book, dockSet(config)) || b.released - a.released)
     .slice(0, 120);
 }
 
@@ -322,10 +319,17 @@ function applyTo(tiles: readonly string[], m: Move): string[] {
  * honest model of what a player knows — it makes the rollout slightly
  * pessimistic about playing on, which is the safe direction for a ceiling.
  */
-function rolloutShip(board: string[], book: string[], dockFrom = 0): number {
+function rolloutShip(
+  board: string[],
+  book: string[],
+  dock: ReadonlySet<number> | null = null,
+): number {
   let shipped = 0;
   for (let i = book.length - 1; i >= 0; i -= 1) {
-    const at = board.indexOf(book[i]!, dockFrom);
+    const want = book[i]!;
+    const at = dock === null
+      ? board.indexOf(want)
+      : board.findIndex((f, j) => f === want && dock.has(j));
     if (at === -1) continue;
     book.splice(i, 1);
     shipped += 1;
@@ -365,6 +369,9 @@ interface BeamNode {
   readonly book: string[];
   readonly issued: number;
   readonly filled: number;
+  /** Streak-weighted, so the ceiling is on the same scale as every agent. */
+  readonly points: number;
+  readonly streak: number;
 }
 
 function beamShip(node: BeamNode, seed: number, config: SynthConfig): BeamNode {
@@ -372,17 +379,25 @@ function beamShip(node: BeamNode, seed: number, config: SynthConfig): BeamNode {
   const book = [...node.book];
   let issued = node.issued;
   let filled = node.filled;
+  let points = node.points;
+  let shippedHere = 0;
   const size = config.book ?? BOOK_SIZE;
   const rule = config.refill ?? 'POOL';
-  const dockFrom = (config.deliver ?? 'ANYWHERE') === 'DOCK' ? CELL_COUNT - BOARD_W : 0;
+  const dock = dockSet(config);
   for (;;) {
     let any = false;
     for (let i = book.length - 1; i >= 0; i -= 1) {
-      const at = tiles.indexOf(book[i]!, dockFrom);
+      const want = book[i]!;
+      const at = dock === null
+        ? tiles.indexOf(want)
+        : tiles.findIndex((f, j) => f === want && dock.has(j));
       if (at === -1) continue;
       tiles[at] = rule === 'VOID' ? VOID_CELL : refillAt(seed, filled);
       book.splice(i, 1);
+      const mult = config.streak ?? 1;
+      points += mult <= 1 ? 1 : Math.pow(mult, node.streak + (shippedHere > 0 ? 1 : 0));
       filled += 1;
+      shippedHere += 1;
       any = true;
     }
     while (book.length < size) {
@@ -391,7 +406,14 @@ function beamShip(node: BeamNode, seed: number, config: SynthConfig): BeamNode {
     }
     if (!any) break;
   }
-  return { tiles, book, issued, filled };
+  return {
+    tiles,
+    book,
+    issued,
+    filled,
+    points,
+    streak: shippedHere > 0 ? node.streak + 1 : 0,
+  };
 }
 
 /**
@@ -409,7 +431,14 @@ export function ceilingScore(
 ): number {
   const start = beginSynth(seed, config);
   let beam: BeamNode[] = [
-    { tiles: [...start.tiles], book: [...start.book], issued: start.issued, filled: 0 },
+    {
+      tiles: [...start.tiles],
+      book: [...start.book],
+      issued: start.issued,
+      filled: 0,
+      points: 0,
+      streak: 0,
+    },
   ];
   let best = 0;
   for (let t = 0; t < config.turns; t += 1) {
@@ -418,19 +447,19 @@ export function ceilingScore(
     for (const node of beam) {
       const moves = legalMoves(node.tiles, config);
       const ranked = [...moves]
-        .sort((a, b) => bookDelta(b, node.book, dockStart(config)) - bookDelta(a, node.book, dockStart(config)) || b.released - a.released)
+        .sort((a, b) => bookDelta(b, node.book, dockSet(config)) - bookDelta(a, node.book, dockSet(config)) || b.released - a.released)
         .slice(0, breadth);
       for (const m of ranked) {
         const advanced = beamShip({ ...node, tiles: applyTo(node.tiles, m) }, seed, config);
         const key = `${advanced.filled}|${advanced.tiles.join(',')}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        if (advanced.filled > best) best = advanced.filled;
+        if (advanced.points > best) best = advanced.points;
         next.push(advanced);
       }
     }
     if (next.length === 0) break;
-    next.sort((a, b) => b.filled - a.filled);
+    next.sort((a, b) => b.points - a.points);
     beam = next.slice(0, width);
   }
   return best;
@@ -469,10 +498,10 @@ export function planAgent(depth = 3, width = 8, breadth = 20): Agent {
   return {
     name: `PLAN-${depth}`,
     choose: (tiles, book, queue, bank, _turn, config) => {
-      const moves = [...legalMoves(tiles, config), ...transposeMoves(tiles, bank)];
+      const moves = [...legalMoves(tiles, config), ...transposeMoves(tiles, bank, config)];
       if (moves.length === 0) return PASS;
       const ranked = [...moves]
-        .sort((a, b) => bookDelta(b, book, dockStart(config)) - bookDelta(a, book, dockStart(config)) || b.released - a.released)
+        .sort((a, b) => bookDelta(b, book, dockSet(config)) - bookDelta(a, book, dockSet(config)) || b.released - a.released)
         .slice(0, breadth);
 
       let best = ranked[0]!;
@@ -495,7 +524,7 @@ export function planAgent(depth = 3, width = 8, breadth = 20): Agent {
         {
           const t0 = applyTo(tiles, m);
           const b0 = [...book];
-          const s0 = rolloutShip(t0, b0, dockStart(config));
+          const s0 = rolloutShip(t0, b0, dockSet(config));
           refillBook(b0);
           beam.push({ tiles: t0, book: b0, shipped: s0 });
         }
@@ -507,13 +536,13 @@ export function planAgent(depth = 3, width = 8, breadth = 20): Agent {
             const fm = [...legalMoves(node.tiles, config)]
               .sort(
                 (a, b) =>
-                  bookDelta(b, node.book, dockStart(config)) - bookDelta(a, node.book, dockStart(config)) || b.released - a.released,
+                  bookDelta(b, node.book, dockSet(config)) - bookDelta(a, node.book, dockSet(config)) || b.released - a.released,
               )
               .slice(0, width);
             for (const f of fm) {
               const t = applyTo(node.tiles, f);
               const b = [...node.book];
-              const s = node.shipped + rolloutShip(t, b, dockStart(config));
+              const s = node.shipped + rolloutShip(t, b, dockSet(config));
               refillBook(b);
               if (s > reach) reach = s;
               next.push({ tiles: t, book: b, shipped: s });
@@ -583,6 +612,8 @@ export function personaLadder(runSeed: number): Agent[] {
 
 export interface AgentResult {
   readonly name: string;
+  /** Streak-weighted score. Equals `shipped` when the streak factor is 1.00. */
+  readonly score: number;
   readonly shipped: number;
   readonly bank: number;
   readonly turns: number;
@@ -594,6 +625,7 @@ export function runAgent(
   seeds: number,
   config: SynthConfig = DEFAULT_SYNTH,
 ): AgentResult {
+  let score = 0;
   let shipped = 0;
   let bank = 0;
   let turns = 0;
@@ -602,13 +634,15 @@ export function runAgent(
     const r = playSynth(s * 7919, config, (tiles, book, queue, b, t) =>
       agent.choose(tiles, book, queue, b, t, config),
     );
-    shipped += r.score;
+    score += r.score;
+    shipped += r.shipped;
     bank += r.bank;
     turns += r.turnsPlayed;
     if (r.stalled) stalls += 1;
   }
   return {
     name: agent.name,
+    score: score / seeds,
     shipped: shipped / seeds,
     bank: bank / seeds,
     turns: turns / seeds,
@@ -686,8 +720,8 @@ export function dominanceProbe(
         const m = legalMoves(tiles, c).filter((x) => x.action.option === 0);
         if (m.length === 0) return PASS;
         return m.reduce((a, b) =>
-          bookDelta(b, book, dockStart(c)) * 1e6 + b.released >
-          bookDelta(a, book, dockStart(c)) * 1e6 + a.released
+          bookDelta(b, book, dockSet(c)) * 1e6 + b.released >
+          bookDelta(a, book, dockSet(c)) * 1e6 + a.released
             ? b
             : a,
         ).action;

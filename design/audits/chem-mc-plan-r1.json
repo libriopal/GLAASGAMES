@@ -1,0 +1,57 @@
+{
+  "name": "chem-mc-plan-r1",
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "at": "2026-09-13T06:04:32.932Z",
+  "provenance": "emitted-after-deliberation",
+  "attempts": [
+    {
+      "pass": 1,
+      "maxTokens": 2500,
+      "finish": "length",
+      "contentChars": 245,
+      "reasoningChars": 10171
+    },
+    {
+      "pass": 2,
+      "maxTokens": 3900,
+      "finish": "stop",
+      "contentChars": 3416
+    }
+  ],
+  "questions": [
+    {
+      "id": "a",
+      "text": "Is this experiment DESIGNED TO FUNCTION? Name the single most likely way this run produces numbers that look conclusive and are not."
+    },
+    {
+      "id": "b",
+      "text": "Stage 1 is a resolution-IV fractional factorial, so main effects are clean of two-factor interactions but those interactions are aliased with each other. Given that my whole reason for running a factorial is that the factors INTERACT, is resolution IV sufficient, or does screening at that resolution defeat the purpose?"
+    },
+    {
+      "id": "c",
+      "text": "I pre-registered that no threshold may move after results are seen, and that if nothing clears a 25% agency floor I report chemistry as a recognition game rather than lower the bar. Is 25% the right bar for THIS game, or am I importing Farkle's number into a genre where it does not belong?"
+    },
+    {
+      "id": "d",
+      "text": "Four fixes were each tested alone and each failed. I am now testing them together. What is the strongest argument that combining four insufficient fixes produces a game that is complicated rather than deep?"
+    },
+    {
+      "id": "e",
+      "text": "Of the eight standing instructions I proposed, which is the weakest or most likely to be quietly skipped under time pressure, and what would you replace it with?"
+    },
+    {
+      "id": "f",
+      "text": "For game three: a procedurally generated universe can be unfair in a way a board cannot, so I add a viability oracle that refuses a seed admitting no viable strategy. What does that oracle COST -- what does filtering seeds on solvability do to the distribution of universes a player actually sees?"
+    }
+  ],
+  "result": {
+    "answer_a": "The single most likely way this run produces conclusive but false numbers is through **Aliasing in Stage 1**. Because a Resolution IV design aliases two-factor interactions with each other, a significant interaction (e.g., Preview $\times$ Swap) could be misidentified as a strong main effect of a single factor. If you then proceed to Stage 2 by running a full factorial on the 'surviving' factors identified by those misattributed main effects, you will be optimizing for a ghost. You will find a 'winning' configuration that is actually just a specific interaction of variables you discarded in the screening phase.",
+    "answer_b": "Resolution IV is **sufficient for screening, but insufficient for understanding**. Given the 23,328-cell total, a full factorial is impossible; therefore, screening is a mathematical necessity. Res IV is the correct compromise because it protects main effects from being corrupted by two-factor interactions. However, it does not 'defeat the purpose'—it simply acknowledges that the screening stage is a filter, not a map. The risk of 'Interaction Blindness' is the price paid to make the compute budget viable.",
+    "answer_c": "25% is not a mathematical constant imported from Farkle; it is a **Minimum Viable Agency (MVA) threshold**. You are using it as a heuristic to define the boundary between a 'recognition game' (where the player merely reacts to a pre-determined stream) and a 'strategy game' (where the player's decisions meaningfully alter the outcome). While arbitrary, it is a valid design gate: if the game cannot reach 25% agency through these ten dials, the design philosophy must shift from 'fixing the game' to 'accepting the genre.'",
+    "answer_d": "The strongest argument is the **Bureaucracy vs. Depth argument**. When you layer multiple insufficient fixes (Preview + Swap + Pool + Deliver), you risk increasing the *cognitive load* (the number of rules a player must track to avoid mistakes) without increasing the *decision density* (the number of meaningful strategic choices). A game that requires managing the interaction of four different 'fix' mechanics can easily become a game of 'managing chores'—which is complexity—rather than a game of 'navigating trade-offs'—which is depth.",
+    "answer_e": "The weakest instruction is **Instruction 2 (Instrument Check)**. Under time pressure, the human instinct is to treat 'weird' data as an outlier to be ignored rather than a symptom of a broken instrument. I would replace it with **Automated Sanity Assertions**: the executor must be hard-coded to throw a fatal exception and halt the run if a Stage 0 control fails or if the Solver Margin becomes negative. Do not rely on a human to 'mark a cell VOID'; make the instrument incapable of lying.",
+    "answer_f": "The oracle introduces **Selection Bias**. By filtering for solvability, you are no longer testing the procedural generator; you are testing the *curator*. The cost is that your results will reflect a 'sanitized' distribution of universes. If the oracle is too successful, you may conclude the game is balanced and deep, while in reality, the generator is producing 90% unplayable garbage that the oracle is simply hiding from the player.",
+    "change_that_matters_most": "The plan is sound, but the risk of Stage 1 aliasing is the pivot point upon which the entire validity of Stage 2 rests.",
+    "verdict": "APPROVE"
+  }
+}

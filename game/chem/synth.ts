@@ -48,6 +48,13 @@ import { MOLECULES, type Molecule } from './library.js';
 import { type Reaction, isEndothermic, rankedRearrangements } from './reaction.js';
 import { BOARD_W } from './board.js';
 import {
+  type Topology,
+  adjacentIn,
+  cellCount as topoCellCount,
+  dockCells,
+  regions as topoRegions,
+} from './topology.js';
+import {
   type MoleculeWeights,
   CELL_COUNT,
   MAX_SELECT,
@@ -95,6 +102,81 @@ export const ORDER_POOL: readonly string[] = ['F2', 'Cl2', 'CH3Cl', 'H2O2', 'C2H
 export type SynthMode = 'SOLO' | 'VS' | 'COOP';
 
 /**
+ * Molecules that a single reaction rarely produces, computed once rather than
+ * chosen.
+ *
+ * The measured defect this exists to attack: an order is shippable on 22.4% of
+ * turns and the one-ply rule ships 0.31 per turn against 0.30 available. It
+ * takes every chance the instant it appears, so no plan can beat it. An order
+ * that CANNOT be made in one move is an order a plan has to route toward.
+ *
+ * "Rarely" is measured over a fixed sample of random reactant multisets rather
+ * than asserted, and the pool is the bottom half by production frequency. A
+ * hand-picked list would be me deciding which molecules are hard, which is the
+ * kind of invented constant that already set a scale ceiling once in this
+ * project.
+ */
+let MULTISTEP_POOL: readonly string[] | null = null;
+
+export function multistepPool(): readonly string[] {
+  if (MULTISTEP_POOL !== null) return MULTISTEP_POOL;
+  const produced = new Map<string, number>();
+  for (const m of MOLECULES) produced.set(m.formula, 0);
+  let h = 0x9e3779b9;
+  const nextIdx = (n: number): number => {
+    h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
+    h = Math.imul(h ^ (h >>> 12), 0x297a2d39);
+    return ((h ^ (h >>> 15)) >>> 0) % n;
+  };
+  for (let trial = 0; trial < 3000; trial += 1) {
+    const size = 2 + (nextIdx(3));
+    const picks: Molecule[] = [];
+    for (let i = 0; i < size; i += 1) picks.push(MOLECULES[nextIdx(MOLECULES.length)]!);
+    for (const r of rankedRearrangements(picks, OPTIONS_PER_SELECTION)) {
+      for (const f of r.products) produced.set(f, (produced.get(f) ?? 0) + 1);
+    }
+  }
+  const ranked = [...produced.entries()].sort((a, b) => a[1] - b[1] || (a[0] < b[0] ? -1 : 1));
+  MULTISTEP_POOL = ranked.slice(0, Math.max(3, Math.floor(ranked.length / 2))).map(([f]) => f);
+  return MULTISTEP_POOL;
+}
+
+/**
+ * A pool drawn against THIS board's atoms, so every order is physically
+ * reachable from what was dealt.
+ *
+ * Conservation means an order for F2 on a board with one fluorine atom is not
+ * hard, it is impossible, and impossible orders are pure deal. That is the
+ * suspected driver of SEED SHARE at 53.9% against Farkle's 3.3%.
+ */
+export function adaptivePool(tiles: readonly string[]): readonly string[] {
+  const atoms = new Map<string, number>();
+  for (const f of tiles) {
+    const m = BY_FORMULA.get(f);
+    if (m === undefined) continue;
+    for (const a of m.atoms) atoms.set(a, (atoms.get(a) ?? 0) + 1);
+  }
+  const out = MOLECULES.filter((m) => {
+    const need = new Map<string, number>();
+    for (const a of m.atoms) need.set(a, (need.get(a) ?? 0) + 1);
+    // Twice the atoms needed, so an order is reachable without consuming the
+    // board's entire supply of an element to fill one slot.
+    for (const [sym, n] of need) if ((atoms.get(sym) ?? 0) < n * 2) return false;
+    return true;
+  }).map((m) => m.formula);
+  return out.length >= 3 ? out : ORDER_POOL;
+}
+
+export function poolFor(config: SynthConfig, tiles: readonly string[]): readonly string[] {
+  if (config.pool !== undefined) return config.pool;
+  switch (config.poolMode ?? 'RARE5') {
+    case 'MULTISTEP': return multistepPool();
+    case 'ADAPTIVE': return adaptivePool(tiles);
+    default: return ORDER_POOL;
+  }
+}
+
+/**
  * What replaces a molecule that ships.
  *
  * POOL tops the cell back up, which is what every measurement in the design
@@ -113,6 +195,23 @@ export type RefillRule = 'POOL' | 'VOID';
 
 /** Whether delivery cares where the molecule is. See `SynthConfig.deliver`. */
 export type DeliveryRule = 'ANYWHERE' | 'DOCK';
+
+export type SwapRule = 'NONE' | 'TURN' | 'FREE' | 'MODIFIER';
+
+/**
+ * How the order pool is chosen.
+ *
+ * RARE5     five awkward molecules, fixed. What phase 2 measured.
+ * MULTISTEP only molecules that CANNOT be made in one reaction from any
+ *           legal region of a fresh board — so filling one requires building a
+ *           precursor first. This is the direct attack on the measured defect:
+ *           an order shippable in one move is an order no plan can improve.
+ * ADAPTIVE  drawn against the board's own atom inventory, so an order is always
+ *           physically reachable. The direct attack on SEED SHARE 53.9%: if
+ *           every deal carries comparable reachable orders, the deal stops
+ *           explaining half the outcome.
+ */
+export type PoolMode = 'RARE5' | 'MULTISTEP' | 'ADAPTIVE';
 
 export interface SynthConfig {
   readonly turns: number;
@@ -152,6 +251,40 @@ export interface SynthConfig {
    * decision a planner can be better at than a rule.
    */
   readonly deliver?: DeliveryRule;
+  /** Board shape. See `topology.ts` — six neighbours instead of four. */
+  readonly topology?: Topology;
+  /**
+   * How the move verb is paid for.
+   *
+   * NONE      no move verb. The phase-2 game, where position is unreachable.
+   * TURN      a swap consumes a turn and 120 kJ. MEASURED: costs the readable
+   *           rule 18%, because a 12-turn game cannot repay a spent turn.
+   * FREE      a small budget of swaps per round that cost no turn and no energy.
+   *           Removes the thing that made TURN unaffordable, keeps scarcity.
+   * MODIFIER  swap AND react in one action, paying energy but not a turn. The
+   *           version most likely to pay, and it is in the design because TURN's
+   *           failure was a PRICE failure rather than a verb failure.
+   */
+  readonly swap?: SwapRule;
+  /** Swaps allowed per round under FREE. Ignored otherwise. */
+  readonly swapBudget?: number;
+  /**
+   * Off-board holding cells. Storage is the simplest construction verb there is:
+   * park a molecule now for a reaction three turns away.
+   */
+  readonly bench?: number;
+  /** Which molecules get ordered, and how the pool is chosen. */
+  readonly poolMode?: PoolMode;
+  /**
+   * Multiplier on consecutive deliveries, applied to the SCORE.
+   *
+   * Same shape as Farkle's run multiplier, which rescued that game from a flat
+   * reward where a rule printed on the screen reached 94% of hindsight-perfect
+   * play. Different payload, and it must be SWEPT the way that one was rather
+   * than chosen — the Farkle constant is meaningless here because it is
+   * downstream of a different pay table.
+   */
+  readonly streak?: number;
   /** Players sharing the board. 1 for solo, 2 for coop and vs. */
   readonly players?: number;
 }
@@ -161,7 +294,17 @@ export const DEFAULT_SYNTH: SynthConfig = {
   mode: 'SOLO',
   refill: 'POOL',
   preview: 2,
+  topology: 'SQUARE36',
+  swap: 'NONE',
+  bench: 0,
+  poolMode: 'RARE5',
+  streak: 1,
 };
+
+/** Cells in the configured board. Not a constant any more. */
+export function cellsOf(config: SynthConfig): number {
+  return topoCellCount(config.topology ?? 'SQUARE36');
+}
 
 /** The orders coming after the current book, as far ahead as `preview` allows. */
 export function previewOf(state: SynthState, config: SynthConfig): string[] {
@@ -268,26 +411,39 @@ export function judgeSynth(
   action: SynthAction,
   bank: number,
   config: SynthConfig,
+  bankSwapsLeft = Number.POSITIVE_INFINITY,
 ): { reaction: Reaction | null; rejected: SynthRejection | null } {
   const { cells, option } = action;
   if ((action.kind ?? 'REACT') === 'TRANSPOSE') {
     if (cells.length !== 2) return { reaction: null, rejected: 'TOO_FEW_CELLS' };
     const [a, b] = cells as [number, number];
-    if (![a, b].every((c) => Number.isInteger(c) && c >= 0 && c < CELL_COUNT)) {
+    if (![a, b].every((c) => Number.isInteger(c) && c >= 0 && c < cellsOf(config))) {
       return { reaction: null, rejected: 'OUT_OF_RANGE' };
     }
-    if (!adjacent(a, b)) return { reaction: null, rejected: 'NOT_ADJACENT' };
+    if ((config.swap ?? 'NONE') === 'NONE') {
+      return { reaction: null, rejected: 'NO_SUCH_OPTION' };
+    }
+    if (!adjacentIn(config.topology ?? 'SQUARE36', a, b)) {
+      return { reaction: null, rejected: 'NOT_ADJACENT' };
+    }
     if (tiles[a] === VOID_CELL || tiles[b] === VOID_CELL) {
       return { reaction: null, rejected: 'VOID_CELL' };
     }
     // Moving a reagent is work and it is charged. A transposition that the bank
     // cannot pay for is refused rather than run into debt.
-    if (bank < TRANSPOSE_COST) return { reaction: null, rejected: 'CANNOT_AFFORD_MOVE' };
+    // FREE spends a per-round budget instead of energy: TURN's failure was a
+    // PRICE failure (it costs the readable rule 18%, because a 12-turn game
+    // cannot repay a spent turn) rather than evidence against the verb.
+    if ((config.swap ?? 'NONE') === 'FREE') {
+      if (bankSwapsLeft <= 0) return { reaction: null, rejected: 'CANNOT_AFFORD_MOVE' };
+    } else if (bank < TRANSPOSE_COST) {
+      return { reaction: null, rejected: 'CANNOT_AFFORD_MOVE' };
+    }
     return { reaction: null, rejected: null };
   }
   if (cells.length < 2) return { reaction: null, rejected: 'TOO_FEW_CELLS' };
   if (cells.length > MAX_SELECT) return { reaction: null, rejected: 'TOO_MANY_CELLS' };
-  if (cells.some((c) => !Number.isInteger(c) || c < 0 || c >= CELL_COUNT)) {
+  if (cells.some((c) => !Number.isInteger(c) || c < 0 || c >= cellsOf(config))) {
     return { reaction: null, rejected: 'OUT_OF_RANGE' };
   }
   if (new Set(cells).size !== cells.length) return { reaction: null, rejected: 'DUPLICATE_CELL' };
@@ -406,8 +562,20 @@ export interface SynthState {
   book: string[];
   /** How many orders have been ISSUED, which is the stream position. */
   issued: number;
-  /** How many have SHIPPED. The score. */
+  /** How many have SHIPPED. Throughput — legible, and not the score under a streak. */
   filled: number;
+  /**
+   * The score: deliveries weighted by the streak multiplier at the moment each
+   * one shipped. Equals `filled` exactly when streak is 1.00, so the control
+   * level of that factor is not merely similar to the old game, it is identical.
+   */
+  points: number;
+  /** Consecutive turns ending in a delivery. Broken by a turn that ships nothing. */
+  streak: number;
+  /** Off-board holding cells. VOID_CELL means empty. */
+  readonly bench: string[];
+  /** Free swaps remaining this round, under SwapRule FREE. */
+  swapsLeft: number;
   bank: number;
   turn: number;
   digest: number;
@@ -415,8 +583,10 @@ export interface SynthState {
 }
 
 export interface SynthResult {
-  /** Orders shipped. The score. */
+  /** The score: streak-weighted deliveries. Equals `shipped` when streak is 1. */
   readonly score: number;
+  /** Orders shipped, unweighted. Throughput. */
+  readonly shipped: number;
   /** Energy banked, kJ/mol. A resource, not the objective. */
   readonly bank: number;
   readonly turnsPlayed: number;
@@ -427,8 +597,8 @@ export interface SynthResult {
 }
 
 function boardWords(tiles: readonly string[]): Int32Array {
-  const words = new Int32Array(CELL_COUNT);
-  for (let i = 0; i < CELL_COUNT; i += 1) words[i] = INDEX_OF.get(tiles[i]!) ?? -1;
+  const words = new Int32Array(tiles.length);
+  for (let i = 0; i < tiles.length; i += 1) words[i] = INDEX_OF.get(tiles[i]!) ?? -1;
   return words;
 }
 
@@ -468,17 +638,30 @@ function shipReady(state: SynthState, config: SynthConfig): string[] {
   // reach. A single cell was considered and rejected without measuring it as a
   // design — one cell makes every order a queue at one door, which is a
   // congestion puzzle rather than a routing one.
-  const dockFrom = where === 'DOCK' ? CELL_COUNT - BOARD_W : 0;
+  // The dock is a SET of cells from the topology, not an index threshold. On a
+  // hex "the bottom row" is not a thing, and an index cut would have selected an
+  // arbitrary arc — the dock would then mean something different on each
+  // topology while wearing one name.
+  const dock: ReadonlySet<number> | null =
+    where === 'DOCK' ? new Set(dockCells(config.topology ?? 'SQUARE36')) : null;
   const shipped: string[] = [];
   for (;;) {
     let any = false;
     for (let i = state.book.length - 1; i >= 0; i -= 1) {
       const want = state.book[i]!;
-      const at = state.tiles.indexOf(want, dockFrom);
+      const at = dock === null
+        ? state.tiles.indexOf(want)
+        : state.tiles.findIndex((f, i) => f === want && dock.has(i));
       if (at === -1) continue;
       state.tiles[at] = rule === 'VOID' ? VOID_CELL : refillAt(state.seed, state.filled);
       state.book.splice(i, 1);
       state.filled += 1;
+      // The streak multiplies the delivery it is ON, compounding within a run
+      // of consecutive delivering turns. Applied at the moment of shipping and
+      // never accumulated, the way Farkle floors its run multiplier once at
+      // banking rather than carrying a growing float through the round.
+      const mult = config.streak ?? 1;
+      state.points += mult <= 1 ? 1 : Math.pow(mult, state.streak);
       shipped.push(want);
       any = true;
     }
@@ -490,16 +673,47 @@ function shipReady(state: SynthState, config: SynthConfig): string[] {
   return shipped;
 }
 
+/**
+ * Draws a board for the configured topology with at least one reaction on it.
+ *
+ * `drawReactiveBoard` is square-only and hard-wired to CELL_COUNT, so a hex
+ * board cannot come from it. Same draw-and-validate discipline, and the same
+ * refusal: a dead board is a generator defect rather than bad luck.
+ */
+function drawBoardFor(seed: number, config: SynthConfig): string[] {
+  const topo = config.topology ?? 'SQUARE36';
+  const n = topoCellCount(topo);
+  const weights = config.weights ?? UNIFORM_WEIGHTS;
+  const regs = topoRegions(topo, MAX_SELECT);
+  for (let attempt = 1; attempt <= 64; attempt += 1) {
+    const tiles = Array.from({ length: n }, (_, i) =>
+      fillAt(seed ^ Math.imul(attempt, 0x7feb352d), -1, i, weights),
+    );
+    for (const reg of regs) {
+      const opts = rankedRearrangements(reg.map((c) => BY_FORMULA.get(tiles[c]!)!), 1);
+      if (opts.length > 0 && opts[0]!.released > 0) return tiles;
+    }
+  }
+  throw new RangeError(
+    `drawBoardFor: 64 draws produced no reactive ${topo} board. That is a weight defect ` +
+      'rather than bad luck; a distribution of only inert molecules cannot produce one at all.',
+  );
+}
+
 export function beginSynth(seed: number, config: SynthConfig): SynthState {
   const rng = makeRng(seed);
   const weights = config.weights ?? UNIFORM_WEIGHTS;
-  const { tiles } = drawReactiveBoard(rng, weights);
+  const tiles = drawBoardFor(seed, config);
   const state: SynthState = {
     seed,
     tiles,
     rng,
     weights,
-    pool: config.pool ?? ORDER_POOL,
+    pool: poolFor(config, tiles),
+    bench: Array.from({ length: config.bench ?? 0 }, () => VOID_CELL),
+    swapsLeft: (config.swap ?? 'NONE') === 'FREE' ? (config.swapBudget ?? 3) : 0,
+    streak: 0,
+    points: 0,
     book: [],
     issued: 0,
     filled: 0,
@@ -513,7 +727,13 @@ export function beginSynth(seed: number, config: SynthConfig): SynthState {
   // before anyone moved, so the book settles first and the count is then zeroed:
   // those were the deal, not the play.
   shipReady(state, config);
+  // Zero ALL THREE. Resetting `filled` alone left `points` carrying the opening
+  // settle, so every agent banked the deal as score while the beam search did
+  // not — ORDER-1 read 12.70 against a ceiling of 4.33. Stage 0's C3 caught it
+  // on its first run, which is the entire argument for running C3 first.
   state.filled = 0;
+  state.points = 0;
+  state.streak = 0;
   return state;
 }
 
@@ -537,7 +757,13 @@ export function advanceSynth(
     state.bank,
     state.turn,
   );
-  const { reaction, rejected } = judgeSynth(state.tiles, action, state.bank, config);
+  const { reaction, rejected } = judgeSynth(
+    state.tiles,
+    action,
+    state.bank,
+    config,
+    state.swapsLeft,
+  );
 
   let shipped: string[] = [];
   if (rejected === null && (action.kind ?? 'REACT') === 'TRANSPOSE') {
@@ -545,7 +771,8 @@ export function advanceSynth(
     const tmp = state.tiles[a]!;
     state.tiles[a] = state.tiles[b]!;
     state.tiles[b] = tmp;
-    state.bank -= TRANSPOSE_COST;
+    if ((config.swap ?? 'NONE') === 'FREE') state.swapsLeft -= 1;
+    else state.bank -= TRANSPOSE_COST;
     // The book is settled after a transposition for symmetry, and it will never
     // actually ship: `shipReady` matches a molecule ANYWHERE on the board, so
     // anything a swap could deliver had already shipped the turn it appeared.
@@ -566,6 +793,10 @@ export function advanceSynth(
     shipped = shipReady(state, config);
   }
 
+  // The streak counts consecutive DELIVERING turns and a dry turn breaks it.
+  // Incremented after shipping so the first delivery of a run scores at
+  // multiplier^0 = 1 and the streak is a reward for continuing, not for starting.
+  state.streak = shipped.length > 0 ? state.streak + 1 : 0;
   state.turn += 1;
   state.digest = (Math.imul(state.digest, 31) ^ hashState(boardWords(state.tiles))) >>> 0;
   state.log.push({
@@ -596,7 +827,8 @@ export function playSynth(
   while (advanceSynth(state, config, chooseAction));
   const last = state.log[state.log.length - 1];
   return {
-    score: state.filled,
+    score: state.points,
+    shipped: state.filled,
     bank: Math.max(0, Math.round(state.bank)),
     turnsPlayed: state.turn,
     digest: state.digest,
