@@ -213,3 +213,39 @@ the one asked.* Recorded, not quietly rerun — the corrected test holds the tot
 budget constant and varies only how it is split in time and across operators.
 
 **Neither the prediction nor its negation has evidence yet.**
+
+### Claim 1 — retested with budget held constant. Directionally supported, and it repriced the tail.
+
+| composition (same total budget) | novel distance beyond the single-verb set |
+|---|---|
+| all at once, one operator | **0.0000** |
+| split in time, SAME operator | 0.1464 |
+| split in time, DIFFERENT operators | **0.1949** |
+
+**The negative control works.** Applying the whole budget at once returns exactly
+0.0000 — it *is* a member of the single-verb set, so the distance must be zero,
+and the metric returns zero. After five vacuous statistics in this project, a
+number that is exactly right for a structural reason is worth stating.
+
+**The Lie-bracket prediction holds, but modestly.** Different operators beat the
+same operator by 33% (0.1949 against 0.1464). Directionally as predicted.
+
+**And the dominant effect is not the one I predicted.** Of the 0.1949 reached by
+mixed operators, **0.1464 — three quarters of it — comes from splitting in time
+at all**, and only the remaining quarter from using different operators.
+
+That is correct physics and I should have seen it coming: in a *nonlinear* flow
+the same operator applied at two separated times does not compose additively,
+because the system evolves between the applications. A(t) then A(s) is not
+A(t+s); the flow in between is itself the second operator. So "same operator,
+split" was never a commuting control — it was already a bracket with the flow.
+
+**This reprices the distribution.** The tail row I put at p=0.13 — *resonance,
+not force; the currency is timing precision rather than magnitude* — is better
+supported than the p=0.10 pure-bracket row it sat below. **When you act is worth
+three times more than which verb you use.**
+
+**What is still missing before any of this is a gate:** a permutation null. The
+effects are 0.146 and 0.195 in a metric whose noise floor has not been measured,
+and standing rule B of the plan says no metric becomes a gate until its null
+model is measured. These are directional findings, not gated ones.
