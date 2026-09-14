@@ -247,6 +247,79 @@ than a decision.
 
 ---
 
+---
+
+## Blind, or clumsy? The discriminator, and it answers neither
+
+The r2 audit's headline was a question I had not posed: *"deciding if the
+player's failure is because they are **blind** (needs a forecast) or because they
+are **clumsy** (needs continuous control)."* Those prescribe opposite and
+expensive designs, and guessing between them is how a project spends a month on
+the wrong one. `scripts/probe/dark-blind.ts` separates them before either is
+built.
+
+It carries a third arm that neither diagnosis proposes, because the auditor's
+objection deserved a measurement rather than a caveat: *"A forecast cone solves
+for uncertainty. However, if a 1-degree error in the first shot results in a
+180-degree error in the second, a forecast is merely a high-resolution view of
+your own inevitable failure. **A map is not a steering wheel.**"* So:
+**FORESIGHT** — perfect knowledge of every first shot's true value under the
+player's *own naive follow-up*, with hands unchanged. That bounds what a forecast
+of any fidelity can buy.
+
+| bearings | actions | sequences | served | BLIND | my FORECAST | **FORESIGHT** | RANDOM | **absolute ceiling** | live | entropy |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 12 | 14 | 196 | 14/24 | 16.3% | 12.9% | **49.7%** | 12.8% | **0.842** | 3.6 | 5.30 |
+| 24 | 26 | 676 | 16/24 | 12.0% | 3.7% | **43.4%** | 8.3% | **0.837** | 3.8 | 6.37 |
+
+| | |
+|---|---|
+| **sight** — information at its bound (foresight − blind) | **+33.4 points** |
+| **hands** — what doubling the lattice adds to *absolute* reach | **−0.5 points** |
+| **residual** — what perfect foresight with naive hands still misses | 50.3 points |
+| noise — blind minus random, the floor any remedy must beat | 3.6 points |
+
+**Not blind, not clumsy — and the answer is sharper than either.**
+
+- **Finer control is worth nothing, and that is now measured rather than
+  assumed.** The absolute ceiling is **0.842 at twelve bearings and 0.837 at
+  twenty-four**. Doubling the action set does not let optimal play reach a single
+  point further, and it makes every human policy *worse* (16.3% → 12.0%) by
+  adding choices to a search that already could not find the needle. The clumsy
+  hypothesis is dead.
+- **Information is worth a third of the game.** Foresight with unchanged hands
+  reaches 49.7% against blind's 16.3% — nine times the noise floor. The
+  auditor's objection is **half** upheld: the map is not a steering wheel, but a
+  better steering wheel is worth measurably nothing, and the map is worth 33
+  points.
+- **And the gap that matters most is inside the information arms.** A forecast
+  makes 49.7% *available*; my rule for using one delivered **12.9%**, worse than
+  having no forecast at all. **The missing thing is not the forecast — it is a
+  rule for reading one.** Both failed policies, mine and the auditor's, ignore
+  magnitude, and magnitude is precisely the half that no horizon makes intuitive.
+
+### The verdict line was wrong before it was right
+
+The probe first printed **CLUMSY**, from a branch reading `ceilingGap > 0.25` —
+while the line directly beneath it reported absolute ceilings of 0.842 and 0.837.
+The predicate did not match its label: `ceilingGap` measures what perfect
+foresight misses, which is evidence about *neither* remedy and certainly not
+evidence *for* finer control.
+
+That is the same defect class as the OR-clause gate — **in a script that did not
+use the instrument built two commits earlier to catch it.** The verdict is now a
+pure function exercised on four synthetic witnesses, including the run's own real
+numbers, and it refuses to speak at all if any witness disagrees with its label.
+The witnesses run *before* the seeds, which is the whole point of the rule.
+
+> Three instrument defects in this one probe — a vacuous oracle arm reading
+> 100.0%, a share-of-local-ceiling normalisation that would have hidden the
+> clumsy answer, and a verdict whose predicate contradicted its name. The
+> project's standing tally of instrument defects outnumbering design findings
+> roughly two to one has not improved.
+
+---
+
 ## What this baseline does NOT claim
 
 - **It is not a depth result.** Chemical's run ended by recommending it ship as a

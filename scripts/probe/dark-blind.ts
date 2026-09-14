@@ -212,6 +212,62 @@ function measure(bearings: number): { served: number; arm: Arm } {
   return { served, arm };
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// THE VERDICT IS A PURE FUNCTION WITH WITNESSES, BECAUSE THE FIRST ONE WAS WRONG.
+//
+// The original branch read `if (ceilingGap > 0.25) -> "CLUMSY"`, and on the real
+// run it printed CLUMSY while the line immediately below it said the absolute
+// ceiling was 0.842 on twelve bearings and 0.837 on twenty-four. Doubling the
+// lattice bought NOTHING, which is the opposite of clumsy. The predicate did not
+// match its label: what `ceilingGap` measures is how far perfect foresight falls
+// short, which is evidence about neither remedy and certainly not evidence FOR
+// finer control.
+//
+// That is the same class of defect as the OR-clause gate two commits ago, in a
+// script that did not use the instrument built to catch it. So the verdict logic
+// is extracted, and it is exercised on synthetic witnesses -- including the real
+// numbers -- before it is allowed to speak about anything.
+
+interface Arms { blind: number; forecast: number; oracle: number; random: number; abs: number }
+
+function diagnose(coarse: Arms, fine: Arms): string {
+  const sight = coarse.oracle - coarse.blind;      // what information is WORTH, at its bound
+  const hands = fine.abs - coarse.abs;             // what finer control adds to absolute REACH
+  const noise = Math.abs(coarse.blind - coarse.random);
+  const residual = 1 - coarse.oracle;              // what neither remedy reaches
+
+  // Hands first, and on ABSOLUTE reach rather than on a share of a local ceiling:
+  // a finer lattice normalised to its own ceiling can look flat while genuinely
+  // reaching further, and can look fine while reaching nowhere new.
+  if (hands > noise && hands > sight) return 'CLUMSY';
+  if (sight > noise * 3 && residual < 0.25) return 'BLIND';
+  if (sight > noise * 3) return 'BOTH, AND NEITHER ALONE';
+  return 'NEITHER';
+}
+
+// ── the witnesses. Each must return what its name says, or nothing below runs. ──
+{
+  const W = (blind: number, oracle: number, random: number, abs: number): Arms => ({ blind, forecast: 0, oracle, random, abs });
+  const cases: [string, string, Arms, Arms][] = [
+    // finer control raises absolute reach a lot, information does not
+    ['CLUMSY', 'finer lattice reaches further', W(0.16, 0.20, 0.13, 0.60), W(0.16, 0.20, 0.13, 0.95)],
+    // information nearly reaches the ceiling, finer control adds no reach
+    ['BLIND', 'foresight almost closes it', W(0.16, 0.90, 0.13, 0.84), W(0.12, 0.88, 0.08, 0.837)],
+    // information is worth a lot but leaves a large residual
+    ['BOTH, AND NEITHER ALONE', 'the real run', W(0.163, 0.497, 0.128, 0.842), W(0.120, 0.434, 0.083, 0.837)],
+    // nothing moves
+    ['NEITHER', 'both remedies inert', W(0.16, 0.18, 0.15, 0.84), W(0.15, 0.17, 0.14, 0.838)],
+  ];
+  for (const [want, why, c, f] of cases) {
+    const got = diagnose(c, f);
+    if (got !== want) {
+      throw new Error(`verdict logic unsound: witness "${why}" expected ${want}, got ${got}. Fix the predicate before trusting the run.`);
+    }
+  }
+  console.log(`verdict logic: ${cases.length} witnesses pass, including the real numbers. Safe to report.`);
+}
+
+
 console.log('BLIND, OR CLUMSY? · the discriminator the auditor named');
 console.log(`${BODIES} bodies · ${LEG}+${LEG} steps · ${SEEDS.length} seeds · share of each lattice's OWN ceiling`);
 console.log('');
@@ -235,28 +291,35 @@ for (const bearings of [12, 24]) {
 console.log('');
 console.log('── THE DIAGNOSIS ──');
 const coarse = out[0]!, fine = out[1]!;
-const sight = coarse.forecast - coarse.blind;
-const hands = fine.blind - coarse.blind;
-const ceilingGap = 1 - coarse.oracle;
 const noise = Math.abs(coarse.blind - coarse.random);
-console.log(`sight   · what a one-shot-ahead forecast buys on the same lattice  ${(sight * 100).toFixed(1)} points`);
-console.log(`hands   · what doubling the lattice buys with no forecast          ${(hands * 100).toFixed(1)} points`);
-console.log(`foresight· what PERFECT foresight + naive hands still misses       ${(ceilingGap * 100).toFixed(1)} points short`);
-console.log(`reach   · absolute ceiling, 12 bearings ${coarse.abs.toFixed(3)} vs 24 bearings ${fine.abs.toFixed(3)}`);
-console.log(`noise   · blind minus random, the floor any remedy must beat       ${(noise * 100).toFixed(1)} points`);
+const sight = coarse.oracle - coarse.blind;
+const hands = fine.abs - coarse.abs;
+const residual = 1 - coarse.oracle;
+console.log(`sight    · what information is worth AT ITS BOUND (foresight - blind)  ${(sight * 100).toFixed(1)} points`);
+console.log(`hands    · what doubling the lattice adds to ABSOLUTE reach            ${(hands * 100).toFixed(1)} points`);
+console.log(`residual · what perfect foresight with naive hands still misses        ${(residual * 100).toFixed(1)} points`);
+console.log(`reach    · absolute ceiling, 12 bearings ${coarse.abs.toFixed(3)} vs 24 bearings ${fine.abs.toFixed(3)}`);
+console.log(`noise    · blind minus random, the floor any remedy must beat          ${(noise * 100).toFixed(1)} points`);
+console.log(`(my implemented forecast policy delivered ${(coarse.forecast * 100).toFixed(1)}%, against the ${(coarse.oracle * 100).toFixed(1)}% the information allows)`);
 console.log('');
-if (ceilingGap > 0.25) {
-  console.log('CLUMSY. Perfect knowledge of the future does not reach the ceiling on this');
-  console.log('lattice, so the shortfall is operational, not epistemic. The auditor\'s objection');
-  console.log('stands: a map is not a steering wheel, and a forecast cone would be decoration.');
-} else if (sight > hands && sight > 0.15) {
-  console.log('BLIND. Seeing one shot ahead is worth more than finer control, and perfect');
-  console.log('foresight nearly reaches the ceiling. The forecast cone is the mechanic.');
-} else if (hands > sight && hands > 0.15) {
-  console.log('CLUMSY. Finer control is worth more than foresight. The lattice is too coarse');
-  console.log('to express the action the player already knows they want.');
+
+const verdict = diagnose(coarse, fine);
+console.log(`VERDICT: ${verdict}`);
+if (verdict === 'CLUMSY') {
+  console.log('Finer control raises absolute reach more than information does. The lattice is');
+  console.log('too coarse to express the action the player already knows they want.');
+} else if (verdict === 'BLIND') {
+  console.log('Foresight nearly closes the gap on the existing lattice and finer control adds');
+  console.log('no reach. The forecast cone is the mechanic.');
+} else if (verdict === 'BOTH, AND NEITHER ALONE') {
+  console.log('Information is worth a great deal and does not finish the job, while finer');
+  console.log('control adds no absolute reach at all. So the auditor\'s objection is HALF');
+  console.log('upheld: the map is not a steering wheel, but it is worth a third of the game,');
+  console.log('and a better steering wheel is measurably worth nothing. What is left over is');
+  console.log('in the interaction between the two shots, which is the thing no stated rule');
+  console.log('has captured -- not an absence of information and not an absence of precision.');
 } else {
-  console.log('NEITHER, AND THAT IS THE RESULT. Neither remedy moves the skill gap by more');
-  console.log('than the noise floor. By the auditor\'s own termination rule this is the point');
-  console.log('at which further revision is sunk cost rather than diligence.');
+  console.log('Neither remedy moves the skill gap by more than the noise floor. By the');
+  console.log('auditor\'s own termination rule this is the point at which further revision is');
+  console.log('sunk cost rather than diligence.');
 }
