@@ -105,3 +105,48 @@ The first eight were proposed with the plan; #2 was replaced by the audit, and
 - **N6 gates on the median persona**, not the mean or the best: *"Gating on the
   mean allows a small group of high-performing personas to mask a game that is
   unplayable for the majority."*
+
+## Standing rules added after Darkmatter's two failed baseline proofs
+
+These are not refinements of this plan's content. They change how any run is
+conducted, and each is the scar of a specific failure in Darkmatter's round two.
+
+- **A GATE MUST PROVE IT CAN FAIL BEFORE IT IS ALLOWED TO PASS.** A pre-registered
+  gate named *"sequencing beats one shot at equal time"* was written
+  `human > single || single < 0.9`. On the run, the clause it was asking about was
+  **false** — 16.3% against 54.7% — and the escape clause was true, so it printed
+  PASS for a condition it was not testing. It also compared a two-shot *policy*
+  against a one-shot *ceiling*. The auditor named the cheaper instrument:
+  *"run the gate against a KNOWN-FAIL dataset... if the gate returns PASS on the
+  known-fail set, the gate is discarded before a single real seed is processed."*
+  Implemented as `runGate` in `foundry/montecarlo/orrery.ts`, which takes a
+  predicate plus two witnesses and **throws** on an unsound gate — because a gate
+  that cannot fail is a broken instrument, not a failing gate, and the two must
+  not be reported through the same channel.
+
+- **A CEILING IS NEVER ITS OWN WITNESS.** The blind-vs-clumsy probe's "perfect
+  foresight" arm read exactly 100.0%, because `max over first shots of (max over
+  second shots)` **is** the global maximum. That is the project's seventh control
+  of that shape. An oracle arm must hold something fixed — here, unchanged naive
+  hands — or it is the ceiling measured against itself.
+
+- **NORMALISING TO A LOCAL CEILING HIDES THE QUESTION YOU ARE ASKING.** Share-of-
+  ceiling is what makes policies comparable *within* a configuration and is
+  exactly what conceals whether a finer configuration reaches a higher absolute
+  score. Report both.
+
+- **THE TERMINATION RULE**, adopted verbatim from the round-two audit, because a
+  project needs a stopping condition it did not choose for itself in the moment:
+  *"You have reached the sunk cost limit when the skill gap — the delta between
+  the best human-statable policy and the ceiling — remains stagnant despite the
+  introduction of new information-density mechanics. If the mechanic is
+  implemented and the share of ceiling for human policies does not move by a
+  margin greater than the noise floor of the simulation, you are no longer
+  designing a game; you are decorating a mathematical impossibility."*
+
+- **EPISTEMIC UNCERTAINTY IS NOT OPERATIONAL SENSITIVITY**, and a forecast only
+  addresses the first. *"If a 1-degree error in the first shot results in a
+  180-degree error in the second, a forecast is merely a high-resolution view of
+  your own inevitable failure. A map is not a steering wheel."* Any observability
+  mechanic is therefore screened against an arm with **perfect information and
+  unchanged hands**, which bounds what any forecast of any fidelity can buy.
