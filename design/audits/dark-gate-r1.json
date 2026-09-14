@@ -1,0 +1,57 @@
+{
+  "name": "dark-gate-r1",
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "at": "2026-09-14T04:20:44.331Z",
+  "provenance": "emitted-after-deliberation",
+  "attempts": [
+    {
+      "pass": 1,
+      "maxTokens": 2500,
+      "finish": "length",
+      "contentChars": 3249,
+      "reasoningChars": 6899
+    },
+    {
+      "pass": 2,
+      "maxTokens": 3900,
+      "finish": "stop",
+      "contentChars": 2916
+    }
+  ],
+  "questions": [
+    {
+      "id": "a",
+      "text": "Showing the player where every action lands is a large amount of information. The gate written to catch over-solving passed at 78.8% of the ceiling against a bar of 85%. Is that bar in the right place, or does a mechanic that takes a naive rule to four fifths of optimal play mean the game is now a lookup rather than a decision?"
+    },
+    {
+      "id": "b",
+      "text": "Pricing a mass drop by its LEVERAGE -- nearer the target body, stronger, dearer -- was chosen because the physics supplies it rather than because it balanced well. Is deriving a price from the mechanic's own physics genuinely more principled than tuning one, or does it just hide a tuned number behind a plausible story?"
+    },
+    {
+      "id": "c",
+      "text": "The screenshot and the simulation independently found the same defect (the budget collapsing the second decision) in the same increment. Does that convergence make the finding stronger, or does it mean one of the two instruments is redundant and I am paying twice for the same coverage?"
+    },
+    {
+      "id": "d",
+      "text": "The target ring is placed by snapping a seeded bearing to a direction the system travels, while leaving the radius alone. I claim this constrains difficulty without choosing the answer. What is the strongest argument that it still leaks the answer?"
+    },
+    {
+      "id": "e",
+      "text": "Four designs failed a pre-registered proof before this one. You gave a termination rule earlier -- stop when the skill gap does not move by more than the noise floor after an information mechanic is added. The gap moved from 16.3% to 78.8%. Does that discharge the rule, or is a design that needed four rebuilds evidence of something the rule does not capture?"
+    },
+    {
+      "id": "f",
+      "text": "The budget failed as a wall and then failed as decoration, and I am sweeping it rather than picking a third value. If no budget satisfies both 'the price changes the answer' and 'the second shot is still a choice', what does that tell you about a single-currency cost on a fourteen-action lattice -- and what would you put in its place?"
+    }
+  ],
+  "result": {
+    "answer_a": "The 85% bar is not the problem; the interaction is. A mechanic that allows a naive rule to reach 80% of the ceiling is only a 'lookup' if the cost of that rule does not force a trade-off. Because K8 failed (9.1% vs 30%), the player is currently performing a lookup: they see the best dot and take it, because the budget is currently too loose to make the 'second-best' dot a viable strategic alternative. The information is high, but the tension is zero.",
+    "answer_b": "It is more principled. Tuning a knob is an arbitrary imposition of difficulty; deriving price from leverage is an imposition of logic. The latter creates a 'natural law' that the player can learn and exploit, whereas the former creates a 'designer's whim' that the player can only endure. The difficulty in physics-based pricing is not in the tuning, but in the discovery of the equilibrium.",
+    "answer_c": "It makes the finding significantly stronger. Redundancy is a waste of resources; convergence is a validation of truth. When the mathematical model (simulation) and the human-interface model (screenshot) independently identify the same structural failure, you have moved from 'observing a bug' to 'identifying a law of the system.' It proves the defect is in the design's DNA, not its skin.",
+    "answer_d": "The strongest argument for leakage is if the snapping algorithm is 'outcome-aware'—that is, if it snaps the ring to a bearing that is not just *possible*, but *optimal* for the current state. If the ring is snapped to a bearing that requires a high-leverage/high-cost action to reach, you haven't leaked the answer, you have merely defined the difficulty. If it snaps to the 'easiest' bearing, you have cheated.",
+    "answer_e": "The rule is discharged. The rule measures the *existence* of a skill gap, not the *elegance* of the path taken to find it. The fact that it took four rebuilds is evidence of 'design friction'—the difficulty of aligning information, physics, and constraints—but it does not invalidate the metric of convergence. The rule worked; the design was simply stubborn.",
+    "answer_f": "It tells you that a single-currency cost is a linear solution to a non-linear problem. On a 14-action lattice where actions have different 'values' (positional change vs. budget consumption), a single scalar cannot capture the multidimensionality of the choice. You should move to an 'Action-Based' budget (e.g., 'You have exactly two shots, regardless of mass') or a 'State-Based' constraint (e.g., 'You cannot exceed X momentum'), which forces the player to manage the physics rather than a ledger.",
+    "change_that_matters_most": "The failure of K8 is the pivot point. The 'Ghost' mechanic solved the information problem, but the budget failure has left the 'decision' problem unsolved. You have built a perfect map, but you have not yet built a reason to care about the fuel.",
+    "verdict": "REVISE"
+  }
+}
