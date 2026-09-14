@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 const url = new URL('../design/dark-sheet.html', import.meta.url).href;
 const out = fileURLToPath(new URL('../design/dark-sheet.png', import.meta.url));
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
-const p = await b.newPage({ viewport: { width: 2020, height: 700 }, deviceScaleFactor: 2 });
+const p = await b.newPage({ viewport: { width: 1420, height: 900 }, deviceScaleFactor: 2 });
 await p.goto(url, { waitUntil: 'networkidle' });
 await p.screenshot({ path: out, fullPage: true });
 await b.close();
