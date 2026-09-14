@@ -409,3 +409,59 @@ export function floorOf(nullPoints: readonly number[]): Floor {
 export function clearsFloor(observed: number, f: Floor, multiple = 2): boolean {
   return observed > f.floor * multiple;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// E13 · A GATE MUST PROVE IT CAN FAIL, BEFORE IT IS ALLOWED TO PASS.
+//
+// This component exists because of a specific defect in this project's own work.
+// A pre-registered gate named "sequencing beats one shot at equal time" was
+// written as:
+//
+//     mean(intuition) > mean(singles) || mean(singles) < 0.9
+//
+// On the run, the clause the gate was ASKING ABOUT was false -- 16.3% against
+// 54.7% -- and the second clause was true, so the gate printed PASS for a
+// condition it was not testing. It was found only by reading the output against
+// the numbers by hand, which is not a method.
+//
+// The independent auditor named the cheaper instrument, and it is the same idea
+// as every negative control in this repository, applied one level up -- to the
+// CHECK rather than to the thing checked:
+//
+//   "Invariant Testing using synthetic edge-case datasets. Before running the
+//    simulation, you must run the gate against a KNOWN-FAIL dataset (where the
+//    predicate is mathematically guaranteed to be false) and a KNOWN-PASS
+//    dataset. If the gate returns PASS on the known-fail set, the gate is
+//    discarded before a single real seed is ever processed."
+//
+// So a gate is not a boolean here. It is a predicate plus two witnesses, and it
+// refuses to be evaluated on real data until it has been seen to fail.
+
+export interface Gate<T> {
+  readonly name: string;
+  readonly predicate: (x: T) => boolean;
+  /** An input on which the predicate MUST be true. */
+  readonly knownPass: T;
+  /** An input on which the predicate MUST be false. This is the load-bearing one. */
+  readonly knownFail: T;
+}
+
+export interface GateResult { readonly name: string; readonly pass: boolean }
+
+/**
+ * Evaluates a gate against real data, but only after the gate has demonstrated
+ * on synthetic witnesses that it can both pass and fail.
+ *
+ * Throws rather than returning false when a gate is unsound: a gate that cannot
+ * fail is not a failing gate, it is a broken instrument, and the two must not
+ * be reported through the same channel.
+ */
+export function runGate<T>(g: Gate<T>, observed: T): GateResult {
+  if (!g.predicate(g.knownPass)) {
+    throw new Error(`gate "${g.name}" is unsound: it returned FALSE on its known-pass witness. The predicate does not match its name.`);
+  }
+  if (g.predicate(g.knownFail)) {
+    throw new Error(`gate "${g.name}" is unsound: it returned TRUE on its known-fail witness. This is the OR-clause defect -- the predicate passes on input where it must not, so a PASS on real data would mean nothing.`);
+  }
+  return { name: g.name, pass: g.predicate(observed) };
+}

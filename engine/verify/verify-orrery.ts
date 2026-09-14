@@ -15,6 +15,7 @@ import {
   LYAPUNOV_HORIZON_STEPS,
   type Lattice,
   type LatticeAction,
+  type Gate,
   type Transpositions,
   antithetic,
   clearsFloor,
@@ -24,6 +25,7 @@ import {
   memoiseByState,
   race,
   resetPrefixCache,
+  runGate,
   settled,
   widthAt,
 } from '../../foundry/montecarlo/orrery.js';
@@ -204,6 +206,45 @@ console.log('── O9 · the forecast cone widens, and is zero when there is no
   // produced.
   const single = cone([cloneUniverse(base)], 0, 160, 40, xyz);
   ok('O9c a single future has ZERO radius throughout', single.every((s) => s.radius < 1e-12), 'the cone reports, it does not decorate');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('');
+console.log('── O10 · a gate must prove it can FAIL before it is allowed to pass ──');
+{
+  interface R { human: number; single: number }
+  // THE ACTUAL DEFECT, REPRODUCED. This is the gate as it was written, verbatim
+  // in shape: an OR clause whose second half passes on input the first half
+  // rejects. On the real run it printed PASS while the condition it named was
+  // false -- 16.3% against 54.7%.
+  const broken: Gate<R> = {
+    name: 'sequencing beats one shot (as originally written)',
+    predicate: (r) => r.human > r.single || r.single < 0.9,
+    knownPass: { human: 0.9, single: 0.4 },
+    knownFail: { human: 0.163, single: 0.547 }, // the real numbers: human LOSES
+  };
+  ok('O10a the OR-clause gate is REJECTED as unsound', throws(() => runGate(broken, { human: 0.5, single: 0.5 })),
+    'it returns TRUE on its known-fail witness');
+
+  // The corrected gate: a ceiling against a ceiling, with no escape clause.
+  const fixed: Gate<R> = {
+    name: 'the 2-shot ceiling exceeds the 1-shot ceiling',
+    predicate: (r) => r.single <= 0.85,
+    knownPass: { human: 0, single: 0.547 },
+    knownFail: { human: 0, single: 0.99 },
+  };
+  ok('O10b the corrected gate is accepted and passes', runGate(fixed, { human: 0.163, single: 0.547 }).pass, 'one shot reaches 54.7%');
+  ok('O10c and it still FAILS on failing data', !runGate(fixed, { human: 0.163, single: 0.95 }).pass, 'a gate that cannot fail is not a gate');
+
+  // A gate whose known-pass witness does not pass is equally broken, in the
+  // other direction: the predicate is stricter than its name.
+  const inverted: Gate<R> = {
+    name: 'a predicate stricter than its name',
+    predicate: (r) => r.single <= 0.1,
+    knownPass: { human: 0, single: 0.547 },
+    knownFail: { human: 0, single: 0.99 },
+  };
+  ok('O10d a gate failing its known-PASS witness is rejected', throws(() => runGate(inverted, { human: 0, single: 0.5 })), 'both witnesses are load-bearing');
 }
 
 console.log('');
