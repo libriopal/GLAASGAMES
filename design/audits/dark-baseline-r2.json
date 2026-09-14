@@ -1,0 +1,46 @@
+{
+  "name": "dark-baseline-r2",
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "at": "2026-09-14T02:27:11.050Z",
+  "provenance": "emitted",
+  "attempts": [
+    {
+      "pass": 1,
+      "maxTokens": 2500,
+      "finish": "stop",
+      "contentChars": 2754,
+      "reasoningChars": 6660
+    }
+  ],
+  "questions": [
+    {
+      "id": "a",
+      "text": "Your prescribed policy -- spin to set momentum, then aim -- was implemented and reached 15.2% of the ceiling against the naive aim-twice policy's 16.3%, both barely above a 9.7% random control. Does that falsify the sequencing pivot, or does it only falsify that particular two-rule policy?"
+    },
+    {
+      "id": "b",
+      "text": "A design with 5.30 bits of move-value entropy, 3.6 live sequences in 196, and agency of 0.842 over inaction, where the best human-statable rule reaches 16% of the ceiling: is that an undiscovered game or a demonstration that this substrate cannot carry a straightforward one?"
+    },
+    {
+      "id": "c",
+      "text": "The author wants to promote the forecast cone from a screened factor to THE hypothesis, on the argument that game two measured a preview-class mechanic moving numbers of this size. What is the strongest reason that reasoning is wrong?"
+    },
+    {
+      "id": "d",
+      "text": "One of my own gates printed PASS for a condition it was not testing, because of an OR clause, and I found it only by reading the output against the numbers. What cheaper instrument catches that class of defect -- a gate whose predicate does not match its name -- before a run rather than after?"
+    },
+    {
+      "id": "e",
+      "text": "Two designs, two failed proofs, and every failure recorded rather than re-tuned. At what point does continuing to revise this game stop being diligence and start being sunk cost, and what measurement would tell me I had reached it?"
+    }
+  ],
+  "result": {
+    "answer_a": "It falsifies the policy, not the pivot. The pivot's success is evidenced by the jump in viability (12.5% to 58.3%); the sequencing structure successfully expanded the reachable state space. The failure of 'Spin + Aim' merely proves that the relationship between the first action and the second is non-linear and non-obvious. If 'Spin + Aim' had outperformed 'Aim Twice,' the pivot would be 'solved.' Because it didn't, the pivot is 'proven to exist but not yet mastered.'",
+    "answer_b": "It is an undiscovered game. A broken substrate produces low entropy (everything is the same) or low agency (nothing matters). Your metrics—high entropy (5.30 bits), high agency (0.842), and a massive gap between the ceiling and human performance—are the classic signatures of a 'deep' system. The substrate is capable of complex behavior; the current interface is simply too coarse for a human to navigate the 'needle' of the 3.6 live sequences without a cognitive bridge.",
+    "answer_c": "The strongest reason is the distinction between **Epistemic Uncertainty** (not knowing where the body will be) and **Operational Sensitivity** (not being able to steer it there). A forecast cone solves for uncertainty. However, if the game's difficulty is driven by the 'butterfly effect'—where a 1-degree error in the first shot results in a 180-degree error in the second—a forecast is merely a high-resolution view of your own inevitable failure. A map is not a steering wheel; if the problem is precision, the forecast is a cosmetic addition, not a mechanical solution.",
+    "answer_d": "Invariant Testing (or Property-Based Testing) using synthetic 'edge-case' datasets. Before running the simulation, you must run the gate against a 'Known-Fail' dataset (where the predicate is mathematically guaranteed to be false) and a 'Known-Pass' dataset. If the gate returns PASS on the 'Known-Fail' set, the gate is discarded before a single real seed is ever processed.",
+    "answer_e": "You have reached the sunk cost limit when the **Skill Gap** (the delta between the best human-statable policy and the ceiling) remains stagnant despite the introduction of new information-density mechanics. If the forecast cone is implemented and the 'Share of Ceiling' for human policies does not move by a margin greater than the noise floor of the simulation, you are no longer designing a game; you are decorating a mathematical impossibility.",
+    "change_that_matters_most": "The pivot proved the game exists. The failure of the policy proved the game is non-intuitive. The next step is the most dangerous: deciding if the player's failure is because they are *blind* (needs a forecast) or because they are *clumsy* (needs continuous control).",
+    "verdict": "REVISE"
+  }
+}

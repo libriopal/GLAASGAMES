@@ -222,6 +222,35 @@ names what would have to be true for it to matter.
 
 ---
 
+## Addendum · what changed in the factor set after the first proof ran
+
+Two of the eight questions above did not survive contact with a measurement, and
+a factor set that survives unchanged was not measuring anything.
+
+**D5 TEMPO was replaced by HORIZON.** The intuition-decay curve
+(`scripts/probe/dark-intuition.ts`) made the shot horizon the measured half of
+tempo: direction of effect is 100% correct within 45° at 30 steps, 95.4% at 120,
+67.6% at 360, 42.6% at 600. Everything in this project had been scored at 360.
+Horizon is also *first* in the pre-registered Lyapunov remedy order, adopted from
+the round-one audit long before there was a reason to reach for it.
+
+**D1's noun level survived, but not for the reason it was proposed.** It was
+proposed as a legibility fix and it is not one — its own human rule reads −0.176
+against a random control of +0.080. What it fixes is *responsiveness*: 9/9 live
+seeds against 0/9 for the band, because a single mass drop cannot move a
+twelve-body system's second moment by a quarter. The band was unreachable, not
+difficult.
+
+**And the framing of D5 changed entirely on the auditor's ruling.** Coverage
+measured 33.7% of the target annulus reachable in one shot and 64.1% in two, and
+the auditor refused to let that be patched: *"It is an admission... pivot the
+objective from aiming to sequencing, where the player uses the first shot to set
+the momentum for a second, more precise intervention."* Darkmatter is a
+sequencing game. That is not a level of a factor; it is which game is being
+screened.
+
+---
+
 ## What the run is entitled to conclude, written before it runs
 
 Negative selection is not positive selection. If these factors fail, the claim is

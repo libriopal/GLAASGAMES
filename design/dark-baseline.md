@@ -169,6 +169,84 @@ carried as unproven rather than as a pass.
 
 ---
 
+---
+
+## Revision 2 · the auditor's pivot, built and measured. Also NOT PROVEN.
+
+The auditor returned **REVISE** and refused the patch: *"It is an admission…
+pivot the objective from aiming to sequencing, where the player uses the first
+shot to set the momentum for a second, more precise intervention."* That is a
+different game, not a fixed one, so it was built and measured as one —
+`scripts/probe/dark-sequence.ts`, 14 actions × 2 shots = **196 sequences**, 120 +
+120 steps, 24 seeds. The metric changed to **share of ceiling**, which is the
+instrument games one and two are gated on, because a rank correlation over a
+single decision degraded to noise on a small sample in r1.
+
+| | |
+|---|---|
+| served by the viability oracle | **14/24** (58.3%, up from 12.5%) |
+| mean ceiling score | 0.842 |
+| **AIM TWICE** — aim, watch, aim again | **16.3%** of ceiling |
+| **SPIN + AIM** — the auditor's own policy | **15.2%** of ceiling |
+| RANDOM — negative control | 9.7% |
+| ONE SHOT ceiling, same total time | 54.7% of the two-shot ceiling |
+| agency over doing nothing | 0.842 |
+| live sequences within 10% of ceiling | 3.6 of 196 |
+| move-value entropy | **5.30 bits** |
+| cost bite | 42.9% |
+
+| gate | verdict | detail |
+|---|---|---|
+| H1 ≥70% served | **FAIL** | 14/24 — better than r1's 3/24, still short |
+| H2 a human policy reaches ≥50% of ceiling | **FAIL** | best of 16.3% / 15.2% |
+| H3 that policy beats random by ≥15 points | **FAIL** | 16.3% vs 9.7% |
+| H4 the 2-shot ceiling exceeds the 1-shot ceiling | PASS | one shot reaches only 54.7% |
+| H5 ≥4 live sequences, and not all | **FAIL** | 3.6 of 196 |
+| H6 entropy ≥4.0 bits | PASS | 5.30 |
+| H7 agency ≥0.30 | PASS | 0.842 |
+| H8 cost changes the answer ≥30% | PASS | 42.9% |
+
+### H4 was written wrong and reported a spurious PASS
+
+The first version read `intuition > singles || singles < 0.9`. On the first run
+the clause it was *asking about* was **false** — 16.3% against 54.7% — and the
+second clause was true, so the gate printed PASS for a condition it was not
+testing. It also compared incomparable things: an intuition-driven two-shot
+*policy* against the best single-shot *ceiling*. Rewritten to put a ceiling
+against a ceiling, it passes for the right reason, and **that is the one thing
+the sequencing pivot demonstrably bought**: one shot reaches only 54.7% of what
+two shots reach over the same total time, which is the coverage result (33.7%
+against 64.1%) restated as a score.
+
+### The finding, and it is not the one anyone wanted
+
+**The auditor's own prescribed policy performed worse than the naive one** —
+15.2% against 16.3%, both barely above a random control at 9.7%. So the pivot is
+not falsified by a bad implementation of it; the specified policy was implemented
+and it does not help.
+
+> **Darkmatter's ceiling is real and rich — 5.30 bits of move-value entropy, 3.6
+> live sequences out of 196, agency 0.842 over doing nothing — and no rule a
+> human can state reaches more than a sixth of it.**
+
+That is the exact inverse of Chemical's preview finding. There, order preview
+bought 31.6 points of agency floor by spending 47 points of solver margin: it
+converted *unreachable ceiling into reachable skill* without creating skill. Here
+roughly **84% of the game is unreachable ceiling**, which is a gap of the size
+Chemical measured a preview-class mechanic capable of moving.
+
+So **D7's forecast cone stops being a factor and becomes the hypothesis.** The
+intuition curve already said direction is knowable and magnitude is not; these
+numbers say the unknowable half is most of the game. Whether showing the cone
+closes a 34-point gap is the next measurement, and it is a measurement rather
+than a decision.
+
+> **Stage 2, revision 2: NOT PROVEN.** Two designs, two failed proofs, both
+> recorded without re-tuning. The baseline is not valid and is not being treated
+> as valid.
+
+---
+
 ## What this baseline does NOT claim
 
 - **It is not a depth result.** Chemical's run ended by recommending it ship as a
