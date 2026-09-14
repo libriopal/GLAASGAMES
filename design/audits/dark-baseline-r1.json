@@ -1,0 +1,52 @@
+{
+  "name": "dark-baseline-r1",
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "at": "2026-09-14T02:08:42.872Z",
+  "provenance": "emitted-after-deliberation",
+  "attempts": [
+    {
+      "pass": 1,
+      "maxTokens": 2500,
+      "finish": "length",
+      "contentChars": 1836,
+      "reasoningChars": 8349
+    },
+    {
+      "pass": 2,
+      "maxTokens": 3400,
+      "finish": "stop",
+      "contentChars": 2849
+    }
+  ],
+  "questions": [
+    {
+      "id": "a",
+      "text": "A published finding was retracted this round because its null model, measured afterwards, sat above it. The null used was an OFF-GRID SINGLE-VERB point -- true novelty zero by construction, but not a member of the reference grid. Is that the right null for a max-of-min novelty estimator, or does it itself understate the floor?"
+    },
+    {
+      "id": "b",
+      "text": "Three gates failed, and the author argues two of them (G1 legibility, G4 live moves) are uninformative BECAUSE the third failed and left only three seeds. Is that a legitimate reading of a failed experiment, or the first step in excusing a bad result?"
+    },
+    {
+      "id": "c",
+      "text": "Fourteen discrete actions cover 33.7% of the target annulus with one shot. Is 'allow a second shot' a design fix, or an admission that a discrete lattice cannot express an aiming game and the objective should change instead?"
+    },
+    {
+      "id": "d",
+      "text": "Direction of effect is intuitive out to 120 steps; magnitude is intuitive at no horizon. That makes the forecast cone load-bearing rather than decorative. But game two measured that showing the player more trades solver margin one-for-one -- it converts unreachable ceiling into reachable skill without creating skill. Is there a way to supply MAGNITUDE that is not just the preview dial again?"
+    },
+    {
+      "id": "e",
+      "text": "The candidate count was derived from the measurement budget: 605 ms per play fixes eight screenable factors, which fixes 32 candidates, plus 8 deliberately unscreenable ones. Is deriving how much to imagine from what can be tested sound discipline, or does it let the instrument decide what may be thought of?"
+    }
+  ],
+  "result": {
+    "answer_a": "The 'off-grid' single-verb point is not just a valid null; it is a superior one. For a max-of-min novelty estimator, the floor is the maximum performance achievable by any single verb within the continuous parameter space. By sampling a point between grid levels, the author effectively measured the 'continuous ceiling' of single-verb actions. This does not understate the floor; it defines it with higher fidelity than a discrete grid would allow. The retraction was a necessary correction of a measurement that had previously used an insufficiently high floor.",
+    "answer_b": "The reading is legitimate. In a cascading experimental failure, if the primary gate (G3) fails to produce a statistically significant sample size, all subsequent metrics derived from that sample (G1, G4) lose their power. To interpret a Spearman correlation of 0.30 over three samples as a meaningful measurement of legibility is a violation of statistical rigor. The author is not excusing a bad result; they are correctly identifying that the experiment failed to produce a result at all.",
+    "answer_c": "It is an admission. The 'One Shot Cannot Aim' finding proves that the current discrete action lattice is mathematically incapable of satisfying a 'single-shot aiming' objective. This is a fundamental mismatch between the action set and the goal. The design must either move to continuous control (which complicates the engine) or, more productively, pivot the objective from 'aiming' to 'sequencing'—where the player uses the first shot to set the momentum for a second, more precise intervention.",
+    "answer_d": "The forecast cone is the correct mechanism. Since magnitude is the source of illegibility (the 'chaos' factor), the player does not need a preview of the *result*, but a preview of the *variance*. Providing a visual representation of the uncertainty cone—the spread of possible landings—converts the 'unreachable' magnitude into a 'calculable risk.' This allows the player to play the probability rather than the physics.",
+    "answer_e": "This is sound discipline. In resource-constrained optimization, the experimental design must be bounded by the measurement budget to ensure that the candidates tested are actually resolvable. Deriving the candidate count from the 605ms/play constraint is a way of ensuring the 'intellectual horizon' of the test is matched to its 'statistical power.' It is not letting the instrument decide what may be thought; it is deciding what can be proven.",
+    "change_that_matters_most": "The baseline is currently attempting to solve a 'One Shot' problem that the data has already falsified. The 'One Shot Cannot Aim' measurement proves that the game, as currently structured, is actually a game of sequence and momentum management, not a game of single-action precision.",
+    "verdict": "REVISE"
+  }
+}
